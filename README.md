@@ -34,7 +34,6 @@ For a full list of configuration options see [config.md](./config.md)
 
 ```yaml
 connectors:
-connectors:
 - type: ethereum
   server:
     port: 5102
