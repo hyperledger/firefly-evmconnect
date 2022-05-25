@@ -1,3 +1,3 @@
 # Changelog
 
-The changelog will be updated on the next release
+[FireFly EVM Connector Releases](https://github.com/hyperledger/firefly-evmconnect/releases)

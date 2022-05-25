@@ -1,0 +1,6 @@
+connectors:
+- type: ethereum
+  server:
+    port: 0
+  ethereum:
+    url: http://localhost:8545
