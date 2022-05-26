@@ -95,6 +95,19 @@ const samplePrepareTXBadMethod = `{
 	"params": []
 }`
 
+const samplePrepareTXBadTo = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "prepare_transaction"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "badness",
+	"gas": 1000000,
+	"method": {"name":"set"},
+	"params": []
+}`
+
 const samplePrepareTXBadParam = `{
 	"ffcapi": {
 		"version": "v1.0.0",
@@ -159,7 +172,7 @@ func TestPrepareTransactionWithEstimate(t *testing.T) {
 
 }
 
-func TestPrepareTransactionWithEstimateFail(t *testing.T) {
+func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 
 	c, mRPC := newTestConnector(t)
 	ctx := context.Background()
@@ -174,6 +187,21 @@ func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXEstimateGas))
 	assert.Regexp(t, "FF23021", err)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Nil(t, iRes)
+
+}
+
+func TestPrepareTransactionWithEstimateFail(t *testing.T) {
+
+	c, mRPC := newTestConnector(t)
+	ctx := context.Background()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
+
+	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXEstimateGas))
+	assert.Regexp(t, "pop", err)
+	assert.Empty(t, reason)
 	assert.Nil(t, iRes)
 
 }
@@ -197,6 +225,18 @@ func TestPrepareTransactionWithBadParam(t *testing.T) {
 
 	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXBadParam))
 	assert.Regexp(t, "FF22030", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+	assert.Nil(t, iRes)
+
+}
+
+func TestPrepareTransactionWithBadTo(t *testing.T) {
+
+	c, _ := newTestConnector(t)
+	ctx := context.Background()
+
+	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXBadTo))
+	assert.Regexp(t, "FF23020", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
 	assert.Nil(t, iRes)
 

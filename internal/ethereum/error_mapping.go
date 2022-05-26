@@ -47,7 +47,6 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 		if strings.Contains(errString, "filter not found") {
 			return ffcapi.ErrorReasonNotFound
 		}
-		return ""
 	case sendRPCMethods:
 		switch {
 		case strings.Contains(errString, "nonce too low"):
@@ -58,8 +57,6 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 			return ffcapi.ErrorReasonTransactionUnderpriced
 		case strings.Contains(errString, "known transaction"):
 			return ffcapi.ErrorKnownTransaction
-		default:
-			return ""
 		}
 	}
 
