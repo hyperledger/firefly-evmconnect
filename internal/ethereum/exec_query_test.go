@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/ffcapi"
@@ -36,13 +37,6 @@ const sampleExecQuery = `{
 	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
 	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
 	"nonce": "222",
-	"method": {
-		"inputs": [],
-		"name":"do",
-		"outputs":[],
-		"stateMutability":"nonpayable",
-		"type":"function"
-	},
 	"method": {
 		"inputs": [
 			{
@@ -108,5 +102,132 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 	assert.JSONEq(t, "null", iRes.(*ffcapi.ExecQueryResponse).Outputs.String())
+
+}
+
+func TestExecQueryBadRevertData(t *testing.T) {
+
+	c, mRPC := newTestConnector(t)
+	ctx := context.Background()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d")
+		}).
+		Return(nil)
+
+	_, reason, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Regexp(t, "FF23022.*0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d", err)
+
+}
+
+func TestExecQueryBadReturnData(t *testing.T) {
+
+	c, mRPC := newTestConnector(t)
+	ctx := context.Background()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d")
+		}).
+		Return(nil)
+
+	_, reason, err := c.execQuery(ctx, []byte(`{
+		"ffcapi": {
+			"version": "v1.0.0",
+			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+			"type": "exec_query"
+		},
+		"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+		"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+		"nonce": "222",
+		"method": {
+			"inputs": [],
+			"name":"set",
+			"outputs":[{"type":"uint256[10]"}],
+			"stateMutability":"nonpayable",
+			"type":"function"
+		},
+		"params": [ ]
+	}`))
+	assert.Empty(t, reason)
+	assert.Regexp(t, "FF23023", err)
+
+}
+
+func TestExecQueryFailCall(t *testing.T) {
+
+	c, mRPC := newTestConnector(t)
+	ctx := context.Background()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
+
+	_, _, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestExecQueryFailBadToAddress(t *testing.T) {
+
+	c, _ := newTestConnector(t)
+	ctx := context.Background()
+
+	_, _, err := c.execQuery(ctx, []byte(`{
+		"ffcapi": {
+			"version": "v1.0.0",
+			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+			"type": "exec_query"
+		},
+		"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+		"to": "wrong",
+		"nonce": "222",
+		"method": {
+			"inputs": [],
+			"name":"set",
+			"outputs":[],
+			"stateMutability":"nonpayable",
+			"type":"function"
+		},
+		"params": [ ]
+	}`))
+	assert.Regexp(t, "FF23020", err)
+
+}
+
+func TestExecQueryFailBadToParams(t *testing.T) {
+
+	c, _ := newTestConnector(t)
+	ctx := context.Background()
+
+	_, _, err := c.execQuery(ctx, []byte(`{
+		"ffcapi": {
+			"version": "v1.0.0",
+			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+			"type": "exec_query"
+		},
+		"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+		"to": "wrong",
+		"nonce": "222",
+		"method": {
+			"inputs": [],
+			"name":"set",
+			"outputs":[],
+			"stateMutability":"nonpayable",
+			"type":"function"
+		},
+		"params": [ "unexpected extra param" ]
+	}`))
+	assert.Regexp(t, "FF22037", err)
+
+}
+
+func TestExecQueryFailBadJSONs(t *testing.T) {
+
+	c, _ := newTestConnector(t)
+	ctx := context.Background()
+
+	_, _, err := c.execQuery(ctx, []byte(`{!!! bad json`))
+	assert.Regexp(t, "invalid", err)
 
 }

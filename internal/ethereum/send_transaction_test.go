@@ -79,6 +79,31 @@ const sampleSendTXBadGasPrice = `{
 	"gasPrice": "not a number"
 }`
 
+const sampleSendTXGasPriceEIP1559 = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "send_transaction"
+	},
+	"from": "0x3088C3B2361e5b12c5270fA0692d2Fa6b29bdB63",
+	"gasPrice": {
+		"maxPriorityFeePerGas": 12345,
+		"maxFeePerGas": "0xffff"
+	}
+}`
+
+const sampleSendTXGasPriceLegacy = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "send_transaction"
+	},
+	"from": "0x3088C3B2361e5b12c5270fA0692d2Fa6b29bdB63",
+	"gasPrice": {
+		"gasPrice": "0xffff"
+	}
+}`
+
 func TestSendTransactionOK(t *testing.T) {
 
 	c, mRPC := newTestConnector(t)
@@ -180,6 +205,45 @@ func TestSendTransactionBadGasPrice(t *testing.T) {
 	assert.Regexp(t, "FF23015", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
 	assert.Nil(t, iRes)
+
+}
+
+func TestSendTransactionGasPriceEIP1559(t *testing.T) {
+
+	c, mRPC := newTestConnector(t)
+	ctx := context.Background()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, int64(65535), tx.MaxFeePerGas.BigInt().Int64())
+			assert.Equal(t, int64(12345), tx.MaxPriorityFeePerGas.BigInt().Int64())
+			return true
+		})).
+		Return(nil)
+
+	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXGasPriceEIP1559))
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.NotNil(t, iRes)
+
+}
+
+func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
+
+	c, mRPC := newTestConnector(t)
+	ctx := context.Background()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, int64(65535), tx.GasPrice.BigInt().Int64())
+			return true
+		})).
+		Return(nil)
+
+	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXGasPriceLegacy))
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.NotNil(t, iRes)
 
 }
 

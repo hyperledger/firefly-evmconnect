@@ -90,11 +90,11 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 	// Match the parameters to the ABI call data for the method.
 	// Note the FireFly ABI decoding package handles formatting errors / translation etc.
+	var callData []byte
 	paramValues, err := method.Inputs.ParseExternalDataCtx(ctx, ethParams)
-	if err != nil {
-		return nil, nil, err
+	if err == nil {
+		callData, err = method.EncodeCallDataCtx(ctx, paramValues)
 	}
-	callData, err := method.EncodeCallDataCtx(ctx, paramValues)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -129,34 +129,4 @@ func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string,
 		Data:     data,
 	}, nil
 
-}
-
-// mapGasPrice handles a variety of inputs from the Transaction Manager policy engine
-//   sending the FFCAPI request. Specifically:
-//   - {"maxFeePerGas": "12345", "maxPriorityFeePerGas": "2345"} - EIP-1559 gas price
-//   - {"gasPrice": "12345"} - legacy gas price
-//   - "12345" - same as  {"gasPrice": "12345"}
-//   - nil - same as {"gasPrice": "0"}
-// Anything else will return an error
-func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, tx *ethsigner.Transaction) error {
-	if input == nil {
-		tx.GasPrice = ethtypes.NewHexInteger64(0)
-		return nil
-	}
-	gasPriceObject := input.JSONObjectNowarn()
-	tx.MaxPriorityFeePerGas = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
-	tx.MaxFeePerGas = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
-	if tx.MaxPriorityFeePerGas.BigInt().Sign() > 0 || tx.MaxFeePerGas.BigInt().Sign() > 0 {
-		log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas)
-		return nil
-	}
-	tx.GasPrice = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("gasPrice"))
-	if tx.GasPrice.BigInt().Sign() == 0 {
-		err := json.Unmarshal(input.Bytes(), &tx.GasPrice)
-		if err != nil {
-			return i18n.NewError(ctx, msgs.MsgGasPriceError, input.String())
-		}
-	}
-	log.L(ctx).Debugf("gasPrice=%s", tx.GasPrice)
-	return nil
 }

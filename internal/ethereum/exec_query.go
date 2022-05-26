@@ -114,15 +114,14 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 	}
 
 	// Parse the data against the outputs
+	var jsonData []byte
 	outputValueTree, err := method.Outputs.DecodeABIDataCtx(ctx, outputData, 0)
+	if err == nil {
+		// Serialize down to JSON, and wrap in a JSONAny
+		jsonData, err = c.serializer.SerializeJSONCtx(ctx, outputValueTree)
+	}
 	if err != nil {
 		log.L(ctx).Warnf("Invalid return data: %s", outputData)
-		return nil, "", i18n.NewError(ctx, msgs.MsgReturnDataInvalid, err)
-	}
-
-	// Serialize down to JSON, and wrap in a JSONAny
-	jsonData, err := c.serializer.SerializeJSONCtx(ctx, outputValueTree)
-	if err != nil {
 		return nil, "", i18n.NewError(ctx, msgs.MsgReturnDataInvalid, err)
 	}
 	return fftypes.JSONAnyPtrBytes(jsonData), "", nil
