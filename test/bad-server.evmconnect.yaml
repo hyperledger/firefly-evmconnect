@@ -1,0 +1,6 @@
+connectors:
+- type: ethereum
+  server:
+    address: :::::::wrong
+  ethereum:
+    url: http://localhost:8545
