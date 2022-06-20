@@ -18,13 +18,14 @@ package ethereum
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -138,12 +139,15 @@ func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXWithGas))
+
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXWithGas), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.PrepareTransactionResponse)
 	assert.Equal(t, int64(1000000), res.Gas.Int64())
 
 }
@@ -163,11 +167,13 @@ func TestPrepareTransactionWithEstimate(t *testing.T) {
 			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
 		})
 
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXEstimateGas))
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXEstimateGas), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.PrepareTransactionResponse)
 	assert.Equal(t, int64(18517) /* 1.5 uplift */, res.Gas.Int64())
 
 }
@@ -184,10 +190,13 @@ func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 		},
 	).Return(nil)
 
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXEstimateGas))
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXEstimateGas), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.Regexp(t, "FF23021", err)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -199,10 +208,13 @@ func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXEstimateGas))
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXEstimateGas), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -211,10 +223,13 @@ func TestPrepareTransactionWithBadMethod(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXBadMethod))
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXBadMethod), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.Regexp(t, "FF23013", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -223,10 +238,13 @@ func TestPrepareTransactionWithBadParam(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXBadParam))
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXBadParam), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.Regexp(t, "FF22030", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -235,22 +253,13 @@ func TestPrepareTransactionWithBadTo(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.prepareTransaction(ctx, []byte(samplePrepareTXBadTo))
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXBadTo), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.Regexp(t, "FF23020", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
-
-}
-
-func TestPrepareTransactionWithBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.prepareTransaction(ctx, []byte("!json"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -259,7 +268,7 @@ func TestMapFFCAPIToEthBadParams(t *testing.T) {
 	c, _ := newTestConnector(t)
 
 	_, _, err := c.prepareCallData(context.Background(), &ffcapi.TransactionInput{
-		Method: "{}",
+		Method: fftypes.JSONAnyPtr("{}"),
 		Params: []*fftypes.JSONAny{fftypes.JSONAnyPtr("!wrong")},
 	})
 	assert.Regexp(t, "FF23014", err)

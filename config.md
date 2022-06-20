@@ -1,8 +1,8 @@
 ---
 layout: default
-title: Configuration Reference
+title: pages.reference
 parent: Reference
-nav_order: 3
+nav_order: 2
 ---
 
 # Configuration Reference
@@ -17,13 +17,40 @@ nav_order: 3
 ---
 
 
-## connectors[]
+## api
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|type|The type of connector|string|`<nil>`
+|address|Listener address for API|`string`|`127.0.0.1`
+|defaultRequestTimeout|Default server-side request timeout for API calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|maxRequestTimeout|Maximum server-side request timeout a caller can request with a Request-Timeout header|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10m`
+|port|Listener port for API|`int`|`5008`
+|publicURL|External address callers should access API over|`string`|`<nil>`
+|readTimeout|The maximum time to wait when reading from an HTTP connection|[`time.Duration`](https://pkg.go.dev/time#Duration)|`15s`
+|shutdownTimeout|The maximum amount of time to wait for any open HTTP requests to finish before shutting down the HTTP server|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|writeTimeout|The maximum time to wait when writing to a HTTP connection|[`time.Duration`](https://pkg.go.dev/time#Duration)|`15s`
 
-## connectors[].ethereum
+## api.tls
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|caFile|The path to the CA file for TLS on this API|`string`|`<nil>`
+|certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
+|clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
+|enabled|Enables or disables TLS on this API|`boolean`|`false`
+|keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
+
+## confirmations
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|blockCacheSize|The maximum number of block headers to keep in the cache|`int`|`1000`
+|blockPollingInterval|How often to poll for new block headers|[`time.Duration`](https://pkg.go.dev/time#Duration)|`3s`
+|notificationQueueLength|Internal queue length for notifying the confirmations manager of new transactions/events|`int`|`50`
+|required|Number of confirmations required to consider a transaction/event final|`int`|`20`
+|staleReceiptTimeout|Duration after which to force a receipt check for a pending transaction|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1m`
+
+## connector
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
@@ -38,20 +65,20 @@ nav_order: 3
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
 |url|URL of JSON/RPC endpoint for the Ethereum node/gateway|string|`<nil>`
 
-## connectors[].ethereum.auth
+## connector.auth
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
 |password|Password|`string`|`<nil>`
 |username|Username|`string`|`<nil>`
 
-## connectors[].ethereum.proxy
+## connector.proxy
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
 |url|Optional HTTP proxy url|string|`<nil>`
 
-## connectors[].ethereum.retry
+## connector.retry
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
@@ -59,27 +86,6 @@ nav_order: 3
 |enabled|Enables retries|`boolean`|`false`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
-
-## connectors[].server
-
-|Key|Description|Type|Default Value|
-|---|-----------|----|-------------|
-|address|Local address for the FFCAPI connector server to listen on|string|`127.0.0.1`
-|port|Port for the FFCAPI connector server to listen on|number|`5102`
-|publicURL|External address callers should access API over|string|`<nil>`
-|readTimeout|The maximum time to wait when reading from an HTTP connection|duration|`15s`
-|shutdownTimeout|The maximum amount of time to wait for any open HTTP requests to finish before shutting down the HTTP server|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
-|writeTimeout|The maximum time to wait when writing to a HTTP connection|duration|`15s`
-
-## connectors[].server.tls
-
-|Key|Description|Type|Default Value|
-|---|-----------|----|-------------|
-|caFile|The path to the CA file for TLS on this API|`string`|`<nil>`
-|certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
-|clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
-|enabled|Enables or disables TLS on this API|`boolean`|`false`
-|keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 
 ## cors
 
@@ -92,6 +98,71 @@ nav_order: 3
 |maxAge|The maximum age a browser should rely on CORS checks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`600`
 |methods| CORS setting to control the allowed methods|`string`|`[GET POST PUT PATCH DELETE]`
 |origins|CORS setting to control the allowed origins|`string`|`[*]`
+
+## eventstreams.defaults
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|batchSize|Default batch size for newly created event streams|`int`|`50`
+|batchTimeout|Default batch timeout for newly created event streams|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5s`
+|blockedRetryDelay|Default blocked retry delay for newly created event streams|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|errorHandling|Default error handling for newly created event streams|'skip' or 'block'|`block`
+|retryTimeout|Default retry timeout for newly created event streams|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|webhookRequestTimeout|Default WebHook request timeout for newly created event streams|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|websocketDistributionMode|Default WebSocket distribution mode for newly created event streams|'load_balance' or 'broadcast'|`load_balance`
+
+## eventstreams.retry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|factor|Factor to increase the delay by, between each retry|`boolean`|`<nil>`
+|initialDelay|Initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|maxDelay|Maximum delay between retries|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+
+## ffcore
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
+|headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
+|idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
+|maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|url|The URL of the FireFly core admin API server to connect to|`string`|`<nil>`
+
+## ffcore.auth
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|password|Password|`string`|`<nil>`
+|username|Username|`string`|`<nil>`
+
+## ffcore.proxy
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|url|Optional HTTP proxy URL to use for the FireFly core admin API server|`string`|`<nil>`
+
+## ffcore.retry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|count|The maximum number of times to retry|`int`|`5`
+|enabled|Enables retries|`boolean`|`false`
+|initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
+|maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
+## ffcore.ws
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|heartbeatInterval|The amount of time to wait between heartbeat signals on the WebSocket connection|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|initialConnectAttempts|The number of attempts FireFly will make to connect to the WebSocket when starting up, before failing|`int`|`5`
+|path|The WebSocket sever URL to which FireFly should connect|WebSocket URL `string`|`/admin/ws`
+|readBufferSize|The size in bytes of the read buffer for the WebSocket connection|[`BytesSize`](https://pkg.go.dev/github.com/docker/go-units#BytesSize)|`16Kb`
+|writeBufferSize|The size in bytes of the write buffer for the WebSocket connection|[`BytesSize`](https://pkg.go.dev/github.com/docker/go-units#BytesSize)|`16Kb`
 
 ## log
 
@@ -124,3 +195,137 @@ nav_order: 3
 |level|Configures the JSON key containing the log level|`string`|`level`
 |message|Configures the JSON key containing the log message|`string`|`message`
 |timestamp|Configures the JSON key containing the timestamp of the log|`string`|`@timestamp`
+
+## manager
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|name|The name of this Transaction Manager, used in operation metadata to track which operations are to be updated|`string`|`<nil>`
+
+## operations
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|errorHistoryCount|The number of historical errors to retain in the operation|`int`|`25`
+|types|The operation types to query in FireFly core, that might have been submitted via this Transaction Manager|string[]|`[blockchain_invoke blockchain_pin_batch token_create_pool]`
+
+## operations.changeListener
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|enabled|Whether to enable the change event listener to detect updates made to operations outside of the FFTM|`boolean`|`<nil>`
+
+## operations.fullScan
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|minimumDelay|The minimum delay between full scans of the FireFly core API, when reconnecting, or recovering from missed events / errors|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5s`
+|pageSize|The page size to use when performing a full scan of the ForeFly core API on startup, or recovery|`int`|`100`
+|startupMaxRetries|The page size to use when performing a full scan of the ForeFly core API on startup, or recovery|`int`|`10`
+
+## persistence
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|type|The type of persistence to use|Only 'leveldb' currently supported|`leveldb`
+
+## persistence.leveldb
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|maxHandles|The maximum number of cached file handles LevelDB should keep open|`int`|`100`
+|path|The path for the LevelDB persistence directory|`string`|`<nil>`
+|syncWrites|Whether to synchronously perform writes to the storage|`boolean`|`true`
+
+## policyengine
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|name|The name of the policy engine to use|`string`|`simple`
+
+## policyengine.simple
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|fixedGasPrice|A fixed gasPrice value/structure to pass to the connector|Raw JSON|`<nil>`
+|warnInterval|The time between warnings when a blockchain transaction has not been allocated a receipt|[`time.Duration`](https://pkg.go.dev/time#Duration)|`15m`
+
+## policyengine.simple.gasOracle
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
+|headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
+|idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
+|maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|method|The HTTP Method to use when invoking the Gas Oracle REST API|`string`|`GET`
+|mode|The gas oracle mode|connector | restapi | disabled|`connector`
+|queryInterval|The minimum interval between queries to the Gas Oracle|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
+|requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|template|REST API Gas Oracle: A go template to execute against the result from the Gas Oracle, to create a JSON block that will be passed as the gas price to the connector|[Go Template](https://pkg.go.dev/text/template) `string`|`<nil>`
+|tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|url|REST API Gas Oracle: The URL of a Gas Oracle REST API to call|`string`|`<nil>`
+
+## policyengine.simple.gasOracle.auth
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|password|Password|`string`|`<nil>`
+|username|Username|`string`|`<nil>`
+
+## policyengine.simple.gasOracle.proxy
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|url|Optional HTTP proxy URL to use for the Gas Oracle REST API|`string`|`<nil>`
+
+## policyengine.simple.gasOracle.retry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|count|The maximum number of times to retry|`int`|`5`
+|enabled|Enables retries|`boolean`|`false`
+|initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
+|maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
+## policyloop
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|interval|Interval at which to invoke the policy engine to evaluate outstanding transactions|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
+
+## webhooks
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|allowPrivateIPs|Whether to allow WebHook URLs that resolve to Private IP address ranges (vs. internet addresses)|`boolean`|`true`
+|connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
+|headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
+|idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
+|maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+
+## webhooks.auth
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|password|Password|`string`|`<nil>`
+|username|Username|`string`|`<nil>`
+
+## webhooks.proxy
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|url|Optional HTTP proxy to use when invoking WebHooks|`string`|`<nil>`
+
+## webhooks.retry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|count|The maximum number of times to retry|`int`|`5`
+|enabled|Enables retries|`boolean`|`false`
+|initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
+|maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`

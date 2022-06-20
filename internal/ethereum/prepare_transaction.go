@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -29,15 +28,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) prepareTransaction(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.PrepareTransactionRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
+func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.TransactionPrepareRequest) (*ffcapi.TransactionPrepareResponse, ffcapi.ErrorReason, error) {
 
 	// Parse the input JSON data, to build the call data
 	callData, method, err := c.prepareCallData(ctx, &req.TransactionInput)
@@ -61,7 +55,7 @@ func (c *ethConnector) prepareTransaction(ctx context.Context, payload []byte) (
 	}
 	log.L(ctx).Infof("Prepared transaction method=%s dataLen=%d gas=%s", method.String(), len(callData), req.Gas.Int())
 
-	return &ffcapi.PrepareTransactionResponse{
+	return &ffcapi.TransactionPrepareResponse{
 		Gas:             req.Gas,
 		TransactionData: ethtypes.HexBytes0xPrefix(callData).String(),
 	}, "", nil
@@ -72,7 +66,7 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 	// Parse the method ABI
 	var method *abi.Entry
-	err := json.Unmarshal([]byte(req.Method), &method)
+	err := json.Unmarshal(req.Method.Bytes(), &method)
 	if err != nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
 	}

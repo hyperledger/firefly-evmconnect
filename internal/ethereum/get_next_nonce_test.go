@@ -18,11 +18,12 @@ package ethereum
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -47,11 +48,13 @@ func TestGetNextNonceOK(t *testing.T) {
 			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
 		})
 
-	iRes, reason, err := c.getNextNonce(ctx, []byte(sampleGetNextNonce))
+	var req ffcapi.NextNonceForSignerRequest
+	err := json.Unmarshal([]byte(sampleGetNextNonce), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.NextNonceForSigner(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.GetNextNonceResponse)
 	assert.Equal(t, int64(12345), res.Nonce.Int64())
 
 }
@@ -64,21 +67,12 @@ func TestGetNextNonceFail(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.getNextNonce(ctx, []byte(sampleGetNextNonce))
+	var req ffcapi.NextNonceForSignerRequest
+	err := json.Unmarshal([]byte(sampleGetNextNonce), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.NextNonceForSigner(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
-
-}
-
-func TestGetNextNonceBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.getNextNonce(ctx, []byte("!json"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }

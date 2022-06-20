@@ -20,20 +20,21 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) NextNonceForSigner(ctx context.Context, req *ffcapi.NextNonceForSignerRequest) (*ffcapi.NextNonceForSignerResponse, ffcapi.ErrorReason, error) {
+func (c *ethConnector) EventListenerVerifyOptions(ctx context.Context, standardOptions *ffcapi.ListenerOptions, customOptions *fftypes.JSONAny) (signature string, options fftypes.JSONAny, err error) {
+	return "", "", nil
+}
 
-	var txnCount ethtypes.HexInteger
-	err := c.backend.Invoke(ctx, &txnCount, "eth_getTransactionCount", req.Signer, "pending")
-	if err != nil {
-		return nil, "", err
-	}
+func (c *ethConnector) EventListenerAdd(ctx context.Context, req *ffcapi.EventListenerAddRequest) (*ffcapi.EventListenerAddResponse, ffcapi.ErrorReason, error) {
+	return nil, "", nil
+}
 
-	return &ffcapi.NextNonceForSignerResponse{
-		Nonce: (*fftypes.FFBigInt)(&txnCount),
-	}, "", nil
+func (c *ethConnector) EventListenerRemove(ctx context.Context, req *ffcapi.EventListenerRemoveRequest) (*ffcapi.EventListenerRemoveResponse, ffcapi.ErrorReason, error) {
+	return nil, "", nil
+}
 
+func (c *ethConnector) NewBlockHashes() <-chan *ffcapi.BlockHashEvent {
+	return nil
 }

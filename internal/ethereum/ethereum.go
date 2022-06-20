@@ -21,13 +21,12 @@ import (
 	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/config"
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-evmconnect/internal/ffconnector"
 	"github.com/hyperledger/firefly-evmconnect/internal/jsonrpc"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 type ethConnector struct {
@@ -36,28 +35,10 @@ type ethConnector struct {
 	gasEstimationFactor *big.Float
 }
 
-func NewEthereumConnector(conf config.Section) ffconnector.Connector {
-	return &ethConnector{}
-}
-
-func (c *ethConnector) HandlerMap() map[ffcapi.RequestType]ffconnector.FFCHandler {
-	return map[ffcapi.RequestType]ffconnector.FFCHandler{
-		ffcapi.RequestTypeCreateBlockListener:  c.createBlockListener,
-		ffcapi.RequestTypeExecQuery:            c.execQuery,
-		ffcapi.RequestTypeGetBlockInfoByHash:   c.getBlockInfoByHash,
-		ffcapi.RequestTypeGetBlockInfoByNumber: c.getBlockInfoByNumber,
-		ffcapi.RequestTypeGetGasPrice:          c.getGasPrice,
-		ffcapi.RequestTypeGetNewBlockHashes:    c.getNewBlockHashes,
-		ffcapi.RequestTypeGetNextNonce:         c.getNextNonce,
-		ffcapi.RequestTypeGetReceipt:           c.getReceipt,
-		ffcapi.RequestTypePrepareTransaction:   c.prepareTransaction,
-		ffcapi.RequestTypeSendTransaction:      c.sendTransaction,
-	}
-}
-
-func (c *ethConnector) Init(ctx context.Context, conf config.Section) error {
+func NewEthereumConnector(ctx context.Context, conf config.Section) (ffcapi.API, error) {
+	c := &ethConnector{}
 	if conf.GetString(ffresty.HTTPConfigURL) == "" {
-		return i18n.NewError(ctx, msgs.MsgMissingBackendURL)
+		return nil, i18n.NewError(ctx, msgs.MsgMissingBackendURL)
 	}
 	c.gasEstimationFactor = big.NewFloat(conf.GetFloat64(ConfigGasEstimationFactor))
 
@@ -72,8 +53,8 @@ func (c *ethConnector) Init(ctx context.Context, conf config.Section) error {
 	case "self_describing":
 		c.serializer.SetFormattingMode(abi.FormatAsSelfDescribingArrays)
 	default:
-		return i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
+		return nil, i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
 	}
 
-	return nil
+	return c, nil
 }

@@ -31,8 +31,6 @@ mocks-$(strip $(1))-$(strip $(2)): ${MOCKERY}
 endef
 
 $(eval $(call makemock, internal/jsonrpc,     Client,    jsonrpcmocks))
-$(eval $(call makemock, internal/ffcserver,   Server,    ffcservermocks))
-$(eval $(call makemock, internal/ffconnector, Connector, ffconnectormocks))
 
 firefly-evmconnect: ${GOFILES}
 		$(VGO) build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v ./evmconnect 

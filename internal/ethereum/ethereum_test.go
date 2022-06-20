@@ -33,10 +33,10 @@ func newTestConnector(t *testing.T) (*ethConnector, *jsonrpcmocks.Client) {
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
 	InitConfig(conf)
-	c := NewEthereumConnector(conf).(*ethConnector)
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
-	err := c.Init(context.Background(), conf)
+	cc, err := NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
+	c := cc.(*ethConnector)
 	c.backend = mRPC
 	return c, mRPC
 
@@ -46,14 +46,15 @@ func TestConnectorInit(t *testing.T) {
 
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
-	c := NewEthereumConnector(conf).(*ethConnector)
 	InitConfig(conf)
-	assert.NotNil(t, c.HandlerMap())
-	ctx := context.Background()
 
-	err := c.Init(ctx, conf)
+	cc, err := NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23025", err)
+
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
+
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.NoError(t, err)
 
 	params := &abi.ParameterArray{
 		{Name: "x", Type: "uint256"},
@@ -63,28 +64,28 @@ func TestConnectorInit(t *testing.T) {
 	assert.NoError(t, err)
 
 	conf.Set(ConfigDataFormat, "map")
-	err = c.Init(ctx, conf)
+	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
-	jv, err := c.serializer.SerializeJSON(cv)
+	jv, err := cc.(*ethConnector).serializer.SerializeJSON(cv)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{"x":"12345","y":"23456"}`, string(jv))
 
 	conf.Set(ConfigDataFormat, "flat_array")
-	err = c.Init(ctx, conf)
+	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
-	jv, err = c.serializer.SerializeJSON(cv)
+	jv, err = cc.(*ethConnector).serializer.SerializeJSON(cv)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `["12345","23456"]`, string(jv))
 
 	conf.Set(ConfigDataFormat, "self_describing")
-	err = c.Init(ctx, conf)
+	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
-	jv, err = c.serializer.SerializeJSON(cv)
+	jv, err = cc.(*ethConnector).serializer.SerializeJSON(cv)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[{"name":"x","type":"uint256","value":"12345"},{"name":"y","type":"uint256","value":"23456"}]`, string(jv))
 
 	conf.Set(ConfigDataFormat, "wrong")
-	err = c.Init(ctx, conf)
+	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23032.*wrong", err)
 
 }

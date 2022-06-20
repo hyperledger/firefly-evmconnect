@@ -1,6 +1,9 @@
-connectors:
-- type: ethereum
-  server:
-    port: 0
-  ethereum:
-    url: http://localhost:8545
+connector:
+  url: http://localhost:8545
+api:
+  port: 0
+manager:
+  name: unit-test
+persistence:
+  leveldb:
+    path: "../test/ldb"

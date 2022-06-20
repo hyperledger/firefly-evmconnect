@@ -19,7 +19,7 @@ package ethereum
 import (
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 type ethRPCMethodCategory int

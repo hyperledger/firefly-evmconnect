@@ -19,9 +19,7 @@ package ethereum
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -29,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 var (
@@ -46,14 +45,7 @@ var (
 	defaultErrorID = defaultError.IDBytes()
 )
 
-func (c *ethConnector) execQuery(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.ExecQueryRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
-
+func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeRequest) (*ffcapi.QueryInvokeResponse, ffcapi.ErrorReason, error) {
 	// Parse the input JSON data, to build the call data
 	callData, method, err := c.prepareCallData(ctx, &req.TransactionInput)
 	if err != nil {
@@ -72,7 +64,7 @@ func (c *ethConnector) execQuery(ctx context.Context, payload []byte) (interface
 		return nil, reason, err
 	}
 
-	return &ffcapi.ExecQueryResponse{
+	return &ffcapi.QueryInvokeResponse{
 		Outputs: outputs,
 	}, "", nil
 

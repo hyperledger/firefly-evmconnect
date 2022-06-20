@@ -17,12 +17,10 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/hyperledger/firefly-evmconnect/mocks/ffcservermocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,16 +47,6 @@ func TestRunOK(t *testing.T) {
 
 }
 
-func TestRunUnknownConnector(t *testing.T) {
-
-	rootCmd.SetArgs([]string{"-f", "../test/unknown-connector.evmconnect.yaml"})
-	defer rootCmd.SetArgs([]string{})
-
-	err := Execute()
-	assert.Regexp(t, "FF23031", err)
-
-}
-
 func TestRunBadConfig(t *testing.T) {
 
 	rootCmd.SetArgs([]string{"-f", "../test/bad-config.evmconnect.yaml"})
@@ -69,7 +57,16 @@ func TestRunBadConfig(t *testing.T) {
 
 }
 
-func TestRunFailStartup(t *testing.T) {
+func TestRunBadConnectorConfig(t *testing.T) {
+	rootCmd.SetArgs([]string{"-f", "../test/bad-connector.evmconnect.yaml"})
+	defer rootCmd.SetArgs([]string{})
+
+	err := Execute()
+	assert.Regexp(t, "FF23025", err)
+
+}
+
+func TestRunBadServerConfig(t *testing.T) {
 	rootCmd.SetArgs([]string{"-f", "../test/bad-server.evmconnect.yaml"})
 	defer rootCmd.SetArgs([]string{})
 
@@ -78,23 +75,11 @@ func TestRunFailStartup(t *testing.T) {
 
 }
 
-func TestRunFailServer(t *testing.T) {
+func TestRunBadConfirmationsConfig(t *testing.T) {
+	rootCmd.SetArgs([]string{"-f", "../test/fail-start.evmconnect.yaml"})
+	defer rootCmd.SetArgs([]string{})
 
-	s := &ffcservermocks.Server{}
-	s.On("Start").Return(fmt.Errorf("pop"))
-	done := make(chan error, 1)
-	runServer(s, done)
-	assert.Regexp(t, <-done, "pop")
-
-}
-
-func TestRunServerReturnErr(t *testing.T) {
-
-	s := &ffcservermocks.Server{}
-	s.On("Start").Return(nil)
-	done := make(chan error, 1)
-	s.On("WaitStopped").Return(fmt.Errorf("pop"))
-	runServer(s, done)
-	assert.Regexp(t, <-done, "pop")
+	err := Execute()
+	assert.Regexp(t, "FF21017", err)
 
 }

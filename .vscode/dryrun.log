@@ -1,0 +1,11 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/pbroadhurst/dev/firefly/firefly-evmconnect'
+go build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=" -tags=prod -tags=prod -v ./evmconnect 
+go get ./evmconnect
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+GOGC=20 /Users/pbroadhurst/go/bin/golangci-lint run -v --timeout 5m
+go test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s
+ 
+go mod tidy
+make: Leaving directory `/Users/pbroadhurst/dev/firefly/firefly-evmconnect'
+ 

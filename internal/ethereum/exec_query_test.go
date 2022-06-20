@@ -18,12 +18,13 @@ package ethereum
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -75,10 +76,13 @@ func TestExecQueryOKResponse(t *testing.T) {
 		}).
 		Return(nil)
 
-	iRes, reason, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.QueryInvoke(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.JSONEq(t, `{"y": "3131961357"}`, iRes.(*ffcapi.ExecQueryResponse).Outputs.String())
+	assert.JSONEq(t, `{"y": "3131961357"}`, res.Outputs.String())
 
 }
 
@@ -98,10 +102,13 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 		}).
 		Return(nil)
 
-	iRes, reason, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.QueryInvoke(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.JSONEq(t, "null", iRes.(*ffcapi.ExecQueryResponse).Outputs.String())
+	assert.JSONEq(t, "null", res.Outputs.String())
 
 }
 
@@ -116,7 +123,10 @@ func TestExecQueryBadRevertData(t *testing.T) {
 		}).
 		Return(nil)
 
-	_, reason, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
 	assert.Regexp(t, "FF23022.*0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d", err)
 
@@ -133,24 +143,28 @@ func TestExecQueryBadReturnData(t *testing.T) {
 		}).
 		Return(nil)
 
-	_, reason, err := c.execQuery(ctx, []byte(`{
-		"ffcapi": {
-			"version": "v1.0.0",
-			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
-			"type": "exec_query"
-		},
-		"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
-		"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
-		"nonce": "222",
-		"method": {
-			"inputs": [],
-			"name":"set",
-			"outputs":[{"type":"uint256[10]"}],
-			"stateMutability":"nonpayable",
-			"type":"function"
-		},
-		"params": [ ]
-	}`))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(`{
+			"ffcapi": {
+				"version": "v1.0.0",
+				"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+				"type": "exec_query"
+			},
+			"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+			"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+			"nonce": "222",
+			"method": {
+				"inputs": [],
+				"name":"set",
+				"outputs":[{"type":"uint256[10]"}],
+				"stateMutability":"nonpayable",
+				"type":"function"
+			},
+			"params": [ ]
+		}`), &req)
+	assert.NoError(t, err)
+
+	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Empty(t, reason)
 	assert.Regexp(t, "FF23023", err)
 
@@ -163,7 +177,10 @@ func TestExecQueryFailCall(t *testing.T) {
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
 
-	_, _, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
 	assert.Regexp(t, "pop", err)
 
 }
@@ -173,7 +190,8 @@ func TestExecQueryFailBadToAddress(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	_, _, err := c.execQuery(ctx, []byte(`{
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(`{
 		"ffcapi": {
 			"version": "v1.0.0",
 			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
@@ -190,7 +208,9 @@ func TestExecQueryFailBadToAddress(t *testing.T) {
 			"type":"function"
 		},
 		"params": [ ]
-	}`))
+	}`), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
 	assert.Regexp(t, "FF23020", err)
 
 }
@@ -200,7 +220,8 @@ func TestExecQueryFailBadToParams(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	_, _, err := c.execQuery(ctx, []byte(`{
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(`{
 		"ffcapi": {
 			"version": "v1.0.0",
 			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
@@ -217,17 +238,9 @@ func TestExecQueryFailBadToParams(t *testing.T) {
 			"type":"function"
 		},
 		"params": [ "unexpected extra param" ]
-	}`))
+	}`), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
 	assert.Regexp(t, "FF22037", err)
-
-}
-
-func TestExecQueryFailBadJSONs(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	_, _, err := c.execQuery(ctx, []byte(`{!!! bad json`))
-	assert.Regexp(t, "invalid", err)
 
 }

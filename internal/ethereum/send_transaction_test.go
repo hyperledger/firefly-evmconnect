@@ -18,12 +18,13 @@ package ethereum
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -119,11 +120,13 @@ func TestSendTransactionOK(t *testing.T) {
 		}).
 		Return(nil)
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTX))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTX), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.SendTransactionResponse)
 	assert.Equal(t, "0x123456", res.TransactionHash)
 
 	mRPC.AssertExpectations(t)
@@ -142,10 +145,13 @@ func TestSendTransactionFail(t *testing.T) {
 		})).
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTX))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTX), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 	mRPC.AssertExpectations(t)
 
@@ -165,10 +171,13 @@ func TestSendTransactionBadFrom(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadFrom))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadFrom), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23019", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -177,10 +186,13 @@ func TestSendTransactionBadTo(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadTo))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadTo), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23020", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -189,10 +201,13 @@ func TestSendTransactionBadData(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadData))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadData), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23018", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -201,10 +216,13 @@ func TestSendTransactionBadGasPrice(t *testing.T) {
 	c, _ := newTestConnector(t)
 	ctx := context.Background()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadGasPrice))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadGasPrice), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23015", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -221,10 +239,13 @@ func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 		})).
 		Return(nil)
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXGasPriceEIP1559))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXGasPriceEIP1559), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.NotNil(t, iRes)
+	assert.NotNil(t, res)
 
 }
 
@@ -240,21 +261,12 @@ func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
 		})).
 		Return(nil)
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXGasPriceLegacy))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXGasPriceLegacy), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.NotNil(t, iRes)
-
-}
-
-func TestSendTransactionBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.sendTransaction(ctx, []byte("!not json!"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.NotNil(t, res)
 
 }

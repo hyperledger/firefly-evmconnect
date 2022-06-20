@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -83,11 +83,13 @@ func TestGetReceiptOkSuccess(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-	iRes, reason, err := c.getReceipt(ctx, []byte(sampleGetReceipt))
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.GetReceiptResponse)
 	assert.True(t, res.Success)
 	assert.Equal(t, int64(1977), res.BlockNumber.Int64())
 	assert.Equal(t, int64(30), res.TransactionIndex.Int64())
@@ -106,10 +108,13 @@ func TestGetReceiptNotFound(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-	iRes, reason, err := c.getReceipt(ctx, []byte(sampleGetReceipt))
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
 	assert.Regexp(t, "FF23012", err)
 	assert.Equal(t, ffcapi.ErrorReasonNotFound, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -121,21 +126,12 @@ func TestGetReceiptError(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.getReceipt(ctx, []byte(sampleGetReceipt))
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, "", reason)
-	assert.Nil(t, iRes)
-
-}
-
-func TestGetReceiptWithBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.getReceipt(ctx, []byte("!json"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }

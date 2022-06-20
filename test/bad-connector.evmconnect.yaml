@@ -1,0 +1,5 @@
+connector: {}
+api:
+  port: 0
+manager:
+  name: unit-test

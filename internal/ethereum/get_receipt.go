@@ -20,11 +20,11 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 // TransactionReceipt is the receipt obtained over JSON/RPC from the ethereum client
@@ -41,17 +41,11 @@ type TransactionReceipt struct {
 	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
 }
 
-func (c *ethConnector) getReceipt(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.GetReceiptRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
+func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
 
 	// Get the receipt in the back-end JSON/RPC format
 	var ethReceipt TransactionReceipt
-	err = c.backend.Invoke(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
+	err := c.backend.Invoke(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
 	if err != nil {
 		return nil, "", err
 	}
@@ -67,12 +61,12 @@ func (c *ethConnector) getReceipt(ctx context.Context, payload []byte) (interfac
 	if ethReceipt.TransactionIndex != nil {
 		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
 	}
-	return &ffcapi.GetReceiptResponse{
+	return &ffcapi.TransactionReceiptResponse{
 		BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
 		TransactionIndex: fftypes.NewFFBigInt(txIndex),
 		BlockHash:        ethReceipt.BlockHash.String(),
 		Success:          isSuccess,
-		ExtraInfo:        *fftypes.JSONAnyPtrBytes(fullReceipt),
+		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
 	}, "", nil
 
 }

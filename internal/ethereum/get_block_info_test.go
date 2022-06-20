@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -88,11 +88,13 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-	iRes, reason, err := c.getBlockInfoByNumber(ctx, []byte(sampleGetBlockInfoByNumber))
+	var req ffcapi.BlockInfoByNumberRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByNumber(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.GetBlockInfoByNumberResponse)
 	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
 	assert.Equal(t, "0x124ca6245d8ddd48203346c2f80b9bc07ce2fcdb8ccb3251b03d8748c1c73b92", res.ParentHash)
 	assert.Equal(t, int64(12345), res.BlockNumber.Int64())
@@ -111,10 +113,13 @@ func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-	iRes, reason, err := c.getBlockInfoByNumber(ctx, []byte(sampleGetBlockInfoByNumber))
+	var req ffcapi.BlockInfoByNumberRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByNumber(ctx, &req)
 	assert.Regexp(t, "FF23011", err)
 	assert.Equal(t, ffcapi.ErrorReasonNotFound, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -126,22 +131,13 @@ func TestGetBlockInfoByNumberFail(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.getBlockInfoByNumber(ctx, []byte(sampleGetBlockInfoByNumber))
+	var req ffcapi.BlockInfoByNumberRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByNumber(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
-
-}
-
-func TestGetBlockInfoByNumberBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.getBlockInfoByNumber(ctx, []byte("!json"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -157,11 +153,13 @@ func TestGetBlockInfoByHashOK(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-	iRes, reason, err := c.getBlockInfoByHash(ctx, []byte(sampleGetBlockInfoByHash))
+	var req ffcapi.BlockInfoByHashRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByHash), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByHash(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.GetBlockInfoByHashResponse)
 	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
 	assert.Equal(t, "0x124ca6245d8ddd48203346c2f80b9bc07ce2fcdb8ccb3251b03d8748c1c73b92", res.ParentHash)
 	assert.Equal(t, int64(12345), res.BlockNumber.Int64())
@@ -180,10 +178,13 @@ func TestGetBlockInfoByHashNotFound(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-	iRes, reason, err := c.getBlockInfoByHash(ctx, []byte(sampleGetBlockInfoByHash))
+	var req ffcapi.BlockInfoByHashRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByHash), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByHash(ctx, &req)
 	assert.Regexp(t, "FF23011", err)
 	assert.Equal(t, ffcapi.ErrorReasonNotFound, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
@@ -195,21 +196,12 @@ func TestGetBlockInfoByHashFail(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.getBlockInfoByHash(ctx, []byte(sampleGetBlockInfoByHash))
+	var req ffcapi.BlockInfoByHashRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByHash), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByHash(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
-
-}
-
-func TestGetBlockInfoByHashBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.getBlockInfoByHash(ctx, []byte("!json"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
