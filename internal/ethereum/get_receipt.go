@@ -27,30 +27,53 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-// TransactionReceipt is the receipt obtained over JSON/RPC from the ethereum client
-type TransactionReceipt struct {
-	BlockHash         *ethtypes.HexBytes0xPrefix `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
-	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
-	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
-	TransactionHash   *ethtypes.HexBytes0xPrefix `json:"transactionHash"`
-	From              *ethtypes.Address0xHex     `json:"from"`
-	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
-	Status            *ethtypes.HexInteger       `json:"status"`
-	To                *ethtypes.Address0xHex     `json:"to"`
-	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
+// txReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
+type txReceiptJSONRPC struct {
+	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash"`
+	BlockNumber       *ethtypes.HexInteger      `json:"blockNumber"`
+	ContractAddress   *ethtypes.Address0xHex    `json:"contractAddress"`
+	CumulativeGasUsed *ethtypes.HexInteger      `json:"cumulativeGasUsed"`
+	From              *ethtypes.Address0xHex    `json:"from"`
+	GasUsed           *ethtypes.HexInteger      `json:"gasUsed"`
+	Logs              []*logJSONRPC             `json:"logs"`
+	Status            *ethtypes.HexInteger      `json:"status"`
+	To                *ethtypes.Address0xHex    `json:"to"`
+	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
+	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
+}
+
+// txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
+type txInfoJSONRPC struct {
+	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
+	BlockNumber      *ethtypes.HexInteger      `json:"blockNumber"` // null if pending
+	From             *ethtypes.Address0xHex    `json:"from"`
+	Gas              *ethtypes.HexInteger      `json:"gas"`
+	GasPrice         *ethtypes.HexInteger      `json:"gasPrice"`
+	Hash             ethtypes.HexBytes0xPrefix `json:"hash"`
+	Input            ethtypes.HexBytes0xPrefix `json:"input"`
+	R                *ethtypes.HexInteger      `json:"r"`
+	S                *ethtypes.HexInteger      `json:"s"`
+	To               *ethtypes.Address0xHex    `json:"to"`
+	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
+	V                *ethtypes.HexInteger      `json:"v"`
+	Value            *ethtypes.HexInteger      `json:"value"`
+}
+
+func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*txInfoJSONRPC, error) {
+	var txInfo *txInfoJSONRPC
+	err := c.backend.Invoke(ctx, &txInfo, "eth_getTransactionByHash", hash)
+	return txInfo, err
 }
 
 func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
 
 	// Get the receipt in the back-end JSON/RPC format
-	var ethReceipt TransactionReceipt
+	var ethReceipt *txReceiptJSONRPC
 	err := c.backend.Invoke(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
 	if err != nil {
 		return nil, "", err
 	}
-	isMined := ethReceipt.BlockHash != nil && ethReceipt.BlockNumber != nil && ethReceipt.BlockNumber.BigInt().Uint64() > 0
-	if !isMined {
+	if ethReceipt == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgReceiptNotAvailable, req.TransactionHash)
 	}
 	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)

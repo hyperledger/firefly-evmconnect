@@ -42,7 +42,7 @@ var (
 			},
 		},
 	}
-	defaultErrorID = defaultError.IDBytes()
+	defaultErrorID = defaultError.FunctionSelectorBytes()
 )
 
 func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeRequest) (*ffcapi.QueryInvokeResponse, ffcapi.ErrorReason, error) {

@@ -19,10 +19,14 @@ package ethereum
 import (
 	"context"
 	"math/big"
+	"sync"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-evmconnect/internal/jsonrpc"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -30,13 +34,39 @@ import (
 )
 
 type ethConnector struct {
-	backend             jsonrpc.Client
-	serializer          *abi.Serializer
-	gasEstimationFactor *big.Float
+	backend              jsonrpc.Client
+	serializer           *abi.Serializer
+	gasEstimationFactor  *big.Float
+	catchupPageSize      int64
+	catchupThreshold     int64
+	checkpointBlockGap   int64
+	retry                *retry.Retry
+	eventBlockTimestamps bool
+	blockListener        *blockListener
+
+	mux          sync.Mutex
+	eventStreams map[fftypes.UUID]*eventStream
+	blockCache   *lru.Cache
 }
 
-func NewEthereumConnector(ctx context.Context, conf config.Section) (ffcapi.API, error) {
-	c := &ethConnector{}
+func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
+	c := &ethConnector{
+		eventStreams:         make(map[fftypes.UUID]*eventStream),
+		catchupPageSize:      conf.GetInt64(EventsCatchupPageSize),
+		catchupThreshold:     conf.GetInt64(EventsCatchupThreshold),
+		checkpointBlockGap:   conf.GetInt64(EventsCheckpointBlockGap),
+		eventBlockTimestamps: conf.GetBool(EventsBlockTimestamps),
+		retry: &retry.Retry{
+			InitialDelay: config.GetDuration(RetryInitDelay),
+			MaximumDelay: config.GetDuration(RetryMaxDelay),
+			Factor:       config.GetFloat64(RetryFactor),
+		},
+	}
+	c.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail)
+	}
+
 	if conf.GetString(ffresty.HTTPConfigURL) == "" {
 		return nil, i18n.NewError(ctx, msgs.MsgMissingBackendURL)
 	}
@@ -55,6 +85,8 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (ffcapi.API,
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
 	}
+
+	c.blockListener = newBlockListener(ctx, c)
 
 	return c, nil
 }

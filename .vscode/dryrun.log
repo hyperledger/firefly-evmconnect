@@ -5,7 +5,6 @@ go get ./evmconnect
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 GOGC=20 /Users/pbroadhurst/go/bin/golangci-lint run -v --timeout 5m
 go test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s
- 
 go mod tidy
 make: Leaving directory `/Users/pbroadhurst/dev/firefly/firefly-evmconnect'
  

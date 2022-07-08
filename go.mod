@@ -4,9 +4,9 @@ go 1.17
 
 require (
 	github.com/go-resty/resty/v2 v2.7.0
-	github.com/hyperledger/firefly-common v0.1.11-0.20220618173558-a825551beb7a
-	github.com/hyperledger/firefly-signer v0.9.10
-	github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220620171116-b21277ba3044
+	github.com/hyperledger/firefly-common v0.1.13
+	github.com/hyperledger/firefly-signer v0.9.11
+	github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220706175544-9e5921ad47f9
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1

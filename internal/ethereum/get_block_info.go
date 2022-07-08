@@ -18,15 +18,17 @@ package ethereum
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-// blockInfoJSONRPC are the fields we parse from the JSON/RPC response
+// blockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
 type blockInfoJSONRPC struct {
 	Number       *ethtypes.HexInteger        `json:"number"`
 	Hash         ethtypes.HexBytes0xPrefix   `json:"hash"`
@@ -46,13 +48,38 @@ func transformBlockInfo(bi *blockInfoJSONRPC, t *ffcapi.BlockInfo) {
 	t.TransactionHashes = stringHashes
 }
 
+func (c *ethConnector) addToBlockCache(blockInfo *blockInfoJSONRPC) {
+	c.blockCache.Add(blockInfo.Hash.String(), blockInfo)
+	c.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
+}
+
+func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int64, expectedHashStr string) (*blockInfoJSONRPC, error) {
+	var blockInfo *blockInfoJSONRPC
+	cached, ok := c.blockCache.Get(strconv.FormatInt(blockNumber, 10))
+	if ok {
+		blockInfo = cached.(*blockInfoJSONRPC)
+		if expectedHashStr != "" && blockInfo.ParentHash.String() != expectedHashStr {
+			log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedHashStr, blockInfo.ParentHash)
+			blockInfo = nil
+		}
+	}
+
+	if blockInfo == nil {
+		err := c.backend.Invoke(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexInteger64(blockNumber), false /* only the txn hashes */)
+		if err != nil || blockInfo == nil {
+			return nil, err
+		}
+		c.addToBlockCache(blockInfo)
+	}
+
+	return blockInfo, nil
+}
+
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockNumber := req.BlockNumber
-	var blockInfo *blockInfoJSONRPC
-	err := c.backend.Invoke(ctx, &blockInfo, "eth_getBlockByNumber", blockNumber, false /* only the txn hashes */)
+	blockInfo, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), req.ExpectedParentHash)
 	if err != nil {
-		return nil, "", err
+		return nil, ffcapi.ErrorReason(""), err
 	}
 	if blockInfo == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
@@ -61,15 +88,31 @@ func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockI
 	res := &ffcapi.BlockInfoByNumberResponse{}
 	transformBlockInfo(blockInfo, &res.BlockInfo)
 	return res, "", nil
+}
 
+func (c *ethConnector) getBlockInfoByHash(ctx context.Context, hash0xString string) (*blockInfoJSONRPC, error) {
+	var blockInfo *blockInfoJSONRPC
+	cached, ok := c.blockCache.Get(hash0xString)
+	if ok {
+		blockInfo = cached.(*blockInfoJSONRPC)
+	}
+
+	if blockInfo == nil {
+		err := c.backend.Invoke(ctx, &blockInfo, "eth_getBlockByHash", hash0xString, false /* only the txn hashes */)
+		if err != nil || blockInfo == nil {
+			return nil, err
+		}
+		c.addToBlockCache(blockInfo)
+	}
+
+	return blockInfo, nil
 }
 
 func (c *ethConnector) BlockInfoByHash(ctx context.Context, req *ffcapi.BlockInfoByHashRequest) (*ffcapi.BlockInfoByHashResponse, ffcapi.ErrorReason, error) {
 
-	var blockInfo *blockInfoJSONRPC
-	err := c.backend.Invoke(ctx, &blockInfo, "eth_getBlockByHash", req.BlockHash, false /* only the txn hashes */)
+	blockInfo, err := c.getBlockInfoByHash(ctx, req.BlockHash)
 	if err != nil {
-		return nil, "", err
+		return nil, ffcapi.ErrorReason(""), err
 	}
 	if blockInfo == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
