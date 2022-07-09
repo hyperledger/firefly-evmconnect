@@ -57,9 +57,9 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		checkpointBlockGap:   conf.GetInt64(EventsCheckpointBlockGap),
 		eventBlockTimestamps: conf.GetBool(EventsBlockTimestamps),
 		retry: &retry.Retry{
-			InitialDelay: config.GetDuration(RetryInitDelay),
-			MaximumDelay: config.GetDuration(RetryMaxDelay),
-			Factor:       config.GetFloat64(RetryFactor),
+			InitialDelay: conf.GetDuration(RetryInitDelay),
+			MaximumDelay: conf.GetDuration(RetryMaxDelay),
+			Factor:       conf.GetFloat64(RetryFactor),
 		},
 	}
 	c.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
@@ -86,7 +86,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		return nil, i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
 	}
 
-	c.blockListener = newBlockListener(ctx, c)
+	c.blockListener = newBlockListener(ctx, c, conf)
 
 	return c, nil
 }

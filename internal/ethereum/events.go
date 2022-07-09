@@ -334,7 +334,7 @@ func (c *ethConnector) doDelay(ctx context.Context, retryCount *int, err error) 
 			break
 		}
 	}
-	log.L(ctx).Errorf("Retrying after %.2s for error (retries=%d): %s", retryDelay.Seconds(), retryCount, err)
+	log.L(ctx).Errorf("Retrying after %.2f for error (retries=%d): %s", retryDelay.Seconds(), retryCount, err)
 	*retryCount++
 	select {
 	case <-time.After(retryDelay):
@@ -369,7 +369,7 @@ func (c *ethConnector) checkCatchup(ctx context.Context, l *listener) bool {
 	headBlock := l.eventStream.headBlock
 	blockGap := headBlock - l.checkpoint.Block
 	l.catchup = blockGap > c.catchupThreshold
-	log.L(ctx).Debugf("Listener %s catchup=%t head=%d gap=%d", l.catchup, headBlock, blockGap)
+	log.L(ctx).Debugf("Listener %s catchup=%t head=%d gap=%d", l.id, l.catchup, headBlock, blockGap)
 	return l.catchup
 }
 
@@ -543,7 +543,7 @@ func (c *ethConnector) decodeLogData(ctx context.Context, event *abi.Entry, topi
 
 func (c *ethConnector) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *txInfoJSONRPC, info *eventInfo) {
 	if len(txInfo.Input) < 4 {
-		log.L(ctx).Debug("No function selector available for TX '%s'", txInfo.Hash)
+		log.L(ctx).Debugf("No function selector available for TX '%s'", txInfo.Hash)
 		return
 	}
 	functionID := txInfo.Input[0:4]

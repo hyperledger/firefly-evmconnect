@@ -27,18 +27,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestConnector(t *testing.T) (*ethConnector, *jsonrpcmocks.Client) {
+func newTestConnector(t *testing.T) (context.Context, func(), *ethConnector, *jsonrpcmocks.Client) {
 
 	mRPC := &jsonrpcmocks.Client{}
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
 	InitConfig(conf)
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
-	cc, err := NewEthereumConnector(context.Background(), conf)
+	conf.Set(BlockPollingInterval, "1h") // Disable for tests that are not using it
+	ctx, done := context.WithCancel(context.Background())
+	cc, err := NewEthereumConnector(ctx, conf)
 	assert.NoError(t, err)
 	c := cc.(*ethConnector)
 	c.backend = mRPC
-	return c, mRPC
+	return ctx, done, c, mRPC
 
 }
 

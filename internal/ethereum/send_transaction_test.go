@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -107,8 +106,8 @@ const sampleSendTXGasPriceLegacy = `{
 
 func TestSendTransactionOK(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -135,8 +134,8 @@ func TestSendTransactionOK(t *testing.T) {
 
 func TestSendTransactionFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -168,8 +167,8 @@ func TestSendErrorMapping(t *testing.T) {
 
 func TestSendTransactionBadFrom(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionSendRequest
 	err := json.Unmarshal([]byte(sampleSendTXBadFrom), &req)
@@ -183,8 +182,8 @@ func TestSendTransactionBadFrom(t *testing.T) {
 
 func TestSendTransactionBadTo(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionSendRequest
 	err := json.Unmarshal([]byte(sampleSendTXBadTo), &req)
@@ -198,8 +197,8 @@ func TestSendTransactionBadTo(t *testing.T) {
 
 func TestSendTransactionBadData(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionSendRequest
 	err := json.Unmarshal([]byte(sampleSendTXBadData), &req)
@@ -213,8 +212,8 @@ func TestSendTransactionBadData(t *testing.T) {
 
 func TestSendTransactionBadGasPrice(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionSendRequest
 	err := json.Unmarshal([]byte(sampleSendTXBadGasPrice), &req)
@@ -228,8 +227,8 @@ func TestSendTransactionBadGasPrice(t *testing.T) {
 
 func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -251,8 +250,8 @@ func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 
 func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {

@@ -48,17 +48,15 @@ type blockListener struct {
 	blockPollingInterval       time.Duration
 }
 
-func newBlockListener(ctx context.Context, c *ethConnector) *blockListener {
+func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) *blockListener {
 	bl := &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		c:                          c,
 		initialBlockHeightObtained: make(chan struct{}),
-		listenLoopDone:             make(chan struct{}),
 		highestBlock:               -1,
 		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
-		blockPollingInterval:       config.GetDuration(BlockPollingInterval),
+		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
 	}
-	go bl.listenLoop()
 	return bl
 }
 
@@ -91,6 +89,14 @@ func (bl *blockListener) listenLoop() {
 	retryCount := 0
 	gapPotential := true
 	for {
+		// Sleep for the polling interval
+		select {
+		case <-time.After(bl.blockPollingInterval):
+		case <-bl.ctx.Done():
+			log.L(bl.ctx).Debugf("Block listener loop stopping")
+			return
+		}
+
 		if filter == nil {
 			err := bl.c.backend.Invoke(bl.ctx, &filter, "eth_newBlockFilter")
 			if err != nil {
@@ -99,7 +105,7 @@ func (bl *blockListener) listenLoop() {
 			}
 		}
 
-		var blockHashes []*ethtypes.HexBytes0xPrefix
+		var blockHashes []ethtypes.HexBytes0xPrefix
 		err := bl.c.backend.Invoke(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
 		if err != nil {
 			if mapError(filterRPCMethods, err) == ffcapi.ErrorReasonNotFound {
@@ -119,7 +125,7 @@ func (bl *blockListener) listenLoop() {
 			switch {
 			case err != nil:
 				log.L(bl.ctx).Debugf("Failed to query block '%s': %s", h, err)
-			case bl == nil:
+			case bi == nil:
 				log.L(bl.ctx).Debugf("Block '%s' no longer available after notification (assuming due to re-org)", h)
 			default:
 				blockHeight := bi.Number.BigInt().Int64()
@@ -143,6 +149,7 @@ func (bl *blockListener) listenLoop() {
 		for _, c := range consumers {
 			select {
 			case c.updates <- update:
+			case <-bl.ctx.Done(): // loop, we're stopping and will exit on next loop
 			case <-c.ctx.Done():
 				log.L(bl.ctx).Debugf("Block update consumer %s closed", c.id)
 				bl.mux.Lock()
@@ -157,14 +164,23 @@ func (bl *blockListener) listenLoop() {
 	}
 }
 
+func (bl *blockListener) checkStartedLocked() {
+	if bl.listenLoopDone == nil {
+		bl.listenLoopDone = make(chan struct{})
+		go bl.listenLoop()
+	}
+}
+
 func (bl *blockListener) addConsumer(c *blockUpdateConsumer) {
 	bl.mux.Lock()
 	defer bl.mux.Unlock()
+	bl.checkStartedLocked()
 	bl.consumers[*c.id] = c
 }
 
 func (bl *blockListener) getHighestBlock() int64 {
 	bl.mux.Lock()
+	bl.checkStartedLocked()
 	highestBlock := bl.highestBlock
 	bl.mux.Unlock()
 	// if not yet initialized, wait to be initialized

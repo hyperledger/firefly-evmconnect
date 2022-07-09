@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -39,8 +38,8 @@ const sampleGetNextNonce = `{
 
 func TestGetNextNonceOK(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
 		Return(nil).
@@ -61,8 +60,8 @@ func TestGetNextNonceOK(t *testing.T) {
 
 func TestGetNextNonceFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
 		Return(fmt.Errorf("pop"))

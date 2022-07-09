@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -69,8 +68,8 @@ const sampleJSONRPCReceipt = `{
 
 func TestGetReceiptOkSuccess(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
 		mock.MatchedBy(func(txHash string) bool {
@@ -98,8 +97,8 @@ func TestGetReceiptOkSuccess(t *testing.T) {
 
 func TestGetReceiptNotFound(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
 		Return(nil).
@@ -120,8 +119,8 @@ func TestGetReceiptNotFound(t *testing.T) {
 
 func TestGetReceiptError(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
 		Return(fmt.Errorf("pop"))

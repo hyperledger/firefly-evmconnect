@@ -17,12 +17,11 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -73,13 +72,13 @@ const sampleBlockJSONRPC = `{
 
 func TestGetBlockInfoByNumberOK(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber",
 		mock.MatchedBy(
-			func(blockNumber *fftypes.FFBigInt) bool {
-				return blockNumber.Int().String() == "12345"
+			func(blockNumber *ethtypes.HexInteger) bool {
+				return blockNumber.BigInt().String() == "12345"
 			}),
 		false).
 		Return(nil).
@@ -103,8 +102,8 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 
 func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
 		Return(nil).
@@ -125,8 +124,8 @@ func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 
 func TestGetBlockInfoByNumberFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
 		Return(fmt.Errorf("pop"))
@@ -143,8 +142,8 @@ func TestGetBlockInfoByNumberFail(t *testing.T) {
 
 func TestGetBlockInfoByHashOK(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", false).
 		Return(nil).
@@ -168,8 +167,8 @@ func TestGetBlockInfoByHashOK(t *testing.T) {
 
 func TestGetBlockInfoByHashNotFound(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
 		Return(nil).
@@ -190,8 +189,8 @@ func TestGetBlockInfoByHashNotFound(t *testing.T) {
 
 func TestGetBlockInfoByHashFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
 		Return(fmt.Errorf("pop"))

@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -39,8 +38,8 @@ const sampleGetGasPrice = `{
 
 func TestGetGasPriceOK(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
 		Return(nil).
@@ -61,8 +60,8 @@ func TestGetGasPriceOK(t *testing.T) {
 
 func TestGetGasPriceFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
 		Return(fmt.Errorf("pop"))

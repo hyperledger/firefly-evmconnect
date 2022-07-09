@@ -137,8 +137,8 @@ const samplePrepareTXBadParam = `{
 
 func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareTXWithGas), &req)
@@ -154,8 +154,8 @@ func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
 func TestPrepareTransactionWithEstimate(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -180,8 +180,8 @@ func TestPrepareTransactionWithEstimate(t *testing.T) {
 
 func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Run(
@@ -202,8 +202,8 @@ func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 
 func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
@@ -220,8 +220,8 @@ func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 
 func TestPrepareTransactionWithBadMethod(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareTXBadMethod), &req)
@@ -235,8 +235,8 @@ func TestPrepareTransactionWithBadMethod(t *testing.T) {
 
 func TestPrepareTransactionWithBadParam(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareTXBadParam), &req)
@@ -250,8 +250,8 @@ func TestPrepareTransactionWithBadParam(t *testing.T) {
 
 func TestPrepareTransactionWithBadTo(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareTXBadTo), &req)
@@ -265,7 +265,8 @@ func TestPrepareTransactionWithBadTo(t *testing.T) {
 
 func TestMapFFCAPIToEthBadParams(t *testing.T) {
 
-	c, _ := newTestConnector(t)
+	_, done, c, _ := newTestConnector(t)
+	defer done()
 
 	_, _, err := c.prepareCallData(context.Background(), &ffcapi.TransactionInput{
 		Method: fftypes.JSONAnyPtr("{}"),

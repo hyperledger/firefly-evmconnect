@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -62,8 +61,8 @@ const sampleExecQuery = `{
 
 func TestExecQueryOKResponse(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -88,8 +87,8 @@ func TestExecQueryOKResponse(t *testing.T) {
 
 func TestExecQueryOKNilResponse(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -114,8 +113,8 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 
 func TestExecQueryBadRevertData(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
 		Run(func(args mock.Arguments) {
@@ -134,8 +133,8 @@ func TestExecQueryBadRevertData(t *testing.T) {
 
 func TestExecQueryBadReturnData(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
 		Run(func(args mock.Arguments) {
@@ -172,8 +171,8 @@ func TestExecQueryBadReturnData(t *testing.T) {
 
 func TestExecQueryFailCall(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, mRPC := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
 
@@ -187,8 +186,8 @@ func TestExecQueryFailCall(t *testing.T) {
 
 func TestExecQueryFailBadToAddress(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(`{
@@ -217,8 +216,8 @@ func TestExecQueryFailBadToAddress(t *testing.T) {
 
 func TestExecQueryFailBadToParams(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, done, c, _ := newTestConnector(t)
+	defer done()
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(`{
