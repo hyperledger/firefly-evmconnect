@@ -653,8 +653,6 @@ github.com/hyperledger/firefly-common v0.1.13 h1:eNK99U9FV43u1F46MM0mPuXT4Xn++or
 github.com/hyperledger/firefly-common v0.1.13/go.mod h1:2NqPi5Ud9H6rSlZXkLbotxW7z4EAD89p3/8oNOpm9Gs=
 github.com/hyperledger/firefly-signer v0.9.11 h1:8YGUl0MjCM3R79PsZ24chks8qLnWpVW08SgyKbcexGI=
 github.com/hyperledger/firefly-signer v0.9.11/go.mod h1:GPQRUZOFOAjkLmg8GDjZUjEdUD0gcar+CSVhwltIwyw=
-github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220711011853-be0a1b12f98e h1:NTOeyPMnJU53ma6356Gzh8B7UT4lGXKR97luAeUG1mU=
-github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220711011853-be0a1b12f98e/go.mod h1:J3zx9z2Zt5AIYUjwx0CpkeyAMYXswriOYkerG5mqA+k=
 github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220711130525-41864b2cad5b h1:OwUbLbHShemiVU1eDxUCSMuYfjihpxwoJw77s4RP6Os=
 github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220711130525-41864b2cad5b/go.mod h1:J3zx9z2Zt5AIYUjwx0CpkeyAMYXswriOYkerG5mqA+k=
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=

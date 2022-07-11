@@ -137,10 +137,10 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 	}
 
 	l := &listener{
-		id:          req.ListenerID,
-		c:           es.c,
-		eventStream: es,
-		hwmBlock:    -1,
+		id:       req.ListenerID,
+		c:        es.c,
+		es:       es,
+		hwmBlock: -1,
 		config: listenerConfig{
 			name:      req.Name,
 			fromBlock: req.FromBlock,
@@ -155,10 +155,20 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 	if err := l.ensureHWM(ctx); err != nil {
 		return nil, err
 	}
+
 	es.updateCount++
 	es.listeners[*req.ListenerID] = l
 
 	return l, nil
+}
+
+func (es *eventStream) startEventListener(l *listener) {
+	readyForLead, removed := l.checkReadyForLeadPackOrRemoved(es.ctx)
+	l.catchup = !readyForLead
+	if l.catchup && !removed {
+		l.catchupLoopDone = make(chan struct{})
+		go l.listenerCatchupLoop()
+	}
 }
 
 func (es *eventStream) removeEventListener(listenerID *fftypes.UUID) {
@@ -177,13 +187,13 @@ func (es *eventStream) removeEventListener(listenerID *fftypes.UUID) {
 }
 
 func (es *eventStream) rejoinLeadGroup(l *listener) {
-	l.eventStream.mux.Lock()
-	defer l.eventStream.mux.Unlock()
-	l.eventStream.updateCount++
+	l.es.mux.Lock()
+	defer l.es.mux.Unlock()
+	l.es.updateCount++
 	l.catchup = false
 }
 
-func (es *eventStream) getStreamListener(lastUpdate *int, ag **aggregatedListener) bool {
+func (es *eventStream) buildReuseLeadGroupListener(lastUpdate *int, ag **aggregatedListener) bool {
 	es.mux.Lock()
 	defer es.mux.Unlock()
 	listenerChanged := false
@@ -210,10 +220,10 @@ func (es *eventStream) leadGroupCatchup() {
 	lastUpdate := -1
 	retryCount := 0
 	for {
-		chainHeadBlock := es.c.blockListener.getHighestBlock()
+		chainHeadBlock := es.c.blockListener.getHighestBlock(es.ctx)
 
 		// Build the aggregated listener list (doesn't matter if it's changed, as we build the list each time)
-		_ = es.getStreamListener(&lastUpdate, &ag)
+		_ = es.buildReuseLeadGroupListener(&lastUpdate, &ag)
 
 		// Determine the earliest block we need to poll from
 		fromBlock := int64(-1)
@@ -231,7 +241,7 @@ func (es *eventStream) leadGroupCatchup() {
 		}
 
 		// Poll in the range for events
-		toBlock := fromBlock + es.c.catchupPageSize
+		toBlock := fromBlock + es.c.catchupPageSize - 1
 		events, err := es.getBlockRangeEvents(es.ctx, ag, fromBlock, toBlock)
 		if err != nil {
 			es.c.doDelay(es.ctx, &retryCount, err)
@@ -240,7 +250,7 @@ func (es *eventStream) leadGroupCatchup() {
 		log.L(es.ctx).Infof("Stream catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
 
 		// Dispatch the events
-		if es.dispatchSetHWMCheckExit(ag, events, toBlock /* hwm is the to block in catchup mode */) {
+		if es.dispatchSetHWMCheckExit(ag, events, toBlock+1 /* hwm is the next block after our poll */) {
 			log.L(es.ctx).Debugf("Stream catchup loop exiting")
 			return
 		}
@@ -259,27 +269,36 @@ func (es *eventStream) streamLoop() {
 	// node to process an excessive amount of logs
 	es.leadGroupCatchup()
 
+	var filter *ethtypes.HexInteger
+	uninstallFilter := func() {
+		var res bool
+		if err := es.c.backend.Invoke(es.ctx, &res, "eth_uninstallFilter", filter); err != nil {
+			log.L(es.ctx).Warnf("Error uninstalling filter '%s': %s", filter, err)
+		}
+		filter = nil
+	}
+	defer uninstallFilter()
+
 	// Then we move into the head mode, where we establish a long-lived filter, and keep polling for changes on it.
 	retryCount := 0
 	filterRPC := ""
 	lastUpdate := -1
 	var ag *aggregatedListener
-	var filter *ethtypes.HexInteger
 	for {
 		// Build the aggregated listener list if it has changed
-		listenerChanged := es.getStreamListener(&lastUpdate, &ag)
+		listenerChanged := es.buildReuseLeadGroupListener(&lastUpdate, &ag)
 
 		// No need to poll for events, if we don't have any listeners
 		if len(ag.signatureSet) > 0 {
+			// High water mark is a point safely behind the head of the chain in this case,
+			// where re-orgs are not expected.
+			hwmBlock := es.c.blockListener.getHighestBlock(es.ctx) - es.c.checkpointBlockGap
+
 			// Re-establish the filter if we need to
 			if filter == nil || listenerChanged {
 				// Uninstall any existing filter
 				if filter != nil {
-					var res bool
-					if err := es.c.backend.Invoke(es.ctx, &res, "eth_newFilter", filter); err != nil {
-						log.L(es.ctx).Warnf("Error uninstalling old filter: %s", err)
-					}
-					filter = nil
+					uninstallFilter()
 				}
 				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new
 				// Determine the earliest block we need to poll from
@@ -323,15 +342,16 @@ func (es *eventStream) streamLoop() {
 				continue
 			}
 
-			// High water mark is a point safely behind the head of the chain in this case,
-			// where re-orgs are not expected.
-			hwmBlock := es.c.blockListener.getHighestBlock() - es.c.checkpointBlockGap
-
 			// Dispatch the events
 			if es.dispatchSetHWMCheckExit(ag, events, hwmBlock) {
 				log.L(es.ctx).Debugf("Stream loop exiting")
 				return
 			}
+
+			// Update the head block to be the hwm block
+			es.mux.Lock()
+			es.headBlock = hwmBlock
+			es.mux.Unlock()
 		}
 
 		// Sleep for the polling interval

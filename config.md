@@ -80,8 +80,9 @@ nav_order: 2
 |---|-----------|----|-------------|
 |blockTimestamps|Whether to include the block timestamps in the event information|`boolean`|`true`
 |catchupPageSize|Number of blocks to query per poll when catching up to the head of the blockchain|`int`|`5000`
-|catchupThreshold|How many blocks behind the chain head an event stream or listener must be on startup, to enter catchup mode|`int`|`500`
+|catchupThreshold|How many blocks behind the chain head an event stream or listener must be on startup, to enter catchup mode|`int`|`5000`
 |checkpointBlockGap|The number of blocks at the head of the chain that should be considered unstable for re-org, such that a checkpoint for an inactive listener should always be this many blocks behind the chain to avoid missing events on restart (in the case a re-org happens that includes new matching events at the head of the chain)|`int`|`50`
+|filterPollingInterval|The interval between polling calls to a filter, when checking for newly arrived events|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
 
 ## connector.proxy
 

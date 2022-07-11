@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-evmconnect/internal/jsonrpc"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
@@ -65,6 +66,10 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 			Factor:       conf.GetFloat64(RetryFactor),
 		},
 	}
+	if c.catchupThreshold < c.catchupPageSize {
+		log.L(ctx).Warnf("Catchup threshold %d must be at least as large as the catchup page size %d (overridden to %d)", c.catchupThreshold, c.catchupPageSize, c.catchupPageSize)
+		c.catchupThreshold = c.catchupPageSize
+	}
 	c.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail)
@@ -77,7 +82,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 
 	c.backend = jsonrpc.NewRPCClient(ffresty.New(ctx, conf))
 
-	c.serializer = abi.NewSerializer()
+	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {
 	case "map":
 		c.serializer.SetFormattingMode(abi.FormatAsObjects)

@@ -75,10 +75,12 @@ const abiTransferFn = `{
 	"type": "function"
 }`
 
+const testHighBlock = 212121
+
 func mockStreamLoopEmpty(mRPC *jsonrpcmocks.Client) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
-		*hbh = *ethtypes.NewHexInteger64(12345)
+		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
 	})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(**ethtypes.HexInteger)
@@ -89,6 +91,9 @@ func mockStreamLoopEmpty(mRPC *jsonrpcmocks.Client) {
 	})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
 	}).Maybe()
 }
 
@@ -122,7 +127,7 @@ func TestEventStreamStartStopOk(t *testing.T) {
 					}`),
 				},
 				Checkpoint: &listenerCheckpoint{
-					Block:            12345, // No catchup required
+					Block:            testHighBlock, // No catchup required
 					TransactionIndex: 123,
 					LogIndex:         0,
 				},
@@ -146,7 +151,7 @@ func TestEventStreamStartStopOk(t *testing.T) {
 		ListenerID: lID,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, int64(12345), r2.Checkpoint.(*listenerCheckpoint).Block)
+	assert.Equal(t, int64(testHighBlock), r2.Checkpoint.(*listenerCheckpoint).Block)
 
 	_, _, err = c.EventStreamStopped(ctx, &ffcapi.EventStreamStoppedRequest{
 		ID: sID,
@@ -282,7 +287,7 @@ func TestEventStreamAddRemoveOk(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, r1)
 
-	r2, _, err := c.EventListenerAdd(ctx, &ffcapi.EventListenerAddRequest{
+	addRequest := &ffcapi.EventListenerAddRequest{
 		StreamID:   sID,
 		ListenerID: lID,
 		Name:       "listener1",
@@ -297,13 +302,17 @@ func TestEventStreamAddRemoveOk(t *testing.T) {
 			}`),
 		},
 		Checkpoint: &listenerCheckpoint{
-			Block:            12345, // No catchup required
+			Block:            testHighBlock, // No catchup required
 			TransactionIndex: 123,
 			LogIndex:         0,
 		},
-	})
+	}
+	r2, _, err := c.EventListenerAdd(ctx, addRequest)
 	assert.NoError(t, err)
 	assert.NotNil(t, r2)
+
+	_, _, err = c.EventListenerAdd(ctx, addRequest)
+	assert.Regexp(t, "FF23038", err) // reject dup
 
 	r3, _, err := c.EventListenerRemove(ctx, &ffcapi.EventListenerRemoveRequest{
 		StreamID:   sID,

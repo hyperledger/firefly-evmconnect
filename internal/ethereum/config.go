@@ -31,7 +31,7 @@ const (
 	EventsCatchupThreshold      = "events.catchupThreshold"
 	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
 	EventsBlockTimestamps       = "events.blockTimestamps"
-	EventsFilterPollingInterval = "event.filterPollingInterval"
+	EventsFilterPollingInterval = "events.filterPollingInterval"
 	RetryInitDelay              = "retry.initialDelay"
 	RetryMaxDelay               = "retry.maxDelay"
 	RetryFactor                 = "retry.factor"
@@ -42,7 +42,7 @@ const (
 	DefaultGasEstimationFactor = 1.5
 
 	DefaultCatchupPageSize          = 5000
-	DefaultEventsCatchupGap         = 500
+	DefaultEventsCatchupThreshold   = 5000
 	DefaultEventsCheckpointBlockGap = 50
 
 	DefaultRetryInitDelay   = "100ms"
@@ -60,7 +60,7 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(EventsBlockTimestamps, true)
 	conf.AddKnownKey(EventsFilterPollingInterval, "1s")
 	conf.AddKnownKey(EventsCatchupPageSize, DefaultCatchupPageSize)
-	conf.AddKnownKey(EventsCatchupThreshold, DefaultEventsCatchupGap)
+	conf.AddKnownKey(EventsCatchupThreshold, DefaultEventsCatchupThreshold)
 	conf.AddKnownKey(EventsCheckpointBlockGap, DefaultEventsCheckpointBlockGap)
 	conf.AddKnownKey(RetryFactor, DefaultRetryDelayFactor)
 	conf.AddKnownKey(RetryInitDelay, DefaultRetryInitDelay)

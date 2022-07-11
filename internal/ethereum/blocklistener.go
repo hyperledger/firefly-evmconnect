@@ -178,7 +178,7 @@ func (bl *blockListener) addConsumer(c *blockUpdateConsumer) {
 	bl.consumers[*c.id] = c
 }
 
-func (bl *blockListener) getHighestBlock() int64 {
+func (bl *blockListener) getHighestBlock(ctx context.Context) int64 {
 	bl.mux.Lock()
 	bl.checkStartedLocked()
 	highestBlock := bl.highestBlock
@@ -187,7 +187,7 @@ func (bl *blockListener) getHighestBlock() int64 {
 	if highestBlock < 0 {
 		select {
 		case <-bl.initialBlockHeightObtained:
-		case <-bl.ctx.Done():
+		case <-ctx.Done():
 		}
 	}
 	bl.mux.Lock()

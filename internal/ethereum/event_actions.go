@@ -43,6 +43,8 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 		listeners:      make(map[fftypes.UUID]*listener),
 		streamLoopDone: make(chan struct{}),
 	}
+
+	chainHead := c.blockListener.getHighestBlock(ctx)
 	for _, lReq := range req.InitialListeners {
 		l, err := es.addEventListener(ctx, lReq)
 		if err != nil {
@@ -50,16 +52,20 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 		}
 		// During initial start we move the "head" block forwards to be the highest of all the initial streams
 		if l.hwmBlock > es.headBlock {
-			es.headBlock = l.hwmBlock
+			if l.hwmBlock > chainHead {
+				es.headBlock = chainHead
+			} else {
+				es.headBlock = l.hwmBlock
+			}
 		}
 	}
 
 	// From this point we consider ourselves started
 	c.eventStreams[*req.ID] = es
 
-	// Now we've calculated our head block, go through and start all the listeners - which might kick off catchup on some of them
+	// Start all the listeners
 	for _, l := range es.listeners {
-		l.start(ctx)
+		es.startEventListener(l)
 	}
 
 	// Start the listener head routine, which reads events for all listeners that are not in catchup mode
@@ -77,8 +83,8 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 
 func (c *ethConnector) EventStreamStopped(ctx context.Context, req *ffcapi.EventStreamStoppedRequest) (*ffcapi.EventStreamStoppedResponse, ffcapi.ErrorReason, error) {
 	c.mux.Lock()
-	defer c.mux.Unlock()
 	es := c.eventStreams[*req.ID]
+	c.mux.Unlock()
 	if es != nil {
 		select {
 		case <-es.ctx.Done():
@@ -86,10 +92,22 @@ func (c *ethConnector) EventStreamStopped(ctx context.Context, req *ffcapi.Event
 		default:
 			return nil, ffcapi.ErrorReason(""), i18n.NewError(ctx, msgs.MsgStreamNotStopped, req.ID)
 		}
-		// Wait for stream loop to complete
-		<-es.streamLoopDone
 	}
+	c.mux.Lock()
 	delete(c.eventStreams, *req.ID)
+	listeners := make([]*listener, 0)
+	for _, l := range es.listeners {
+		listeners = append(listeners, l)
+	}
+	c.mux.Unlock()
+	// Wait for stream loop to complete
+	<-es.streamLoopDone
+	// Wait for any listener catchup loops
+	for _, l := range listeners {
+		if l.catchupLoopDone != nil {
+			<-l.catchupLoopDone
+		}
+	}
 	return &ffcapi.EventStreamStoppedResponse{}, "", nil
 }
 
@@ -125,7 +143,7 @@ func (c *ethConnector) EventListenerAdd(ctx context.Context, req *ffcapi.EventLi
 		return nil, ffcapi.ErrorReason(""), err
 	}
 	// We start this listener straight away
-	l.start(ctx)
+	es.startEventListener(l)
 	return &ffcapi.EventListenerAddResponse{}, ffcapi.ErrorReason(""), nil
 }
 

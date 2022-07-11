@@ -55,14 +55,15 @@ type listenerConfig struct {
 
 // listener is the state we hold in memory for each individual listener that has been added
 type listener struct {
-	id          *fftypes.UUID
-	c           *ethConnector
-	eventStream *eventStream
-	hwmMux      sync.Mutex // Protects checkpoint of an individual listener. May hold ES lock when taking this, must NOT attempt to obtain ES lock while holding this
-	hwmBlock    int64
-	config      listenerConfig
-	removed     bool
-	catchup     bool
+	id              *fftypes.UUID
+	c               *ethConnector
+	es              *eventStream
+	hwmMux          sync.Mutex // Protects checkpoint of an individual listener. May hold ES lock when taking this, must NOT attempt to obtain ES lock while holding this
+	hwmBlock        int64
+	config          listenerConfig
+	removed         bool
+	catchup         bool
+	catchupLoopDone chan struct{}
 }
 
 type logFilterJSONRPC struct {
@@ -74,9 +75,9 @@ type logFilterJSONRPC struct {
 
 type logJSONRPC struct {
 	Removed          bool                        `json:"removed"`
-	LogIndex         *fftypes.FFBigInt           `json:"logIndex"`
-	TransactionIndex *fftypes.FFBigInt           `json:"transactionIndex"`
-	BlockNumber      *fftypes.FFBigInt           `json:"blockNumber"`
+	LogIndex         *ethtypes.HexInteger        `json:"logIndex"`
+	TransactionIndex *ethtypes.HexInteger        `json:"transactionIndex"`
+	BlockNumber      *ethtypes.HexInteger        `json:"blockNumber"`
 	TransactionHash  ethtypes.HexBytes0xPrefix   `json:"transactionHash"`
 	BlockHash        ethtypes.HexBytes0xPrefix   `json:"blockHash"`
 	Address          *ethtypes.Address0xHex      `json:"address"`
@@ -94,13 +95,12 @@ func (cp *listenerCheckpoint) LessThan(b ffcapi.EventListenerCheckpoint) bool {
 
 func (l *listener) getInitialBlock(ctx context.Context, fromBlockInstruction string) (int64, error) {
 	if fromBlockInstruction == ffcapi.FromBlockLatest || fromBlockInstruction == "" {
-		// Get the latest block number to store in the `FromBlock`
-		var fromBlock *fftypes.FFBigInt
-		err := l.c.backend.Invoke(ctx, &fromBlock, "eth_blockNumber")
-		if err != nil {
-			return -1, err // retry indefinitely (only exits if context is cancelled)
+		// Get the latest block number of the chain
+		chainHead := l.c.blockListener.getHighestBlock(ctx)
+		if chainHead < 0 {
+			return -1, i18n.NewError(ctx, msgs.MsgTimedOutQueryingChainHead)
 		}
-		return fromBlock.Int64(), nil
+		return chainHead, nil
 	}
 	num, ok := new(big.Int).SetString(fromBlockInstruction, 0)
 	if !ok {
@@ -120,14 +120,6 @@ func parseListenerOptions(ctx context.Context, o *fftypes.JSONAny) (*listenerOpt
 	return &options, nil
 }
 
-func (l *listener) start(ctx context.Context) {
-	// If the block gap at the point of start is
-	catchup, removed := l.checkCatchupRemoved(ctx)
-	if catchup && !removed {
-		go l.listenerCatchupLoop()
-	}
-}
-
 func (l *listener) ensureHWM(ctx context.Context) error {
 	l.hwmMux.Lock()
 	defer l.hwmMux.Unlock()
@@ -143,16 +135,16 @@ func (l *listener) ensureHWM(ctx context.Context) error {
 	return nil
 }
 
-func (l *listener) checkCatchupRemoved(ctx context.Context) (bool, bool) {
+func (l *listener) checkReadyForLeadPackOrRemoved(ctx context.Context) (bool, bool) {
 	l.hwmMux.Lock()
 	defer l.hwmMux.Unlock()
 	// We do a dirty read of the head block (unless the caller has locked the eventStream Mutex, which
 	// we support in the mutex hierarchy)
-	headBlock := l.eventStream.headBlock
+	headBlock := l.es.headBlock
 	blockGap := headBlock - l.hwmBlock
-	l.catchup = blockGap > l.c.catchupThreshold
-	log.L(ctx).Debugf("Listener %s catchup=%t head=%d gap=%d", l.id, l.catchup, headBlock, blockGap)
-	return l.catchup, l.removed
+	readyForLead := blockGap < l.c.catchupThreshold
+	log.L(ctx).Debugf("Listener %s head=%d gap=%d readyForLead=%t", l.id, headBlock, blockGap, readyForLead)
+	return readyForLead, l.removed
 }
 
 // getHWMCheckpoint gets the point the event polling is up to for this listener.
@@ -184,44 +176,49 @@ func (l *listener) setHWM(hwmBlock int64) {
 // Then it moves this listener into the head-set of listeners, which share a common filter, listening
 // for new events to arrive at the head of the chain.
 func (l *listener) listenerCatchupLoop() {
+	defer close(l.catchupLoopDone)
 
 	// Only filtering on a single listener
-	ctx := log.WithLogField(l.eventStream.ctx, "listener", l.id.String())
-	al := l.eventStream.buildAggregatedListener([]*listener{l})
+	ctx := log.WithLogField(l.es.ctx, "listener", l.id.String())
+	al := l.es.buildAggregatedListener([]*listener{l})
 
 	retryCount := 0
 	for {
-		catchup, removed := l.checkCatchupRemoved(ctx)
+		readyForLead, removed := l.checkReadyForLeadPackOrRemoved(ctx)
 		if removed {
 			log.L(ctx).Infof("Listener removed during catchup")
 			return
 		}
-		if !catchup {
+		if readyForLead {
 			// We're done with catchup for this listener - it can join the main group
-			l.eventStream.rejoinLeadGroup(l)
+			l.es.rejoinLeadGroup(l)
 			log.L(ctx).Infof("Listener completed catchup, and rejoined lead group")
 			return
 		}
 
 		fromBlock := l.hwmBlock
-		toBlock := l.hwmBlock + l.c.catchupPageSize
-		events, err := l.eventStream.getBlockRangeEvents(ctx, al, fromBlock, toBlock)
+		toBlock := l.hwmBlock + l.c.catchupPageSize - 1
+		events, err := l.es.getBlockRangeEvents(ctx, al, fromBlock, toBlock)
 		if err != nil {
-			if l.c.doDelay(l.eventStream.ctx, &retryCount, err) {
+			if l.c.doDelay(l.es.ctx, &retryCount, err) {
 				log.L(ctx).Infof("Listener catchup loop exiting")
 				return
 			}
 			continue
 		}
+		log.L(ctx).Infof("Listener catchup fromBlock=%d toBlock=%d events=%d", fromBlock, toBlock, len(events))
 
 		for _, event := range events {
 			select {
-			case l.eventStream.events <- event:
-			case <-l.eventStream.ctx.Done():
+			case l.es.events <- event:
+			case <-l.es.ctx.Done():
 				log.L(ctx).Infof("Listener catchup loop exiting as stream is stopping")
 				return
 			}
 		}
+		l.hwmMux.Lock()
+		l.hwmBlock = toBlock + 1
+		l.hwmMux.Unlock()
 		retryCount = 0 // Reset on success
 	}
 }
@@ -274,9 +271,9 @@ func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo
 func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool) {
 
 	// Apply a post-filter check to the event
-	blockNumber := ethLog.BlockNumber.Int64()
-	transactionIndex := ethLog.TransactionIndex.Int64()
-	logIndex := ethLog.LogIndex.Int64()
+	blockNumber := ethLog.BlockNumber.BigInt().Int64()
+	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
+	logIndex := ethLog.LogIndex.BigInt().Int64()
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
 	topicMatches := len(ethLog.Topics) > 0 && bytes.Equal(ethLog.Topics[0], f.Topic0)
 	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])

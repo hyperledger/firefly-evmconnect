@@ -41,7 +41,7 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(12345)
 	})
 
-	assert.Equal(t, int64(12345), bl.getHighestBlock())
+	assert.Equal(t, int64(12345), bl.getHighestBlock(bl.ctx))
 	done() // Stop immediately in this case, while we're in the polling interval
 
 	<-bl.listenLoopDone
@@ -59,7 +59,7 @@ func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").
 		Return(fmt.Errorf("pop")).Maybe()
 
-	assert.Equal(t, int64(-1), bl.getHighestBlock())
+	assert.Equal(t, int64(-1), bl.getHighestBlock(bl.ctx))
 
 	<-bl.listenLoopDone
 
