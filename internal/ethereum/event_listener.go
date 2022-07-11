@@ -55,13 +55,14 @@ type listenerConfig struct {
 
 // listener is the state we hold in memory for each individual listener that has been added
 type listener struct {
-	id            *fftypes.UUID
-	c             *ethConnector
-	eventStream   *eventStream
-	checkpointMux sync.Mutex // Protects checkpoint of an individual listener. May hold ES lock when taking this, must NOT attempt to obtain ES lock while holding this
-	checkpoint    *listenerCheckpoint
-	config        listenerConfig
-	catchup       bool
+	id          *fftypes.UUID
+	c           *ethConnector
+	eventStream *eventStream
+	hwmMux      sync.Mutex // Protects checkpoint of an individual listener. May hold ES lock when taking this, must NOT attempt to obtain ES lock while holding this
+	hwmBlock    int64
+	config      listenerConfig
+	removed     bool
+	catchup     bool
 }
 
 type logFilterJSONRPC struct {
@@ -81,6 +82,14 @@ type logJSONRPC struct {
 	Address          *ethtypes.Address0xHex      `json:"address"`
 	Data             ethtypes.HexBytes0xPrefix   `json:"data"`
 	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
+}
+
+func (cp *listenerCheckpoint) LessThan(b ffcapi.EventListenerCheckpoint) bool {
+	bcp := b.(*listenerCheckpoint)
+	return cp.Block < bcp.Block ||
+		(cp.Block == bcp.Block &&
+			(cp.TransactionIndex < bcp.TransactionIndex ||
+				(cp.TransactionIndex == bcp.TransactionIndex && (cp.LogIndex < bcp.LogIndex))))
 }
 
 func (l *listener) getInitialBlock(ctx context.Context, fromBlockInstruction string) (int64, error) {
@@ -113,38 +122,61 @@ func parseListenerOptions(ctx context.Context, o *fftypes.JSONAny) (*listenerOpt
 
 func (l *listener) start(ctx context.Context) {
 	// If the block gap at the point of start is
-	if l.checkCatchup(ctx) {
+	catchup, removed := l.checkCatchupRemoved(ctx)
+	if catchup && !removed {
 		go l.listenerCatchupLoop()
 	}
 }
 
-func (l *listener) ensureCheckpoint(ctx context.Context) error {
-	l.checkpointMux.Lock()
-	defer l.checkpointMux.Unlock()
-	if l.checkpoint == nil {
+func (l *listener) ensureHWM(ctx context.Context) error {
+	l.hwmMux.Lock()
+	defer l.hwmMux.Unlock()
+	if l.hwmBlock < 0 {
 		firstBlock, err := l.getInitialBlock(ctx, l.config.fromBlock)
 		if err != nil {
 			log.L(ctx).Errorf("Failed to initialize listener: %s", err)
 			return err
 		}
-		// Simulate a checkpoint at the configured fromBlock
-		l.checkpoint = &listenerCheckpoint{
-			Block: firstBlock,
-		}
+		// HWM is the configured fromBlock
+		l.hwmBlock = firstBlock
 	}
 	return nil
 }
 
-func (l *listener) checkCatchup(ctx context.Context) bool {
-	l.checkpointMux.Lock()
-	defer l.checkpointMux.Unlock()
+func (l *listener) checkCatchupRemoved(ctx context.Context) (bool, bool) {
+	l.hwmMux.Lock()
+	defer l.hwmMux.Unlock()
 	// We do a dirty read of the head block (unless the caller has locked the eventStream Mutex, which
 	// we support in the mutex hierarchy)
 	headBlock := l.eventStream.headBlock
-	blockGap := headBlock - l.checkpoint.Block
+	blockGap := headBlock - l.hwmBlock
 	l.catchup = blockGap > l.c.catchupThreshold
 	log.L(ctx).Debugf("Listener %s catchup=%t head=%d gap=%d", l.id, l.catchup, headBlock, blockGap)
-	return l.catchup
+	return l.catchup, l.removed
+}
+
+// getHWMCheckpoint gets the point the event polling is up to for this listener.
+// Note this intentionally does not account for dispatched events, as the parent framework ensures that
+// this checkpoint is only persisted when there are no events in-flight pending dispatch for this listener,
+// and the checkpoint for this listener is stale.
+func (l *listener) getHWMCheckpoint() *listenerCheckpoint {
+	l.hwmMux.Lock()
+	defer l.hwmMux.Unlock()
+	if l.hwmBlock < 0 {
+		return nil
+	}
+	// Generate a checkpoint before the first transaction, in the high watermark block
+	return &listenerCheckpoint{
+		Block:            l.hwmBlock,
+		TransactionIndex: -1,
+		LogIndex:         -1,
+	}
+}
+
+func (l *listener) setHWM(hwmBlock int64) {
+	l.hwmMux.Lock()
+	defer l.hwmMux.Unlock()
+	l.hwmBlock = hwmBlock
 }
 
 // listenerCatchupLoop reads pages of blocks at a time, until it gets within the configured catchup-threshold
@@ -159,15 +191,20 @@ func (l *listener) listenerCatchupLoop() {
 
 	retryCount := 0
 	for {
-		if !l.checkCatchup(ctx) {
+		catchup, removed := l.checkCatchupRemoved(ctx)
+		if removed {
+			log.L(ctx).Infof("Listener removed during catchup")
+			return
+		}
+		if !catchup {
 			// We're done with catchup for this listener - it can join the main group
 			l.eventStream.rejoinLeadGroup(l)
 			log.L(ctx).Infof("Listener completed catchup, and rejoined lead group")
 			return
 		}
 
-		fromBlock := l.checkpoint.Block
-		toBlock := l.checkpoint.Block + l.c.catchupPageSize
+		fromBlock := l.hwmBlock
+		toBlock := l.hwmBlock + l.c.catchupPageSize
 		events, err := l.eventStream.getBlockRangeEvents(ctx, al, fromBlock, toBlock)
 		if err != nil {
 			if l.c.doDelay(l.eventStream.ctx, &retryCount, err) {
@@ -176,8 +213,14 @@ func (l *listener) listenerCatchupLoop() {
 			}
 			continue
 		}
+
 		for _, event := range events {
-			l.eventStream.events <- event
+			select {
+			case l.eventStream.events <- event:
+			case <-l.eventStream.ctx.Done():
+				log.L(ctx).Infof("Listener catchup loop exiting as stream is stopping")
+				return
+			}
 		}
 		retryCount = 0 // Reset on success
 	}
@@ -226,7 +269,6 @@ func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo
 		return
 	}
 	info.InputArgs = fftypes.JSONAnyPtrBytes(b)
-	return
 }
 
 func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool) {
@@ -240,15 +282,6 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])
 	if !topicMatches || !addrMatches {
 		log.L(ctx).Debugf("Listener %s skipping event '%s' topicMatches=%t addrMatches=%t", l.id, protoID, topicMatches, addrMatches)
-		return nil, false
-	}
-
-	// If this event is behind the current checkpoint, then we ignore it (higher code layers ensure we always have a checkpoint here).
-	// This is possible because we aggregate together many listeners for JSON/RPC call efficiency, so after restarts or catchup
-	// it's possible for us to replay events on listener1, while finding new events on listener2.
-	afterCheckpoint := blockNumber > l.checkpoint.Block || transactionIndex > l.checkpoint.TransactionIndex || logIndex > l.checkpoint.LogIndex
-	if !afterCheckpoint {
-		log.L(ctx).Debugf("Listener %s skipping event '%s' at or before checkpoint (b=%d,i=%d,l=%d)", l.id, protoID, l.checkpoint.Block, l.checkpoint.TransactionIndex, l.checkpoint.LogIndex)
 		return nil, false
 	}
 
@@ -282,14 +315,12 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	}
 
 	infoBytes, _ := json.Marshal(&info)
-	cp := listenerCheckpoint{
-		Block:            blockNumber,
-		TransactionIndex: transactionIndex,
-		LogIndex:         logIndex,
-	}
-	cpb, _ := json.Marshal(&cp)
 	return &ffcapi.ListenerEvent{
-		Checkpoint: fftypes.JSONAnyPtrBytes(cpb),
+		Checkpoint: &listenerCheckpoint{
+			Block:            blockNumber,
+			TransactionIndex: transactionIndex,
+			LogIndex:         logIndex,
+		},
 		Event: &ffcapi.Event{
 			EventID: ffcapi.EventID{
 				ListenerID:       l.id,

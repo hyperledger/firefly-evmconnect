@@ -44,8 +44,7 @@ nav_order: 2
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|blockCacheSize|The maximum number of block headers to keep in the cache|`int`|`1000`
-|blockPollingInterval|How often to poll for new block headers|[`time.Duration`](https://pkg.go.dev/time#Duration)|`3s`
+|blockQueueLength|Internal queue length for notifying the confirmations manager of new blocks|`int`|`50`
 |notificationQueueLength|Internal queue length for notifying the confirmations manager of new transactions/events|`int`|`50`
 |required|Number of confirmations required to consider a transaction/event final|`int`|`20`
 |staleReceiptTimeout|Duration after which to force a receipt check for a pending transaction|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1m`
@@ -54,6 +53,9 @@ nav_order: 2
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
+|blockCacheSize|Maximum of blocks to hold in the block info cache|`int`|`250`
+|blockCacheTTL|Time to live for the block info cache|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
+|blockPollingInterval|Interval for polling to check for new blocks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
 |connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |dataFormat|Configure the JSON data format for query output and events|map,flat_array,self_describing|`map`
 |expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
@@ -72,6 +74,15 @@ nav_order: 2
 |password|Password|`string`|`<nil>`
 |username|Username|`string`|`<nil>`
 
+## connector.events
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|blockTimestamps|Whether to include the block timestamps in the event information|`boolean`|`true`
+|catchupPageSize|Number of blocks to query per poll when catching up to the head of the blockchain|`int`|`5000`
+|catchupThreshold|How many blocks behind the chain head an event stream or listener must be on startup, to enter catchup mode|`int`|`500`
+|checkpointBlockGap|The number of blocks at the head of the chain that should be considered unstable for re-org, such that a checkpoint for an inactive listener should always be this many blocks behind the chain to avoid missing events on restart (in the case a re-org happens that includes new matching events at the head of the chain)|`int`|`50`
+
 ## connector.proxy
 
 |Key|Description|Type|Default Value|
@@ -84,7 +95,10 @@ nav_order: 2
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
+|factor|The retry backoff factor|`boolean`|`2`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
+|initialDelay|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
+|maxDelay|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
 ## cors
@@ -98,6 +112,12 @@ nav_order: 2
 |maxAge|The maximum age a browser should rely on CORS checks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`600`
 |methods| CORS setting to control the allowed methods|`string`|`[GET POST PUT PATCH DELETE]`
 |origins|CORS setting to control the allowed origins|`string`|`[*]`
+
+## eventstreams
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|checkpointInterval|Regular interval to write checkpoints for an event stream listener that is not actively detecting/delivering events|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1m`
 
 ## eventstreams.defaults
 

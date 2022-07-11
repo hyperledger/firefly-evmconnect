@@ -110,16 +110,14 @@ func parseEventFilters(ctx context.Context, filters []fftypes.JSONAny) (string, 
 func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventListenerAddRequest) (*listener, error) {
 	es.mux.Lock()
 	defer es.mux.Unlock()
-	_, ok := es.listeners[*req.ID]
+	_, ok := es.listeners[*req.ListenerID]
 	if ok {
-		return nil, i18n.NewError(ctx, msgs.MsgListenerAlreadyStarted, req.ID)
+		return nil, i18n.NewError(ctx, msgs.MsgListenerAlreadyStarted, req.ListenerID)
 	}
 
 	var checkpoint *listenerCheckpoint
 	if req.Checkpoint != nil {
-		if err := json.Unmarshal(req.Checkpoint.Bytes(), &checkpoint); err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgInvalidCheckpoint, err)
-		}
+		checkpoint = req.Checkpoint.(*listenerCheckpoint)
 	}
 
 	signature, filters, err := parseEventFilters(ctx, req.Filters)
@@ -134,10 +132,10 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 	}
 
 	l := &listener{
-		id:          req.ID,
+		id:          req.ListenerID,
 		c:           es.c,
 		eventStream: es,
-		checkpoint:  checkpoint,
+		hwmBlock:    -1,
 		config: listenerConfig{
 			name:      req.Name,
 			fromBlock: req.FromBlock,
@@ -146,20 +144,31 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 			signature: signature,
 		},
 	}
-	if err := l.ensureCheckpoint(ctx); err != nil {
+	if checkpoint != nil {
+		l.hwmBlock = checkpoint.Block
+	}
+	if err := l.ensureHWM(ctx); err != nil {
 		return nil, err
 	}
-	es.listeners[*req.ID] = l
+	es.updateCount++
+	es.listeners[*req.ListenerID] = l
 
 	return l, nil
 }
 
-// leadGroupCatchup is called whenever the steam loop restarts, to see how far it is behind the head of the
-// chain and if it's
-func (es *eventStream) leadGroupCatchup() {
+func (es *eventStream) removeEventListener(listenerID *fftypes.UUID) {
+	es.mux.Lock()
+	defer es.mux.Unlock()
 
-	//
-
+	l := es.listeners[*listenerID]
+	if l != nil {
+		es.updateCount++
+		delete(es.listeners, *listenerID)
+		l.hwmMux.Lock()
+		l.removed = true
+		l.hwmMux.Unlock()
+		log.L(es.ctx).Infof("Listener '%s' removed", listenerID)
+	}
 }
 
 func (es *eventStream) rejoinLeadGroup(l *listener) {
@@ -187,19 +196,69 @@ func (es *eventStream) getStreamListener(lastUpdate *int, ag **aggregatedListene
 	return listenerChanged
 }
 
-func (es *eventStream) streamLoop() {
+// leadGroupCatchup is called whenever the steam loop restarts, to see how far it is behind the head of the
+// chain and if it's a way behind then we catch up all this head group as one set (rather than with individual
+// catchup routines as is the case if one listener starts a way behind the pack)
+func (es *eventStream) leadGroupCatchup() {
 
-	lastUpdate := -1
 	var ag *aggregatedListener
-	var filter *ethtypes.HexInteger
+	lastUpdate := -1
+	retryCount := 0
+	for {
+		chainHeadBlock := es.c.blockListener.getHighestBlock()
+
+		// Build the aggregated listener list (doesn't matter if it's changed, as we build the list each time)
+		_ = es.getStreamListener(&lastUpdate, &ag)
+
+		// Determine the earliest block we need to poll from
+		fromBlock := int64(-1)
+		for _, l := range ag.listeners {
+			if fromBlock < 0 || l.hwmBlock < fromBlock {
+				fromBlock = l.hwmBlock
+			}
+		}
+
+		// Check if we're ready to exit catchup mode
+		headGap := (chainHeadBlock - fromBlock)
+		if headGap < es.c.catchupThreshold {
+			log.L(es.ctx).Infof("Stream head is up to date with chain fromBlock=%d chainHead=%d headGap=%d", fromBlock, chainHeadBlock, headGap)
+			return
+		}
+
+		// Poll in the range for events
+		toBlock := fromBlock + es.c.catchupPageSize
+		events, err := es.getBlockRangeEvents(es.ctx, ag, fromBlock, toBlock)
+		if err != nil {
+			es.c.doDelay(es.ctx, &retryCount, err)
+			continue
+		}
+		log.L(es.ctx).Infof("Stream catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
+
+		// Dispatch the events
+		if es.dispatchSetHWMCheckExit(ag, events, toBlock /* hwm is the to block in catchup mode */) {
+			log.L(es.ctx).Debugf("Stream catchup loop exiting")
+			return
+		}
+
+		// Reset retry count for a successful loop
+		retryCount = 0
+	}
+
+}
+
+func (es *eventStream) streamLoop() {
 
 	// When we first start, we might find our leading pack of listeners are all way behind
 	// the head of the chain. So we run a catchup mode loop to ensure we don't ask the blockchain
 	// node to process an excessive amount of logs
+	es.leadGroupCatchup()
 
 	// Then we move into the head mode, where we establish a long-lived filter, and keep polling for changes on it.
 	retryCount := 0
 	filterRPC := ""
+	lastUpdate := -1
+	var ag *aggregatedListener
+	var filter *ethtypes.HexInteger
 	for {
 		// Build the aggregated listener list if it has changed
 		listenerChanged := es.getStreamListener(&lastUpdate, &ag)
@@ -220,8 +279,8 @@ func (es *eventStream) streamLoop() {
 				// Determine the earliest block we need to poll from
 				fromBlock := int64(-1)
 				for _, l := range ag.listeners {
-					if fromBlock < 0 || l.checkpoint.Block < fromBlock {
-						fromBlock = l.checkpoint.Block
+					if fromBlock < 0 || l.hwmBlock < fromBlock {
+						fromBlock = l.hwmBlock
 					}
 				}
 				// Create the new filter
@@ -250,8 +309,45 @@ func (es *eventStream) streamLoop() {
 				es.c.doDelay(es.ctx, &retryCount, err)
 				continue
 			}
+
+			// Enrich the events
+			events, err := es.filterEnrichSort(es.ctx, ag, ethLogs)
+			if err != nil {
+				es.c.doDelay(es.ctx, &retryCount, err)
+				continue
+			}
+
+			// High water mark is a point safely behind the head of the chain in this case,
+			// where re-orgs are not expected.
+			hwmBlock := es.c.blockListener.getHighestBlock() - es.c.checkpointBlockGap
+
+			// Dispatch the events
+			if es.dispatchSetHWMCheckExit(ag, events, hwmBlock) {
+				log.L(es.ctx).Debugf("Stream loop exiting")
+				return
+			}
 		}
 	}
+}
+
+func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ffcapi.ListenerEvents, hwm int64) (exiting bool) {
+
+	// Dispatch the events, updating the in-memory checkpoint for all listeners.
+	for _, event := range events {
+		select {
+		case es.events <- event:
+		case <-es.ctx.Done():
+			return true
+		}
+	}
+
+	// Set the HWM on all the listeners
+	for _, l := range ag.listeners {
+		l.setHWM(hwm)
+	}
+
+	return false
+
 }
 
 func (es *eventStream) buildAggregatedListener(listeners []*listener) *aggregatedListener {
@@ -313,4 +409,16 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 	}
 
 	return es.filterEnrichSort(ctx, ag, ethLogs)
+}
+
+func (es *eventStream) getListenerHWM(ctx context.Context, listenerID *fftypes.UUID) (*ffcapi.EventListenerHWMResponse, ffcapi.ErrorReason, error) {
+	es.mux.Lock()
+	l := es.listeners[*listenerID]
+	es.mux.Unlock()
+	if l == nil {
+		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgListenerNotStarted, listenerID, es.id)
+	}
+	return &ffcapi.EventListenerHWMResponse{
+		Checkpoint: l.getHWMCheckpoint(),
+	}, "", nil
 }

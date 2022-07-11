@@ -47,8 +47,8 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 			return nil, "", err
 		}
 		// During initial start we move the "head" block forwards to be the highest of all the initial streams
-		if l.checkpoint.Block > es.headBlock {
-			es.headBlock = l.checkpoint.Block
+		if l.hwmBlock > es.headBlock {
+			es.headBlock = l.hwmBlock
 		}
 	}
 
@@ -57,8 +57,15 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 		l.start(ctx)
 	}
 
-	// Finally start the listener head routine, which reads events for all listeners that are not in catchup mode
+	// Start the listener head routine, which reads events for all listeners that are not in catchup mode
 	go es.streamLoop()
+
+	// Add the block consumer
+	c.blockListener.addConsumer(&blockUpdateConsumer{
+		id:      es.id,
+		ctx:     req.StreamContext,
+		updates: req.BlockListener,
+	})
 
 	return nil, "", nil
 }
@@ -88,7 +95,7 @@ func (c *ethConnector) EventListenerAdd(ctx context.Context, req *ffcapi.EventLi
 	es := c.eventStreams[*req.StreamID]
 	c.mux.Unlock()
 	if es == nil {
-		return nil, ffcapi.ErrorReason(""), i18n.NewError(ctx, msgs.MsgStreamNotStarted, req.StreamID)
+		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgStreamNotStarted, req.StreamID)
 	}
 	l, err := es.addEventListener(ctx, req)
 	if err != nil {
@@ -100,9 +107,26 @@ func (c *ethConnector) EventListenerAdd(ctx context.Context, req *ffcapi.EventLi
 }
 
 func (c *ethConnector) EventListenerRemove(ctx context.Context, req *ffcapi.EventListenerRemoveRequest) (*ffcapi.EventListenerRemoveResponse, ffcapi.ErrorReason, error) {
-	return nil, "", nil
+	c.mux.Lock()
+	es := c.eventStreams[*req.StreamID]
+	c.mux.Unlock()
+	if es == nil {
+		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgStreamNotStarted, req.StreamID)
+	}
+	es.removeEventListener(req.ListenerID)
+	return &ffcapi.EventListenerRemoveResponse{}, ffcapi.ErrorReason(""), nil
+}
+
+func (c *ethConnector) EventStreamNewCheckpointStruct() ffcapi.EventListenerCheckpoint {
+	return &listenerCheckpoint{}
 }
 
 func (c *ethConnector) EventListenerHWM(ctx context.Context, req *ffcapi.EventListenerHWMRequest) (*ffcapi.EventListenerHWMResponse, ffcapi.ErrorReason, error) {
-	return nil, "", nil
+	c.mux.Lock()
+	es := c.eventStreams[*req.StreamID]
+	c.mux.Unlock()
+	if es == nil {
+		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgStreamNotStarted, req.StreamID)
+	}
+	return es.getListenerHWM(ctx, req.ListenerID)
 }

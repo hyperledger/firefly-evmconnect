@@ -8,7 +8,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This program built for i386-apple-darwin11.3.0
  
 
-# Make data base, printed on Thu Jun 30 12:00:31 2022
+# Make data base, printed on Sun Jul 10 17:06:41 2022
 
 # Variables
 
@@ -27,6 +27,7 @@ VSCODE_LOG_NATIVE = false
 # makefile
 CURDIR := /Users/pbroadhurst/dev/firefly/firefly-evmconnect
 # makefile
+ 
 SHELL = /bin/sh
 # environment
 VSCODE_NLS_CONFIG = {"locale":"en-us","availableLanguages":{},"_languagePackSupport":true}
@@ -43,7 +44,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 INFOPATH = /opt/homebrew/share/info:
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/tb/b88h058x6675g5g_dkgsy8jm0000gn/T/vscode-ipc-45427221-2991-40c7-b77b-2ebd0981ac62.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/tb/b88h058x6675g5g_dkgsy8jm0000gn/T/vscode-ipc-cd00aff8-6c26-45cc-b9a7-c2c57ba45195.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -60,8 +61,6 @@ LINT := /Users/pbroadhurst/go/bin/golangci-lint
 MOCKERY := /Users/pbroadhurst/go/bin/mockery
 # environment
 GOPATH = /Users/pbroadhurst/go
-# environment
-LaunchInstanceID = CE51ADA8-252F-4D64-AAAD-60D4189A855D
 # environment
 VSCODE_LOG_STACK = false
 # environment
@@ -93,7 +92,7 @@ MAKEFILEPATH = $(shell /usr/bin/xcode-select -print-path 2>/dev/null || echo /De
 # makefile (from `Makefile', line 9)
 GOGC = 30
 # environment
-VSCODE_CODE_CACHE_PATH = /Users/pbroadhurst/Library/Application Support/Code/CachedData/4af164ea3a06f701fe3e89a2bcbb421d2026b68f
+VSCODE_CODE_CACHE_PATH = /Users/pbroadhurst/Library/Application Support/Code/CachedData/30d9c6cd9483b2cc586687151bcbcd635f373630
 # environment
 LOGNAME = pbroadhurst
 # environment
@@ -139,7 +138,7 @@ TMPDIR = /var/folders/tb/b88h058x6675g5g_dkgsy8jm0000gn/T/
 # automatic
 *F = $(notdir $*)
 # environment
-VSCODE_IPC_HOOK = /Users/pbroadhurst/Library/Application Support/Code/1.68.0-main.sock
+VSCODE_IPC_HOOK = /Users/pbroadhurst/Library/Application Support/Code/1.68.1-main.sock
 # makefile
 MAKEFLAGS = Rrqp
 # environment
@@ -147,7 +146,7 @@ MFLAGS = -Rrqp
 # automatic
 *D = $(patsubst %/,%,$(dir $*))
 # environment
-XPC_SERVICE_NAME = application.com.microsoft.VSCode.22333126.22333132
+XPC_SERVICE_NAME = application.com.microsoft.VSCode.25727244.25727250
 # environment
 HOMEBREW_PREFIX = /opt/homebrew
 # automatic
@@ -170,8 +169,6 @@ VGO = go
 PAGER = less
 # environment
 LC_ALL = C
-# environment
-SECURITYSESSIONID = 186b1
 # automatic
 ^F = $(notdir $^)
 # default
@@ -179,7 +176,7 @@ SUFFIXES :=
 # default
 .INCLUDE_DIRS = /usr/local/include
 # makefile (from `Makefile', line 2)
-GOFILES := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/events.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
+GOFILES := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/blocklistener.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/retry_delay.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/blocklistener_test.go internal/ethereum/event_actions.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
 # environment
 MAKELEVEL := 0
 # environment
@@ -187,9 +184,9 @@ GPG_TTY = not a tty
 # environment
 LANG = C
 # environment
-VSCODE_PID = 610
+VSCODE_PID = 67243
 # variable set hash-table stats:
-# Load=86/1024=8%, Rehash=0, Collisions=2/129=2%
+# Load=84/1024=8%, Rehash=0, Collisions=2/127=2%
 
 # Pattern-specific Variable Values
 
@@ -210,7 +207,7 @@ VSCODE_PID = 610
 # Not a target:
 internal/msgs/en_error_messges.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-29 19:44:45
+#  Last modified 2022-07-10 12:48:30
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -228,6 +225,15 @@ internal/msgs/en_error_messges.go:
 cmd/config_docs_generate_test.go:
 #  Implicit rule search has been done.
 #  Last modified 2022-05-24 22:56:30
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+internal/ethereum/blocklistener_test.go:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-09 17:34:03
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -262,7 +268,7 @@ internal/ethereum/prepare_transaction.go:
 # Not a target:
 internal/ethereum/get_next_nonce_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:47:08
+#  Last modified 2022-07-09 16:20:47
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -281,8 +287,8 @@ all: build test go-mod-tidy
 internal/ethereum/error_mapping.go:
 #  Implicit rule search has been done.
 #  Last modified 2022-06-20 11:55:36
- 
 #  File has been updated.
+ 
 #  Successfully updated.
 # variable set hash-table stats:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
@@ -290,7 +296,16 @@ internal/ethereum/error_mapping.go:
 # Not a target:
 internal/ethereum/send_transaction_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:51:33
+#  Last modified 2022-07-09 16:21:46
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+internal/ethereum/event_stream.go:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-10 16:33:18
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -316,7 +331,7 @@ go-mod-tidy: .ALWAYS
 # Not a target:
 internal/ethereum/get_block_info_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:54:39
+#  Last modified 2022-07-09 16:39:03
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -364,9 +379,9 @@ Makefile:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 # Not a target:
-internal/ethereum/events.go:
+internal/ethereum/retry_delay.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-29 22:59:24
+#  Last modified 2022-07-10 12:15:50
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -383,7 +398,16 @@ test: deps lint
 # Not a target:
 internal/ethereum/ethereum_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:56:27
+#  Last modified 2022-07-09 16:43:36
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+internal/ethereum/blocklistener.go:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-10 12:14:22
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -434,6 +458,15 @@ internal/ethereum/estimate_gas.go:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 # Not a target:
+internal/ethereum/event_listener.go:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-10 16:36:21
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
 internal/ethereum/get_block_info.go:
 #  Implicit rule search has been done.
 #  Last modified 2022-06-26 13:33:49
@@ -445,7 +478,7 @@ internal/ethereum/get_block_info.go:
 # Not a target:
 internal/ethereum/config.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-29 22:01:25
+#  Last modified 2022-07-07 17:18:39
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -469,7 +502,7 @@ cmd/config_test.go:
 # Not a target:
 internal/ethereum/ethereum.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-29 22:06:22
+#  Last modified 2022-07-09 16:25:12
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -521,10 +554,11 @@ docker:
 	docker build --build-arg BUILD_VERSION=${BUILD_VERSION} ${DOCKER_ARGS} -t hyperledger/firefly-evmconnect .
 	
 
-firefly-evmconnect: cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/events.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
+ 
+firefly-evmconnect: cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/blocklistener.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/retry_delay.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/blocklistener_test.go internal/ethereum/event_actions.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
 #  Implicit rule search has not been done.
 #  Implicit/static pattern stem: `'
-#  Last modified 2022-06-20 13:55:12
+#  Last modified 2022-07-09 17:34:49
 #  File has been updated.
 #  Needs to be updated (-q is set).
 # automatic
@@ -534,16 +568,15 @@ firefly-evmconnect: cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_do
 # automatic
 # * := 
 # automatic
- 
-# + := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/events.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
+# + := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/blocklistener.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/retry_delay.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/blocklistener_test.go internal/ethereum/event_actions.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
 # automatic
 # | := 
 # automatic
 # < := cmd/config.go
 # automatic
-# ^ := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/events.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
+# ^ := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/blocklistener.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/retry_delay.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/blocklistener_test.go internal/ethereum/event_actions.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/prepare_transaction.go
 # automatic
-# ? := internal/msgs/en_error_messges.go internal/ethereum/config.go internal/ethereum/get_receipt.go internal/ethereum/events.go internal/ethereum/get_block_info.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go
+# ? := internal/msgs/en_error_messges.go internal/ethereum/blocklistener.go internal/ethereum/retry_delay.go internal/ethereum/event_actions.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go
 # variable set hash-table stats:
 # Load=8/32=25%, Rehash=0, Collisions=1/12=8%
 #  commands to execute (from `Makefile', line 36):
@@ -562,7 +595,16 @@ cmd/config_docs_test.go:
 # Not a target:
 internal/ethereum/get_receipt_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:47:45
+#  Last modified 2022-07-09 16:20:49
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+internal/ethereum/event_actions.go:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-10 13:25:37
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -571,7 +613,7 @@ internal/ethereum/get_receipt_test.go:
 # Not a target:
 internal/ethereum/prepare_transaction_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:49:41
+#  Last modified 2022-07-09 16:21:32
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -617,7 +659,7 @@ mocks-internal/jsonrpc-Client: /Users/pbroadhurst/go/bin/mockery
 # Not a target:
 internal/ethereum/get_gas_price_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:45:16
+#  Last modified 2022-07-09 16:20:45
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -640,7 +682,7 @@ cmd/config.go:
 # Not a target:
 internal/ethereum/exec_query_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-20 11:42:17
+#  Last modified 2022-07-09 16:20:21
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -665,9 +707,10 @@ cmd/version.go:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 # files hash-table stats:
-# Load=52/1024=5%, Rehash=0, Collisions=2/109=2%
+# Load=57/1024=6%, Rehash=0, Collisions=2/119=2%
 # VPATH Search Paths
 
+ 
 # No `vpath' search paths.
 
 # No general (`VPATH' variable) search path.
@@ -677,6 +720,6 @@ cmd/version.go:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Thu Jun 30 12:00:31 2022
+# Finished Make data base on Sun Jul 10 17:06:41 2022
 
  

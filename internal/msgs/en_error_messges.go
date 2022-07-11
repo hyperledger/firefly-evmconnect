@@ -60,4 +60,6 @@ var (
 	MsgCacheInitFail             = ffe("FF23040", "Failed to initialize cache")
 	MsgStreamNotStarted          = ffe("FF23041", "Event stream %s not started")
 	MsgStreamAlreadyStarted      = ffe("FF23042", "Event stream %s already started")
+	MsgListenerNotStarted        = ffe("FF23043", "Event listener %s not started in event stream %s")
+	MsgListenerNotInitialized    = ffe("FF23044", "Event listener %s not initialized in event stream %s")
 )
