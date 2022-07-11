@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/big"
 	"sync"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/config"
@@ -34,15 +35,16 @@ import (
 )
 
 type ethConnector struct {
-	backend              jsonrpc.Client
-	serializer           *abi.Serializer
-	gasEstimationFactor  *big.Float
-	catchupPageSize      int64
-	catchupThreshold     int64
-	checkpointBlockGap   int64
-	retry                *retry.Retry
-	eventBlockTimestamps bool
-	blockListener        *blockListener
+	backend                    jsonrpc.Client
+	serializer                 *abi.Serializer
+	gasEstimationFactor        *big.Float
+	catchupPageSize            int64
+	catchupThreshold           int64
+	checkpointBlockGap         int64
+	retry                      *retry.Retry
+	eventBlockTimestamps       bool
+	blockListener              *blockListener
+	eventFilterPollingInterval time.Duration
 
 	mux          sync.Mutex
 	eventStreams map[fftypes.UUID]*eventStream
@@ -51,11 +53,12 @@ type ethConnector struct {
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
 	c := &ethConnector{
-		eventStreams:         make(map[fftypes.UUID]*eventStream),
-		catchupPageSize:      conf.GetInt64(EventsCatchupPageSize),
-		catchupThreshold:     conf.GetInt64(EventsCatchupThreshold),
-		checkpointBlockGap:   conf.GetInt64(EventsCheckpointBlockGap),
-		eventBlockTimestamps: conf.GetBool(EventsBlockTimestamps),
+		eventStreams:               make(map[fftypes.UUID]*eventStream),
+		catchupPageSize:            conf.GetInt64(EventsCatchupPageSize),
+		catchupThreshold:           conf.GetInt64(EventsCatchupThreshold),
+		checkpointBlockGap:         conf.GetInt64(EventsCheckpointBlockGap),
+		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
+		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
 		retry: &retry.Retry{
 			InitialDelay: conf.GetDuration(RetryInitDelay),
 			MaximumDelay: conf.GetDuration(RetryMaxDelay),

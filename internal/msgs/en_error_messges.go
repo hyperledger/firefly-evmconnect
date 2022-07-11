@@ -62,4 +62,5 @@ var (
 	MsgStreamAlreadyStarted      = ffe("FF23042", "Event stream %s already started")
 	MsgListenerNotStarted        = ffe("FF23043", "Event listener %s not started in event stream %s")
 	MsgListenerNotInitialized    = ffe("FF23044", "Event listener %s not initialized in event stream %s")
+	MsgStreamNotStopped          = ffe("FF23045", "Event stream %s not stopped")
 )

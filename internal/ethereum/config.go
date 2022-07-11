@@ -22,18 +22,19 @@ import (
 )
 
 const (
-	ConfigGasEstimationFactor = "gasEstimationFactor"
-	ConfigDataFormat          = "dataFormat"
-	BlockPollingInterval      = "blockPollingInterval"
-	BlockCacheSize            = "blockCacheSize"
-	BlockCacheTTL             = "blockCacheTTL"
-	EventsCatchupPageSize     = "events.catchupPageSize"
-	EventsCatchupThreshold    = "events.catchupThreshold"
-	EventsCheckpointBlockGap  = "events.checkpointBlockGap"
-	EventsBlockTimestamps     = "events.blockTimestamps"
-	RetryInitDelay            = "retry.initialDelay"
-	RetryMaxDelay             = "retry.maxDelay"
-	RetryFactor               = "retry.factor"
+	ConfigGasEstimationFactor   = "gasEstimationFactor"
+	ConfigDataFormat            = "dataFormat"
+	BlockPollingInterval        = "blockPollingInterval"
+	BlockCacheSize              = "blockCacheSize"
+	BlockCacheTTL               = "blockCacheTTL"
+	EventsCatchupPageSize       = "events.catchupPageSize"
+	EventsCatchupThreshold      = "events.catchupThreshold"
+	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
+	EventsBlockTimestamps       = "events.blockTimestamps"
+	EventsFilterPollingInterval = "event.filterPollingInterval"
+	RetryInitDelay              = "retry.initialDelay"
+	RetryMaxDelay               = "retry.maxDelay"
+	RetryFactor                 = "retry.factor"
 )
 
 const (
@@ -57,6 +58,7 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(ConfigDataFormat, "map")
 	conf.AddKnownKey(ConfigGasEstimationFactor, DefaultGasEstimationFactor)
 	conf.AddKnownKey(EventsBlockTimestamps, true)
+	conf.AddKnownKey(EventsFilterPollingInterval, "1s")
 	conf.AddKnownKey(EventsCatchupPageSize, DefaultCatchupPageSize)
 	conf.AddKnownKey(EventsCatchupThreshold, DefaultEventsCatchupGap)
 	conf.AddKnownKey(EventsCheckpointBlockGap, DefaultEventsCheckpointBlockGap)

@@ -35,11 +35,13 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 	}
 
 	es = &eventStream{
-		id:        req.ID,
-		ctx:       req.StreamContext,
-		events:    req.EventStream,
-		headBlock: -1,
-		listeners: make(map[fftypes.UUID]*listener),
+		id:             req.ID,
+		c:              c,
+		ctx:            req.StreamContext,
+		events:         req.EventStream,
+		headBlock:      -1,
+		listeners:      make(map[fftypes.UUID]*listener),
+		streamLoopDone: make(chan struct{}),
 	}
 	for _, lReq := range req.InitialListeners {
 		l, err := es.addEventListener(ctx, lReq)
@@ -51,6 +53,9 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 			es.headBlock = l.hwmBlock
 		}
 	}
+
+	// From this point we consider ourselves started
+	c.eventStreams[*req.ID] = es
 
 	// Now we've calculated our head block, go through and start all the listeners - which might kick off catchup on some of them
 	for _, l := range es.listeners {
@@ -67,7 +72,25 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 		updates: req.BlockListener,
 	})
 
-	return nil, "", nil
+	return &ffcapi.EventStreamStartResponse{}, "", nil
+}
+
+func (c *ethConnector) EventStreamStopped(ctx context.Context, req *ffcapi.EventStreamStoppedRequest) (*ffcapi.EventStreamStoppedResponse, ffcapi.ErrorReason, error) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	es := c.eventStreams[*req.ID]
+	if es != nil {
+		select {
+		case <-es.ctx.Done():
+			// This is good, it is stopped
+		default:
+			return nil, ffcapi.ErrorReason(""), i18n.NewError(ctx, msgs.MsgStreamNotStopped, req.ID)
+		}
+		// Wait for stream loop to complete
+		<-es.streamLoopDone
+	}
+	delete(c.eventStreams, *req.ID)
+	return &ffcapi.EventStreamStoppedResponse{}, "", nil
 }
 
 func (c *ethConnector) EventListenerVerifyOptions(ctx context.Context, req *ffcapi.EventListenerVerifyOptionsRequest) (*ffcapi.EventListenerVerifyOptionsResponse, ffcapi.ErrorReason, error) {

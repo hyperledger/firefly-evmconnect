@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -55,14 +56,15 @@ type eventInfo struct {
 
 // eventStream is the state we hold in memory for each eventStream
 type eventStream struct {
-	id          *fftypes.UUID
-	ctx         context.Context
-	c           *ethConnector
-	events      chan<- *ffcapi.ListenerEvent
-	mux         sync.Mutex
-	updateCount int
-	listeners   map[fftypes.UUID]*listener
-	headBlock   int64
+	id             *fftypes.UUID
+	ctx            context.Context
+	c              *ethConnector
+	events         chan<- *ffcapi.ListenerEvent
+	mux            sync.Mutex
+	updateCount    int
+	listeners      map[fftypes.UUID]*listener
+	headBlock      int64
+	streamLoopDone chan struct{}
 }
 
 // aggregatedListener is a generated structure that allows use to query/filter logs efficiently across a large number of listeners,
@@ -83,6 +85,9 @@ func parseEventFilters(ctx context.Context, filters []fftypes.JSONAny) (string, 
 	sigStrings := make([]string, len(filters))
 	for i, f := range filters {
 		err := json.Unmarshal(f.Bytes(), &ethFilters[i])
+		if err != nil {
+			return "", nil, i18n.NewError(ctx, msgs.MsgInvalidEventFilter, f.Bytes())
+		}
 		if ethFilters[i].Event == nil {
 			return "", nil, i18n.NewError(ctx, msgs.MsgMissingEventFilter)
 		}
@@ -247,6 +252,7 @@ func (es *eventStream) leadGroupCatchup() {
 }
 
 func (es *eventStream) streamLoop() {
+	defer close(es.streamLoopDone)
 
 	// When we first start, we might find our leading pack of listeners are all way behind
 	// the head of the chain. So we run a catchup mode loop to ensure we don't ask the blockchain
@@ -327,12 +333,27 @@ func (es *eventStream) streamLoop() {
 				return
 			}
 		}
+
+		// Sleep for the polling interval
+		select {
+		case <-time.After(es.c.eventFilterPollingInterval):
+		case <-es.ctx.Done():
+			log.L(es.ctx).Debugf("Stream loop stopping")
+			return
+		}
 	}
 }
 
 func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ffcapi.ListenerEvents, hwm int64) (exiting bool) {
 
 	// Dispatch the events, updating the in-memory checkpoint for all listeners.
+	if len(events) == 0 {
+		select {
+		case <-es.ctx.Done():
+			return true
+		default:
+		}
+	}
 	for _, event := range events {
 		select {
 		case es.events <- event:
