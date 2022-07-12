@@ -85,7 +85,8 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleBlockJSONRPC), args[1])
 			assert.NoError(t, err)
-		})
+		}).
+		Twice() // two cache misses and a hit
 
 	var req ffcapi.BlockInfoByNumberRequest
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
@@ -97,6 +98,15 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
 	assert.Equal(t, "0x124ca6245d8ddd48203346c2f80b9bc07ce2fcdb8ccb3251b03d8748c1c73b92", res.ParentHash)
 	assert.Equal(t, int64(12345), res.BlockNumber.Int64())
+
+	res, reason, err = c.BlockInfoByNumber(ctx, &req) // cached
+	assert.NoError(t, err)
+	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
+
+	req.ExpectedParentHash = "0x40e06d2d366dcfcdc311bf1624aa307928207676f307ed68cca73a841be6db8b"
+	res, reason, err = c.BlockInfoByNumber(ctx, &req) // cache miss
+	assert.NoError(t, err)
+	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
 
 }
 
@@ -150,7 +160,8 @@ func TestGetBlockInfoByHashOK(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleBlockJSONRPC), args[1])
 			assert.NoError(t, err)
-		})
+		}).
+		Once()
 
 	var req ffcapi.BlockInfoByHashRequest
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByHash), &req)
@@ -162,6 +173,11 @@ func TestGetBlockInfoByHashOK(t *testing.T) {
 	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
 	assert.Equal(t, "0x124ca6245d8ddd48203346c2f80b9bc07ce2fcdb8ccb3251b03d8748c1c73b92", res.ParentHash)
 	assert.Equal(t, int64(12345), res.BlockNumber.Int64())
+
+	res, reason, err = c.BlockInfoByHash(ctx, &req) // cached
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", res.BlockHash)
 
 }
 

@@ -11,6 +11,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1
+	golang.org/x/net v0.0.0-20220531201128-c960675eff93
 	golang.org/x/text v0.3.7
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -56,7 +57,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
-	golang.org/x/net v0.0.0-20220531201128-c960675eff93 // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect

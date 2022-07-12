@@ -57,9 +57,12 @@ func TestConnectorInit(t *testing.T) {
 	assert.Regexp(t, "FF23025", err)
 
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
+	conf.Set(EventsCatchupThreshold, 1)
+	conf.Set(EventsCatchupPageSize, 500)
 
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
+	assert.Equal(t, int64(500), cc.(*ethConnector).catchupThreshold) // set to page size
 
 	params := &abi.ParameterArray{
 		{Name: "x", Type: "uint256"},
@@ -92,5 +95,10 @@ func TestConnectorInit(t *testing.T) {
 	conf.Set(ConfigDataFormat, "wrong")
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23032.*wrong", err)
+
+	conf.Set(ConfigDataFormat, "map")
+	conf.Set(BlockCacheSize, "-1")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23040", err)
 
 }

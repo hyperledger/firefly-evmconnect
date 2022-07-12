@@ -154,10 +154,8 @@ func (l *listener) checkReadyForLeadPackOrRemoved(ctx context.Context) (bool, bo
 func (l *listener) getHWMCheckpoint() *listenerCheckpoint {
 	l.hwmMux.Lock()
 	defer l.hwmMux.Unlock()
-	if l.hwmBlock < 0 {
-		return nil
-	}
 	// Generate a checkpoint before the first transaction, in the high watermark block
+	log.L(l.es.ctx).Debugf("HWM checkpoint block for '%s': %d", l.id, l.hwmBlock)
 	return &listenerCheckpoint{
 		Block:            l.hwmBlock,
 		TransactionIndex: -1,
@@ -227,14 +225,13 @@ func (l *listener) listenerCatchupLoop() {
 }
 
 func (l *listener) decodeLogData(ctx context.Context, event *abi.Entry, topics []ethtypes.HexBytes0xPrefix, data ethtypes.HexBytes0xPrefix) *fftypes.JSONAny {
+	var b []byte
 	v, err := event.DecodeEventDataCtx(ctx, topics, data)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to decode event: %s", err)
-		return nil
+	if err == nil {
+		b, err = l.c.serializer.SerializeJSONCtx(ctx, v)
 	}
-	b, err := l.c.serializer.SerializeJSONCtx(ctx, v)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to serialize event: %s", err)
+		log.L(ctx).Errorf("Failed to process event log: %s", err)
 		return nil
 	}
 	return fftypes.JSONAnyPtrBytes(b)
@@ -248,7 +245,7 @@ func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo
 	functionID := txInfo.Input[0:4]
 	var method *abi.Entry
 	for _, m := range methods {
-		if bytes.Equal(method.FunctionSelectorBytes(), functionID) {
+		if bytes.Equal(m.FunctionSelectorBytes(), functionID) {
 			method = m
 			break
 		}
@@ -259,13 +256,12 @@ func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo
 	}
 	info.InputMethod = method.String()
 	v, err := method.DecodeCallDataCtx(ctx, txInfo.Input)
+	var b []byte
+	if err == nil {
+		b, err = l.c.serializer.SerializeJSONCtx(ctx, v)
+	}
 	if err != nil {
 		log.L(ctx).Warnf("Failed to decode input for TX '%s' using '%s'", txInfo.Hash, info.InputMethod)
-		return
-	}
-	b, err := l.c.serializer.SerializeJSONCtx(ctx, v)
-	if err != nil {
-		log.L(ctx).Errorf("Failed to serialize function input arguments: %s", err)
 		return
 	}
 	info.InputArgs = fftypes.JSONAnyPtrBytes(b)

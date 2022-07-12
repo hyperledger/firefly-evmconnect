@@ -206,7 +206,3 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) int64 {
 	bl.mux.Unlock()
 	return highestBlock
 }
-
-func (c *ethConnector) NewBlockHashes() <-chan *ffcapi.BlockHashEvent {
-	return nil
-}

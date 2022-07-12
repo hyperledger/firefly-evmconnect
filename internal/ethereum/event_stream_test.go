@@ -50,6 +50,7 @@ func testEventStreamExistingConnector(t *testing.T, ctx context.Context, done fu
 	assert.NoError(t, err)
 	es := c.eventStreams[*esID]
 	es.c.eventFilterPollingInterval = 1 * time.Millisecond
+	es.c.retry.MaximumDelay = 1 * time.Microsecond
 	assert.NotNil(t, es)
 	return es, events, mRPC, func() {
 		done()
@@ -231,10 +232,10 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Topics: []ethtypes.HexBytes0xPrefix{
 					ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"),
-					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000c3c587977f7369c5fcdb1e39d428fc52bb6f6653"),
-					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000f2e76eee945efc5a789e400c2c67829c7ebbf942"),
+					ethtypes.MustNewHexBytes0xPrefix("0x0000000000000000000000003968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
+					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d091"),
 				},
-				Data: ethtypes.MustNewHexBytes0xPrefix("0x0000000000000000000000000000000000000000000000000000000000989680"),
+				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			})
 		case 6000:
 			close(listenerCaughtUp)
@@ -263,9 +264,9 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
 	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)
 	assert.NotNil(t, e.Event)
-	assert.Equal(t, "0xc3c587977f7369c5fcdb1e39d428fc52bb6f6653", e.Event.Data.JSONObject().GetString("from"))
-	assert.Equal(t, "0xf2e76eee945efc5a789e400c2c67829c7ebbf942", e.Event.Data.JSONObject().GetString("to"))
-	assert.Equal(t, "10000000", e.Event.Data.JSONObject().GetString("value"))
+	assert.Equal(t, "0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4", e.Event.Data.JSONObject().GetString("from"))
+	assert.Equal(t, "0xd0f2f5103fd050739a9fb567251bc460cc24d091", e.Event.Data.JSONObject().GetString("to"))
+	assert.Equal(t, "1000", e.Event.Data.JSONObject().GetString("value"))
 
 	<-listenerCaughtUp
 
@@ -320,10 +321,10 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 				Address:          ethtypes.MustNewAddress("0xc89E46EEED41b777ca6625d37E1Cc87C5c037828"),
 				Topics: []ethtypes.HexBytes0xPrefix{
 					ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"),
-					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000c3c587977f7369c5fcdb1e39d428fc52bb6f6653"),
-					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000f2e76eee945efc5a789e400c2c67829c7ebbf942"),
+					ethtypes.MustNewHexBytes0xPrefix("0x0000000000000000000000003968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
+					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d091"),
 				},
-				Data: ethtypes.MustNewHexBytes0xPrefix("0x0000000000000000000000000000000000000000000000000000000000989680"),
+				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			},
 		}
 	}).Once()
@@ -340,9 +341,8 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 		*args[1].(*bool) = true
 	}).Maybe()
 
-	es, events, _, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	_, events, _, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
-	es.c.retry.MaximumDelay = 1 * time.Microsecond
 
 	e := <-events
 	assert.Equal(t, uint64(1024), e.Event.BlockNumber)
@@ -352,9 +352,9 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
 	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)
 	assert.NotNil(t, e.Event)
-	assert.Equal(t, "0xc3c587977f7369c5fcdb1e39d428fc52bb6f6653", e.Event.Data.JSONObject().GetString("from"))
-	assert.Equal(t, "0xf2e76eee945efc5a789e400c2c67829c7ebbf942", e.Event.Data.JSONObject().GetString("to"))
-	assert.Equal(t, "10000000", e.Event.Data.JSONObject().GetString("value"))
+	assert.Equal(t, "0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4", e.Event.Data.JSONObject().GetString("from"))
+	assert.Equal(t, "0xd0f2f5103fd050739a9fb567251bc460cc24d091", e.Event.Data.JSONObject().GetString("to"))
+	assert.Equal(t, "1000", e.Event.Data.JSONObject().GetString("value"))
 }
 
 func TestLeadGroupCatchupRetry(t *testing.T) {
@@ -382,9 +382,8 @@ func TestLeadGroupCatchupRetry(t *testing.T) {
 		}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop"))
 
-	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
-	es.c.retry.MaximumDelay = 1 * time.Microsecond
 
 	<-retried
 
@@ -416,9 +415,8 @@ func TestStreamLoopNewFilterFail(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
 
-	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
-	es.c.retry.MaximumDelay = 1 * time.Microsecond
 
 	<-retried
 
@@ -478,7 +476,6 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 
 	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
-	es.c.retry.MaximumDelay = 1 * time.Microsecond
 
 	<-reestablishedFilter
 
@@ -498,7 +495,6 @@ func TestStreamLoopFilterReset(t *testing.T) {
 	}
 	ctx, c, mRPC, done := newTestConnector(t)
 
-	var es *eventStream
 	reestablishedFilter := make(chan struct{})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -524,9 +520,8 @@ func TestStreamLoopFilterReset(t *testing.T) {
 		*args[1].(*bool) = true
 	}).Maybe()
 
-	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
-	es.c.retry.MaximumDelay = 1 * time.Microsecond
 
 	<-reestablishedFilter
 
