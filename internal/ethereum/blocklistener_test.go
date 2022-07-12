@@ -172,7 +172,9 @@ func TestBlockListenerClosed(t *testing.T) {
 		}
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		done() // Close after we've processed the log
+		if len(bl.consumers) == 0 {
+			done() // Close after we've processed the log
+		}
 	})
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
@@ -327,4 +329,15 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 
 	mRPC.AssertExpectations(t)
 
+}
+
+func TestBlockListenerDispatchStopped(t *testing.T) {
+	_, c, _, done := newTestConnector(t)
+	done()
+
+	c.blockListener.dispatchToConsumers([]*blockUpdateConsumer{
+		{id: fftypes.NewUUID(), ctx: context.Background(), updates: make(chan<- *ffcapi.BlockHashEvent)},
+	}, &ffcapi.BlockHashEvent{
+		BlockHashes: []string{},
+	})
 }

@@ -156,22 +156,26 @@ func (bl *blockListener) listenLoop() {
 		bl.mux.Unlock()
 
 		// Spin through delivering the block update
-		for _, c := range consumers {
-			select {
-			case c.updates <- update:
-			case <-bl.ctx.Done(): // loop, we're stopping and will exit on next loop
-			case <-c.ctx.Done():
-				log.L(bl.ctx).Debugf("Block update consumer %s closed", c.id)
-				bl.mux.Lock()
-				delete(bl.consumers, *c.id)
-				bl.mux.Unlock()
-			}
-		}
+		bl.dispatchToConsumers(consumers, update)
 
 		// Reset retry count when we have a full successful loop
 		failCount = 0
 		gapPotential = false
 
+	}
+}
+
+func (bl *blockListener) dispatchToConsumers(consumers []*blockUpdateConsumer, update *ffcapi.BlockHashEvent) {
+	for _, c := range consumers {
+		select {
+		case c.updates <- update:
+		case <-bl.ctx.Done(): // loop, we're stopping and will exit on next loop
+		case <-c.ctx.Done():
+			log.L(bl.ctx).Debugf("Block update consumer %s closed", c.id)
+			bl.mux.Lock()
+			delete(bl.consumers, *c.id)
+			bl.mux.Unlock()
+		}
 	}
 }
 
