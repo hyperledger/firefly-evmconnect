@@ -23,17 +23,20 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 )
 
-func (c *ethConnector) doDelay(ctx context.Context, retryCount *int, err error) bool {
+func (c *ethConnector) doFailureDelay(ctx context.Context, failureCount int) bool {
+	if failureCount <= 0 {
+		return false
+	}
+
 	retryDelay := c.retry.InitialDelay
-	for i := 0; i < *retryCount; i++ {
+	for i := 0; i < (failureCount - 1); i++ {
 		retryDelay = time.Duration(float64(retryDelay) * c.retry.Factor)
 		if retryDelay > c.retry.MaximumDelay {
 			retryDelay = c.retry.MaximumDelay
 			break
 		}
 	}
-	log.L(ctx).Errorf("Retrying after %.2f for error (retries=%d): %s", retryDelay.Seconds(), retryCount, err)
-	*retryCount++
+	log.L(ctx).Debugf("Retrying after %.2f (failures=%d)", retryDelay.Seconds(), failureCount)
 	select {
 	case <-time.After(retryDelay):
 		return false

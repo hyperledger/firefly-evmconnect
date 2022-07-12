@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestConnector(t *testing.T) (context.Context, func(), *ethConnector, *jsonrpcmocks.Client) {
+func newTestConnector(t *testing.T) (context.Context, *ethConnector, *jsonrpcmocks.Client, func()) {
 
 	mRPC := &jsonrpcmocks.Client{}
 	config.RootConfigReset()
@@ -40,7 +40,10 @@ func newTestConnector(t *testing.T) (context.Context, func(), *ethConnector, *js
 	assert.NoError(t, err)
 	c := cc.(*ethConnector)
 	c.backend = mRPC
-	return ctx, done, c, mRPC
+	return ctx, c, mRPC, func() {
+		done()
+		mRPC.AssertExpectations(t)
+	}
 
 }
 

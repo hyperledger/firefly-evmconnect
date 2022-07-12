@@ -38,7 +38,7 @@ const sampleGetNextNonce = `{
 
 func TestGetNextNonceOK(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
@@ -60,7 +60,7 @@ func TestGetNextNonceOK(t *testing.T) {
 
 func TestGetNextNonceFail(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").

@@ -72,7 +72,7 @@ const sampleBlockJSONRPC = `{
 
 func TestGetBlockInfoByNumberOK(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber",
@@ -102,7 +102,7 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 
 func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
@@ -124,7 +124,7 @@ func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 
 func TestGetBlockInfoByNumberFail(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
@@ -142,7 +142,7 @@ func TestGetBlockInfoByNumberFail(t *testing.T) {
 
 func TestGetBlockInfoByHashOK(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", false).
@@ -167,7 +167,7 @@ func TestGetBlockInfoByHashOK(t *testing.T) {
 
 func TestGetBlockInfoByHashNotFound(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
@@ -189,7 +189,7 @@ func TestGetBlockInfoByHashNotFound(t *testing.T) {
 
 func TestGetBlockInfoByHashFail(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).

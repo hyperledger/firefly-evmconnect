@@ -137,7 +137,7 @@ const samplePrepareTXBadParam = `{
 
 func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
@@ -154,7 +154,7 @@ func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
 func TestPrepareTransactionWithEstimate(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas",
@@ -180,7 +180,7 @@ func TestPrepareTransactionWithEstimate(t *testing.T) {
 
 func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
@@ -202,7 +202,7 @@ func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 
 func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
@@ -220,7 +220,7 @@ func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 
 func TestPrepareTransactionWithBadMethod(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
@@ -235,7 +235,7 @@ func TestPrepareTransactionWithBadMethod(t *testing.T) {
 
 func TestPrepareTransactionWithBadParam(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
@@ -250,7 +250,7 @@ func TestPrepareTransactionWithBadParam(t *testing.T) {
 
 func TestPrepareTransactionWithBadTo(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionPrepareRequest
@@ -265,7 +265,7 @@ func TestPrepareTransactionWithBadTo(t *testing.T) {
 
 func TestMapFFCAPIToEthBadParams(t *testing.T) {
 
-	_, done, c, _ := newTestConnector(t)
+	_, c, _, done := newTestConnector(t)
 	defer done()
 
 	_, _, err := c.prepareCallData(context.Background(), &ffcapi.TransactionInput{

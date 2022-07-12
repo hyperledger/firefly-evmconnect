@@ -182,8 +182,13 @@ func (l *listener) listenerCatchupLoop() {
 	ctx := log.WithLogField(l.es.ctx, "listener", l.id.String())
 	al := l.es.buildAggregatedListener([]*listener{l})
 
-	retryCount := 0
+	failCount := 0
 	for {
+		if l.c.doFailureDelay(ctx, failCount) {
+			log.L(ctx).Debugf("Listener catchup loop loop exiting")
+			return
+		}
+
 		readyForLead, removed := l.checkReadyForLeadPackOrRemoved(ctx)
 		if removed {
 			log.L(ctx).Infof("Listener removed during catchup")
@@ -200,10 +205,8 @@ func (l *listener) listenerCatchupLoop() {
 		toBlock := l.hwmBlock + l.c.catchupPageSize - 1
 		events, err := l.es.getBlockRangeEvents(ctx, al, fromBlock, toBlock)
 		if err != nil {
-			if l.c.doDelay(l.es.ctx, &retryCount, err) {
-				log.L(ctx).Infof("Listener catchup loop exiting")
-				return
-			}
+			log.L(ctx).Errorf("Failed to query block range fromBlock=%d toBlock=%d: %s", fromBlock, toBlock, err)
+			failCount++
 			continue
 		}
 		log.L(ctx).Infof("Listener catchup fromBlock=%d toBlock=%d events=%d", fromBlock, toBlock, len(events))
@@ -219,7 +222,7 @@ func (l *listener) listenerCatchupLoop() {
 		l.hwmMux.Lock()
 		l.hwmBlock = toBlock + 1
 		l.hwmMux.Unlock()
-		retryCount = 0 // Reset on success
+		failCount = 0 // Reset on success
 	}
 }
 

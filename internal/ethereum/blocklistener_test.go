@@ -31,7 +31,7 @@ import (
 
 func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").
@@ -52,7 +52,7 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 
 func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	done() // Stop before we start
 	bl := c.blockListener
 
@@ -69,7 +69,7 @@ func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 
 func TestBlockListenerOK(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -151,7 +151,7 @@ func TestBlockListenerOK(t *testing.T) {
 
 func TestBlockListenerClosed(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -200,7 +200,7 @@ func TestBlockListenerClosed(t *testing.T) {
 
 func TestBlockListenerBlockNotFound(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -238,7 +238,7 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 
 func TestBlockListenerBlockHashFailed(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -276,7 +276,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -309,7 +309,7 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 
 func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 
-	_, done, c, mRPC := newTestConnector(t)
+	_, c, mRPC, done := newTestConnector(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 

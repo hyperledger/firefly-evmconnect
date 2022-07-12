@@ -106,7 +106,7 @@ const sampleSendTXGasPriceLegacy = `{
 
 func TestSendTransactionOK(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
@@ -134,7 +134,7 @@ func TestSendTransactionOK(t *testing.T) {
 
 func TestSendTransactionFail(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
@@ -167,7 +167,7 @@ func TestSendErrorMapping(t *testing.T) {
 
 func TestSendTransactionBadFrom(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionSendRequest
@@ -182,7 +182,7 @@ func TestSendTransactionBadFrom(t *testing.T) {
 
 func TestSendTransactionBadTo(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionSendRequest
@@ -197,7 +197,7 @@ func TestSendTransactionBadTo(t *testing.T) {
 
 func TestSendTransactionBadData(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionSendRequest
@@ -212,7 +212,7 @@ func TestSendTransactionBadData(t *testing.T) {
 
 func TestSendTransactionBadGasPrice(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.TransactionSendRequest
@@ -227,7 +227,7 @@ func TestSendTransactionBadGasPrice(t *testing.T) {
 
 func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
@@ -250,7 +250,7 @@ func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 
 func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",

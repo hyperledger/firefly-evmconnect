@@ -86,21 +86,29 @@ func (bl *blockListener) listenLoop() {
 	}
 
 	var filter *ethtypes.HexInteger
-	retryCount := 0
+	failCount := 0
 	gapPotential := true
 	for {
-		// Sleep for the polling interval
-		select {
-		case <-time.After(bl.blockPollingInterval):
-		case <-bl.ctx.Done():
-			log.L(bl.ctx).Debugf("Block listener loop stopping")
-			return
+		if failCount > 0 {
+			if bl.c.doFailureDelay(bl.ctx, failCount) {
+				log.L(bl.ctx).Debugf("Block listener loop exiting")
+				return
+			}
+		} else {
+			// Sleep for the polling interval
+			select {
+			case <-time.After(bl.blockPollingInterval):
+			case <-bl.ctx.Done():
+				log.L(bl.ctx).Debugf("Block listener loop stopping")
+				return
+			}
 		}
 
 		if filter == nil {
 			err := bl.c.backend.Invoke(bl.ctx, &filter, "eth_newBlockFilter")
 			if err != nil {
-				bl.c.doDelay(bl.ctx, &retryCount, err)
+				log.L(bl.ctx).Errorf("Failed to establish new block filter: %s", err)
+				failCount++
 				continue
 			}
 		}
@@ -113,6 +121,8 @@ func (bl *blockListener) listenLoop() {
 				filter = nil
 				gapPotential = true
 			}
+			log.L(bl.ctx).Errorf("Failed to query block filter changes: %s", err)
+			failCount++
 			continue
 		}
 
@@ -159,8 +169,9 @@ func (bl *blockListener) listenLoop() {
 		}
 
 		// Reset retry count when we have a full successful loop
-		retryCount = 0
+		failCount = 0
 		gapPotential = false
+
 	}
 }
 

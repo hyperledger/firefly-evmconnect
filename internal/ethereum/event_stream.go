@@ -214,12 +214,17 @@ func (es *eventStream) buildReuseLeadGroupListener(lastUpdate *int, ag **aggrega
 // leadGroupCatchup is called whenever the steam loop restarts, to see how far it is behind the head of the
 // chain and if it's a way behind then we catch up all this head group as one set (rather than with individual
 // catchup routines as is the case if one listener starts a way behind the pack)
-func (es *eventStream) leadGroupCatchup() {
+func (es *eventStream) leadGroupCatchup() bool {
 
 	var ag *aggregatedListener
 	lastUpdate := -1
-	retryCount := 0
+	failCount := 0
 	for {
+		if es.c.doFailureDelay(es.ctx, failCount) {
+			log.L(es.ctx).Debugf("Stream catchup loop exiting")
+			return true
+		}
+
 		chainHeadBlock := es.c.blockListener.getHighestBlock(es.ctx)
 
 		// Build the aggregated listener list (doesn't matter if it's changed, as we build the list each time)
@@ -237,14 +242,15 @@ func (es *eventStream) leadGroupCatchup() {
 		headGap := (chainHeadBlock - fromBlock)
 		if headGap < es.c.catchupThreshold {
 			log.L(es.ctx).Infof("Stream head is up to date with chain fromBlock=%d chainHead=%d headGap=%d", fromBlock, chainHeadBlock, headGap)
-			return
+			return false
 		}
 
 		// Poll in the range for events
 		toBlock := fromBlock + es.c.catchupPageSize - 1
 		events, err := es.getBlockRangeEvents(es.ctx, ag, fromBlock, toBlock)
 		if err != nil {
-			es.c.doDelay(es.ctx, &retryCount, err)
+			log.L(es.ctx).Errorf("Failed to query block range fromBlock=%d toBlock=%d headBlock=%d: %s", fromBlock, toBlock, chainHeadBlock, err)
+			failCount++
 			continue
 		}
 		log.L(es.ctx).Infof("Stream catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
@@ -252,11 +258,11 @@ func (es *eventStream) leadGroupCatchup() {
 		// Dispatch the events
 		if es.dispatchSetHWMCheckExit(ag, events, toBlock+1 /* hwm is the next block after our poll */) {
 			log.L(es.ctx).Debugf("Stream catchup loop exiting")
-			return
+			return true
 		}
 
 		// Reset retry count for a successful loop
-		retryCount = 0
+		failCount = 0
 	}
 
 }
@@ -267,7 +273,10 @@ func (es *eventStream) streamLoop() {
 	// When we first start, we might find our leading pack of listeners are all way behind
 	// the head of the chain. So we run a catchup mode loop to ensure we don't ask the blockchain
 	// node to process an excessive amount of logs
-	es.leadGroupCatchup()
+	exited := es.leadGroupCatchup()
+	if exited {
+		return
+	}
 
 	var filter *ethtypes.HexInteger
 	uninstallFilter := func() {
@@ -280,11 +289,16 @@ func (es *eventStream) streamLoop() {
 	defer uninstallFilter()
 
 	// Then we move into the head mode, where we establish a long-lived filter, and keep polling for changes on it.
-	retryCount := 0
+	failCount := 0
 	filterRPC := ""
 	lastUpdate := -1
 	var ag *aggregatedListener
 	for {
+		if es.c.doFailureDelay(es.ctx, failCount) {
+			log.L(es.ctx).Debugf("Stream loop exiting")
+			return
+		}
+
 		// Build the aggregated listener list if it has changed
 		listenerChanged := es.buildReuseLeadGroupListener(&lastUpdate, &ag)
 
@@ -317,7 +331,8 @@ func (es *eventStream) streamLoop() {
 				})
 				// If we fail to create the filter, we need to keep retrying
 				if err != nil {
-					es.c.doDelay(es.ctx, &retryCount, err)
+					log.L(es.ctx).Errorf("Failed to establish filter: %s", err)
+					failCount++
 					continue
 				}
 				log.L(es.ctx).Infof("Filter '%s' established", filter)
@@ -331,16 +346,14 @@ func (es *eventStream) streamLoop() {
 					log.L(es.ctx).Infof("Filter '%s' reset: %s", filter, err)
 					filter = nil
 				}
-				es.c.doDelay(es.ctx, &retryCount, err)
+				log.L(es.ctx).Errorf("Failed to query filter (%s): %s", filterRPC, err)
+				failCount++
 				continue
 			}
+			filterRPC = "eth_getFilterChanges"
 
 			// Enrich the events
-			events, err := es.filterEnrichSort(es.ctx, ag, ethLogs)
-			if err != nil {
-				es.c.doDelay(es.ctx, &retryCount, err)
-				continue
-			}
+			events := es.filterEnrichSort(es.ctx, ag, ethLogs)
 
 			// Dispatch the events
 			if es.dispatchSetHWMCheckExit(ag, events, hwmBlock) {
@@ -353,6 +366,9 @@ func (es *eventStream) streamLoop() {
 			es.headBlock = hwmBlock
 			es.mux.Unlock()
 		}
+
+		// Reset failure count if we reach here
+		failCount = 0
 
 		// Sleep for the polling interval
 		select {
@@ -373,12 +389,13 @@ func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ff
 			return true
 		default:
 		}
-	}
-	for _, event := range events {
-		select {
-		case es.events <- event:
-		case <-es.ctx.Done():
-			return true
+	} else {
+		for _, event := range events {
+			select {
+			case es.events <- event:
+			case <-es.ctx.Done():
+				return true
+			}
 		}
 	}
 
@@ -413,7 +430,7 @@ func getEventProtoID(blockNumber, transactionIndex, logIndex int64) string {
 	return fmt.Sprintf("%.12d/%.6d/%.6d", blockNumber, transactionIndex, logIndex)
 }
 
-func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListener, ethLogs []*logJSONRPC) (ffcapi.ListenerEvents, error) {
+func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListener, ethLogs []*logJSONRPC) ffcapi.ListenerEvents {
 	updates := make(ffcapi.ListenerEvents, 0, len(ethLogs))
 	for _, ethLog := range ethLogs {
 		listeners := ag.listenersByTopic0[ethLog.Topics[0].String()]
@@ -428,7 +445,7 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 		}
 	}
 	sort.Sort(updates)
-	return updates, nil
+	return updates
 }
 
 func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedListener, fromBlock, toBlock int64) (ffcapi.ListenerEvents, error) {
@@ -448,8 +465,7 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 	if err != nil {
 		return nil, err
 	}
-
-	return es.filterEnrichSort(ctx, ag, ethLogs)
+	return es.filterEnrichSort(ctx, ag, ethLogs), nil
 }
 
 func (es *eventStream) getListenerHWM(ctx context.Context, listenerID *fftypes.UUID) (*ffcapi.EventListenerHWMResponse, ffcapi.ErrorReason, error) {

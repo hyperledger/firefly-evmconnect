@@ -18,6 +18,8 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,7 +32,7 @@ import (
 )
 
 func testEventStream(t *testing.T, listeners ...*ffcapi.EventListenerAddRequest) (*eventStream, chan *ffcapi.ListenerEvent, *jsonrpcmocks.Client, func()) {
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	mockStreamLoopEmpty(mRPC)
 	return testEventStreamExistingConnector(t, ctx, done, c, mRPC, listeners...)
 }
@@ -47,6 +49,7 @@ func testEventStreamExistingConnector(t *testing.T, ctx context.Context, done fu
 	})
 	assert.NoError(t, err)
 	es := c.eventStreams[*esID]
+	es.c.eventFilterPollingInterval = 1 * time.Millisecond
 	assert.NotNil(t, es)
 	return es, events, mRPC, func() {
 		done()
@@ -280,4 +283,279 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		}
 		break
 	}
+}
+
+func TestLeadGroupDeliverEvents(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0xc89E46EEED41b777ca6625d37E1Cc87C5c037828","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: strconv.Itoa(testHighBlock),
+		},
+	}
+
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*ethtypes.HexInteger) = *ethtypes.NewHexInteger64(testHighBlock)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(101010)
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
+			{
+				BlockNumber:      ethtypes.NewHexInteger64(1024),
+				TransactionIndex: ethtypes.NewHexInteger64(64),
+				LogIndex:         ethtypes.NewHexInteger64(2),
+				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
+				Address:          ethtypes.MustNewAddress("0xc89E46EEED41b777ca6625d37E1Cc87C5c037828"),
+				Topics: []ethtypes.HexBytes0xPrefix{
+					ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"),
+					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000c3c587977f7369c5fcdb1e39d428fc52bb6f6653"),
+					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000f2e76eee945efc5a789e400c2c67829c7ebbf942"),
+				},
+				Data: ethtypes.MustNewHexBytes0xPrefix("0x0000000000000000000000000000000000000000000000000000000000989680"),
+			},
+		}
+	}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1024),
+			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
+		}
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{}
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	es, events, _, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+	es.c.retry.MaximumDelay = 1 * time.Microsecond
+
+	e := <-events
+	assert.Equal(t, uint64(1024), e.Event.BlockNumber)
+	assert.Equal(t, uint64(64), e.Event.TransactionIndex)
+	assert.Equal(t, uint64(2), e.Event.LogIndex)
+	assert.Equal(t, int64(1024), e.Checkpoint.(*listenerCheckpoint).Block)
+	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
+	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)
+	assert.NotNil(t, e.Event)
+	assert.Equal(t, "0xc3c587977f7369c5fcdb1e39d428fc52bb6f6653", e.Event.Data.JSONObject().GetString("from"))
+	assert.Equal(t, "0xf2e76eee945efc5a789e400c2c67829c7ebbf942", e.Event.Data.JSONObject().GetString("to"))
+	assert.Equal(t, "10000000", e.Event.Data.JSONObject().GetString("value"))
+}
+
+func TestLeadGroupCatchupRetry(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "0",
+		},
+	}
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	retried := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop")).
+		Run(func(args mock.Arguments) {
+			close(retried)
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop"))
+
+	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+	es.c.retry.MaximumDelay = 1 * time.Microsecond
+
+	<-retried
+
+}
+
+func TestStreamLoopNewFilterFail(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: strconv.Itoa(testHighBlock),
+		},
+	}
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	retried := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(fmt.Errorf("pop")).
+		Run(func(args mock.Arguments) {
+			close(retried)
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
+
+	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+	es.c.retry.MaximumDelay = 1 * time.Microsecond
+
+	<-retried
+
+}
+
+func TestStreamLoopChangeFilter(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0x171AE0BDd882F7b4C84D5b7FBFA994E39C5a3129","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: strconv.Itoa(testHighBlock),
+		},
+	}
+	l2req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0xc1552c7E527f8cb51bbca69c6849a192598FAFe6","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: strconv.Itoa(testHighBlock),
+		},
+	}
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	var es *eventStream
+	reestablishedFilter := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			l2req.StreamID = es.id
+			_, _, err := c.EventListenerAdd(ctx, l2req)
+			assert.NoError(t, err)
+			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(101010)
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(202020)
+			close(reestablishedFilter)
+		})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+	es.c.retry.MaximumDelay = 1 * time.Microsecond
+
+	<-reestablishedFilter
+
+}
+
+func TestStreamLoopFilterReset(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0x171AE0BDd882F7b4C84D5b7FBFA994E39C5a3129","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: strconv.Itoa(testHighBlock),
+		},
+	}
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	var es *eventStream
+	reestablishedFilter := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(101010)
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(202020)
+			close(reestablishedFilter)
+		})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(fmt.Errorf("filter not found")).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+	es.c.retry.MaximumDelay = 1 * time.Microsecond
+
+	<-reestablishedFilter
+
+}
+
+func TestDispatchListenerDone(t *testing.T) {
+
+	doneCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	es := &eventStream{
+		ctx:    doneCtx,
+		events: make(chan<- *ffcapi.ListenerEvent),
+	}
+	exiting := es.dispatchSetHWMCheckExit(&aggregatedListener{}, ffcapi.ListenerEvents{
+		{},
+	}, -1)
+	assert.True(t, exiting)
+
+}
+
+func TestGetListenerHWMNotFound(t *testing.T) {
+
+	es := &eventStream{
+		ctx:       context.Background(),
+		events:    make(chan<- *ffcapi.ListenerEvent),
+		listeners: make(map[fftypes.UUID]*listener),
+	}
+	_, rc, err := es.getListenerHWM(context.Background(), fftypes.NewUUID())
+	assert.Regexp(t, "FF23043", err)
+	assert.Equal(t, ffcapi.ErrorReasonNotFound, rc)
+
 }

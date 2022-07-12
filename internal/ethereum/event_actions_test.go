@@ -81,14 +81,14 @@ func mockStreamLoopEmpty(mRPC *jsonrpcmocks.Client) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
-	})
+	}).Maybe()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(**ethtypes.HexInteger)
 		*hbh = ethtypes.NewHexInteger64(101010)
-	})
+	}).Maybe()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
-	})
+	}).Maybe()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Maybe()
@@ -99,7 +99,7 @@ func mockStreamLoopEmpty(mRPC *jsonrpcmocks.Client) {
 
 func TestEventStreamStartStopOk(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -170,7 +170,7 @@ func TestEventStreamStartStopOk(t *testing.T) {
 
 func TestEventStreamStartBadListener(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -204,7 +204,7 @@ func TestEventStreamStartBadListener(t *testing.T) {
 
 func TestEventListenerVerifyOptionsOk(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -228,7 +228,7 @@ func TestEventListenerVerifyOptionsOk(t *testing.T) {
 
 func TestEventListenerVerifyOptionsBadFilters(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -247,7 +247,7 @@ func TestEventListenerVerifyOptionsBadFilters(t *testing.T) {
 
 func TestEventListenerVerifyOptionsBadOptions(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -266,7 +266,7 @@ func TestEventListenerVerifyOptionsBadOptions(t *testing.T) {
 
 func TestEventStreamAddRemoveOk(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -333,7 +333,7 @@ func TestEventStreamAddRemoveOk(t *testing.T) {
 
 func TestEventStreamAddBadOptions(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -377,7 +377,7 @@ func TestEventStreamAddBadOptions(t *testing.T) {
 
 func TestEventStreamAddBadStream(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -394,7 +394,7 @@ func TestEventStreamAddBadStream(t *testing.T) {
 
 func TestEventStreamRemoveBadStream(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 
@@ -410,7 +410,7 @@ func TestEventStreamRemoveBadStream(t *testing.T) {
 
 func TestEventStreamNewCheckpointStruct(t *testing.T) {
 
-	_, done, c, _ := newTestConnector(t)
+	_, c, _, done := newTestConnector(t)
 	defer done()
 
 	var expectedType *listenerCheckpoint
@@ -420,7 +420,7 @@ func TestEventStreamNewCheckpointStruct(t *testing.T) {
 
 func TestEventListenerHWMBadStream(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 	mockStreamLoopEmpty(mRPC)
 

@@ -61,7 +61,7 @@ const sampleExecQuery = `{
 
 func TestExecQueryOKResponse(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call",
@@ -87,7 +87,7 @@ func TestExecQueryOKResponse(t *testing.T) {
 
 func TestExecQueryOKNilResponse(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call",
@@ -113,7 +113,7 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 
 func TestExecQueryBadRevertData(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
@@ -133,7 +133,7 @@ func TestExecQueryBadRevertData(t *testing.T) {
 
 func TestExecQueryBadReturnData(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
@@ -171,7 +171,7 @@ func TestExecQueryBadReturnData(t *testing.T) {
 
 func TestExecQueryFailCall(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
@@ -186,7 +186,7 @@ func TestExecQueryFailCall(t *testing.T) {
 
 func TestExecQueryFailBadToAddress(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.QueryInvokeRequest
@@ -216,7 +216,7 @@ func TestExecQueryFailBadToAddress(t *testing.T) {
 
 func TestExecQueryFailBadToParams(t *testing.T) {
 
-	ctx, done, c, _ := newTestConnector(t)
+	ctx, c, _, done := newTestConnector(t)
 	defer done()
 
 	var req ffcapi.QueryInvokeRequest

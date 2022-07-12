@@ -68,7 +68,7 @@ const sampleJSONRPCReceipt = `{
 
 func TestGetReceiptOkSuccess(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -97,7 +97,7 @@ func TestGetReceiptOkSuccess(t *testing.T) {
 
 func TestGetReceiptNotFound(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
@@ -119,7 +119,7 @@ func TestGetReceiptNotFound(t *testing.T) {
 
 func TestGetReceiptError(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).

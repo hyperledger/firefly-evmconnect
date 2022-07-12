@@ -38,7 +38,7 @@ const sampleGetGasPrice = `{
 
 func TestGetGasPriceOK(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
@@ -60,7 +60,7 @@ func TestGetGasPriceOK(t *testing.T) {
 
 func TestGetGasPriceFail(t *testing.T) {
 
-	ctx, done, c, mRPC := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").

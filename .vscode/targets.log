@@ -8,12 +8,13 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This program built for i386-apple-darwin11.3.0
  
 
-# Make data base, printed on Mon Jul 11 17:15:50 2022
+# Make data base, printed on Mon Jul 11 18:09:19 2022
 
 # Variables
 
 # environment
 VSCODE_GIT_ASKPASS_MAIN = /Applications/Visual Studio Code.app/Contents/Resources/app/extensions/git/dist/askpass-main.js
+ 
 # automatic
 <D = $(patsubst %/,%,$(dir $<))
 # automatic
@@ -47,7 +48,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 INFOPATH = /opt/homebrew/share/info:/opt/homebrew/share/info:
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/tb/b88h058x6675g5g_dkgsy8jm0000gn/T/vscode-ipc-7eba61d2-2435-4fde-9a5e-1956e34f86f2.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/tb/b88h058x6675g5g_dkgsy8jm0000gn/T/vscode-ipc-b17d0eca-856d-4ce1-9c0a-03a1e6a98d74.sock
 # environment
 VSCODE_CWD = /Users/pbroadhurst/dev/firefly/firefly-transaction-manager
 # environment
@@ -101,7 +102,7 @@ VSCODE_CODE_CACHE_PATH = /Users/pbroadhurst/Library/Application Support/Code/Cac
 # environment
 LOGNAME = pbroadhurst
 # environment
-APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
 # environment
 ZSH = /Users/pbroadhurst/.oh-my-zsh
 # makefile (from `Makefile', line 27)
@@ -163,7 +164,7 @@ MFLAGS = -Rrqp
 # environment
 TERM_PROGRAM_VERSION = 1.68.1
 # environment
-XPC_SERVICE_NAME = application.com.microsoft.VSCode.25727244.25727250.2024C457-437E-4EA1-A725-2C53B68996EF
+XPC_SERVICE_NAME = application.com.microsoft.VSCode.25727244.25727250.FA43E705-17D4-4719-A417-5108C58481AA
 # environment
 HOMEBREW_PREFIX = /opt/homebrew
 # automatic
@@ -254,7 +255,6 @@ cmd/config_docs_generate_test.go:
 # Not a target:
 internal/ethereum/blocklistener_test.go:
 #  Implicit rule search has been done.
- 
 #  Last modified 2022-07-11 12:39:16
 #  File has been updated.
 #  Successfully updated.
@@ -263,6 +263,7 @@ internal/ethereum/blocklistener_test.go:
 
 # Not a target:
 internal/ethereum/get_receipt.go:
+ 
 #  Implicit rule search has been done.
 #  Last modified 2022-06-27 12:35:35
 #  File has been updated.
@@ -326,7 +327,7 @@ internal/ethereum/send_transaction_test.go:
 # Not a target:
 internal/ethereum/event_stream.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-07-11 17:10:47
+#  Last modified 2022-07-11 17:59:30
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -402,7 +403,7 @@ Makefile:
 # Not a target:
 internal/ethereum/retry_delay.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-07-10 12:15:50
+#  Last modified 2022-07-11 17:56:46
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -428,7 +429,7 @@ internal/ethereum/ethereum_test.go:
 # Not a target:
 internal/ethereum/blocklistener.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-07-11 12:37:36
+#  Last modified 2022-07-11 18:02:35
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -490,7 +491,7 @@ internal/ethereum/estimate_gas.go:
 # Not a target:
 internal/ethereum/event_listener.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-07-11 17:10:17
+#  Last modified 2022-07-11 17:59:03
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -545,7 +546,6 @@ cmd/evmconnect_test.go:
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
- 
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 # Not a target:
@@ -555,6 +555,7 @@ cmd/version_test.go:
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
+ 
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
 clean:
@@ -588,7 +589,7 @@ docker:
 firefly-evmconnect: cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/blocklistener.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/retry_delay.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/blocklistener_test.go internal/ethereum/event_actions.go internal/ethereum/event_stream_test.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/event_actions_test.go internal/ethereum/prepare_transaction.go
 #  Implicit rule search has not been done.
 #  Implicit/static pattern stem: `'
-#  Last modified 2022-07-11 16:55:35
+#  Last modified 2022-07-11 17:34:42
 #  File has been updated.
 #  Needs to be updated (-q is set).
 # automatic
@@ -606,7 +607,7 @@ firefly-evmconnect: cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_do
 # automatic
 # ^ := cmd/config.go cmd/version.go cmd/evmconnect.go cmd/config_docs_generate_test.go cmd/evmconnect_test.go cmd/version_test.go cmd/config_test.go cmd/config_docs_test.go internal/jsonrpc/rpc.go internal/msgs/en_error_messges.go internal/msgs/en_config_descriptions.go internal/ethereum/blocklistener.go internal/ethereum/get_next_nonce_test.go internal/ethereum/error_mapping.go internal/ethereum/config.go internal/ethereum/get_gas_price_test.go internal/ethereum/get_receipt.go internal/ethereum/retry_delay.go internal/ethereum/estimate_gas.go internal/ethereum/get_next_nonce.go internal/ethereum/get_block_info_test.go internal/ethereum/blocklistener_test.go internal/ethereum/event_actions.go internal/ethereum/event_stream_test.go internal/ethereum/send_transaction_test.go internal/ethereum/get_receipt_test.go internal/ethereum/get_block_info.go internal/ethereum/prepare_transaction_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/get_gas_price.go internal/ethereum/exec_query_test.go internal/ethereum/exec_query.go internal/ethereum/ethereum.go internal/ethereum/send_transaction.go internal/ethereum/ethereum_test.go internal/ethereum/event_actions_test.go internal/ethereum/prepare_transaction.go
 # automatic
-# ? := internal/ethereum/event_stream_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go internal/ethereum/event_actions_test.go
+# ? := internal/ethereum/blocklistener.go internal/ethereum/retry_delay.go internal/ethereum/event_stream_test.go internal/ethereum/event_listener.go internal/ethereum/event_stream.go
 # variable set hash-table stats:
 # Load=8/32=25%, Rehash=0, Collisions=1/12=8%
 #  commands to execute (from `Makefile', line 36):
@@ -681,7 +682,7 @@ lint: /Users/pbroadhurst/go/bin/golangci-lint
 # Not a target:
 internal/ethereum/event_stream_test.go:
 #  Implicit rule search has been done.
-#  Last modified 2022-07-11 17:15:45
+#  Last modified 2022-07-11 17:43:32
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -692,7 +693,6 @@ mocks-internal/jsonrpc-Client: /Users/pbroadhurst/go/bin/mockery
 #  Modification time never checked.
 #  File has not been updated.
 #  commands to execute (from `Makefile', line 33):
- 
 	/Users/pbroadhurst/go/bin/mockery --case underscore --dir  internal/jsonrpc --name      Client --outpkg     jsonrpcmocks --output mocks/jsonrpcmocks
 	
 
@@ -702,6 +702,7 @@ internal/ethereum/get_gas_price_test.go:
 #  Last modified 2022-07-09 16:20:45
 #  File has been updated.
 #  Successfully updated.
+ 
 # variable set hash-table stats:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
@@ -759,6 +760,6 @@ cmd/version.go:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Mon Jul 11 17:15:50 2022
+# Finished Make data base on Mon Jul 11 18:09:19 2022
 
  
