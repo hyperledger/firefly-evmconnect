@@ -83,8 +83,7 @@ func mockStreamLoopEmpty(mRPC *jsonrpcmocks.Client) {
 		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
 	}).Maybe()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(101010)
+		*args[1].(*string) = "filter_id1"
 	}).Maybe()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)

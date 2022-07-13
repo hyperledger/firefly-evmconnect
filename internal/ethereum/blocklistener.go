@@ -85,7 +85,7 @@ func (bl *blockListener) listenLoop() {
 		log.L(bl.ctx).Warnf("Block listener exiting before establishing initial block height: %s", err)
 	}
 
-	var filter *ethtypes.HexInteger
+	var filter string
 	failCount := 0
 	gapPotential := true
 	for {
@@ -104,7 +104,7 @@ func (bl *blockListener) listenLoop() {
 			}
 		}
 
-		if filter == nil {
+		if filter == "" {
 			err := bl.c.backend.Invoke(bl.ctx, &filter, "eth_newBlockFilter")
 			if err != nil {
 				log.L(bl.ctx).Errorf("Failed to establish new block filter: %s", err)
@@ -117,8 +117,8 @@ func (bl *blockListener) listenLoop() {
 		err := bl.c.backend.Invoke(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
 		if err != nil {
 			if mapError(filterRPCMethods, err) == ffcapi.ErrorReasonNotFound {
-				log.L(bl.ctx).Warnf("Block filter '%s' no longer valid. Recreating filter: %s", filter, err)
-				filter = nil
+				log.L(bl.ctx).Warnf("Block filter '%v' no longer valid. Recreating filter: %s", filter, err)
+				filter = ""
 				gapPotential = true
 			}
 			log.L(bl.ctx).Errorf("Failed to query block filter changes: %s", err)

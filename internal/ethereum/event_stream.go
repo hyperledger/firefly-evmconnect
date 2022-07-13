@@ -278,13 +278,13 @@ func (es *eventStream) streamLoop() {
 		return
 	}
 
-	var filter *ethtypes.HexInteger
+	var filter string
 	uninstallFilter := func() {
 		var res bool
 		if err := es.c.backend.Invoke(es.ctx, &res, "eth_uninstallFilter", filter); err != nil {
-			log.L(es.ctx).Warnf("Error uninstalling filter '%s': %s", filter, err)
+			log.L(es.ctx).Warnf("Error uninstalling filter '%v': %s", filter, err)
 		}
-		filter = nil
+		filter = ""
 	}
 	defer uninstallFilter()
 
@@ -309,9 +309,9 @@ func (es *eventStream) streamLoop() {
 			hwmBlock := es.c.blockListener.getHighestBlock(es.ctx) - es.c.checkpointBlockGap
 
 			// Re-establish the filter if we need to
-			if filter == nil || listenerChanged {
+			if filter == "" || listenerChanged {
 				// Uninstall any existing filter
-				if filter != nil {
+				if filter != "" {
 					uninstallFilter()
 				}
 				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new
@@ -335,7 +335,7 @@ func (es *eventStream) streamLoop() {
 					failCount++
 					continue
 				}
-				log.L(es.ctx).Infof("Filter '%s' established", filter)
+				log.L(es.ctx).Infof("Filter '%v' established", filter)
 			}
 			// Get the next batch of logs
 			var ethLogs []*logJSONRPC
@@ -343,8 +343,8 @@ func (es *eventStream) streamLoop() {
 			// If we fail to query we just retry - setting filter to nil if not found
 			if err != nil {
 				if mapError(filterRPCMethods, err) == ffcapi.ErrorReasonNotFound {
-					log.L(es.ctx).Infof("Filter '%s' reset: %s", filter, err)
-					filter = nil
+					log.L(es.ctx).Infof("Filter '%v' reset: %s", filter, err)
+					filter = ""
 				}
 				log.L(es.ctx).Errorf("Failed to query filter (%s): %s", filterRPC, err)
 				failCount++

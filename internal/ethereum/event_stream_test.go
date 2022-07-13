@@ -306,7 +306,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(101010)
+			*args[1].(*string) = "filter_id1"
 		}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
@@ -457,11 +457,11 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 			l2req.StreamID = es.id
 			_, _, err := c.EventListenerAdd(ctx, l2req)
 			assert.NoError(t, err)
-			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(101010)
+			*args[1].(*string) = "filter_id1"
 		}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(202020)
+			*args[1].(*string) = "filter_id2"
 			close(reestablishedFilter)
 		})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -502,11 +502,11 @@ func TestStreamLoopFilterReset(t *testing.T) {
 	})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(101010)
+			*args[1].(*string) = "filter_id1"
 		}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethtypes.HexInteger) = ethtypes.NewHexInteger64(202020)
+			*args[1].(*string) = "filter_id2"
 			close(reestablishedFilter)
 		})
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(fmt.Errorf("filter not found")).Once()

@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func strPtr(s string) *string { return &s }
+
 func newTestConnector(t *testing.T) (context.Context, *ethConnector, *jsonrpcmocks.Client, func()) {
 
 	mRPC := &jsonrpcmocks.Client{}

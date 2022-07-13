@@ -78,21 +78,17 @@ func TestBlockListenerOK(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(101010)
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
 	})
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.MatchedBy(func(filter *ethtypes.HexInteger) bool {
-		return filter.BigInt().Int64() == 101010
-	})).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{
 			ethtypes.MustNewHexBytes0xPrefix("0x936feb38eae37a1083a995a33795d952ae502017bb749d2566ed5ad0cb3b49e1"),
 			ethtypes.MustNewHexBytes0xPrefix("0x67e48f436893ff6b1bd5303a14dad1f4981441b2990e72d31dc2678faa55f38c"),
 		}
 	}).Once()
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.MatchedBy(func(filter *ethtypes.HexInteger) bool {
-		return filter.BigInt().Int64() == 101010
-	})).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{
 			ethtypes.MustNewHexBytes0xPrefix("0xe74ebee74141ef8932666923fae9b8d6cf04ba67989e7908fcddb66565d41e42"),
@@ -160,12 +156,10 @@ func TestBlockListenerClosed(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(101010)
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
 	})
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.MatchedBy(func(filter *ethtypes.HexInteger) bool {
-		return filter.BigInt().Int64() == 101010
-	})).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{
 			ethtypes.MustNewHexBytes0xPrefix("0xe74ebee74141ef8932666923fae9b8d6cf04ba67989e7908fcddb66565d41e42"),
@@ -211,12 +205,10 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(101010)
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
 	})
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.MatchedBy(func(filter *ethtypes.HexInteger) bool {
-		return filter.BigInt().Int64() == 101010
-	})).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{
 			ethtypes.MustNewHexBytes0xPrefix("0xe74ebee74141ef8932666923fae9b8d6cf04ba67989e7908fcddb66565d41e42"),
@@ -249,12 +241,10 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(101010)
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
 	})
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.MatchedBy(func(filter *ethtypes.HexInteger) bool {
-		return filter.BigInt().Int64() == 101010
-	})).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{
 			ethtypes.MustNewHexBytes0xPrefix("0xe74ebee74141ef8932666923fae9b8d6cf04ba67989e7908fcddb66565d41e42"),
@@ -287,16 +277,14 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(101010)
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(**ethtypes.HexInteger)
-		*hbh = ethtypes.NewHexInteger64(202020)
+		hbh := args[1].(*string)
+		*hbh = "filter_id2"
 	}).Once()
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.MatchedBy(func(filter *ethtypes.HexInteger) bool {
-		return filter.BigInt().Int64() == 101010
-	})).Return(fmt.Errorf("filter not found")).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(fmt.Errorf("filter not found")).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		done() // Close after we've processed the log
 	})
