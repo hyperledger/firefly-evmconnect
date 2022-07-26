@@ -97,12 +97,22 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 }
 
-func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string, nonce, gas, value *fftypes.FFBigInt, data []byte) (*ethsigner.Transaction, error) {
+func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string, nonce, gas, value *fftypes.FFBigInt, data []byte) (tx *ethsigner.Transaction, err error) {
+	tx = &ethsigner.Transaction{
+		Nonce:    (*ethtypes.HexInteger)(nonce),
+		GasLimit: (*ethtypes.HexInteger)(gas),
+		Value:    (*ethtypes.HexInteger)(value),
+		Data:     data,
+	}
 
-	// Verify the from address, and normalize formatting to pass downstream
-	from, err := ethtypes.NewAddress(fromString)
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
+	// Parse the from address (if set)
+	var from *ethtypes.Address0xHex
+	if fromString != "" {
+		from, err = ethtypes.NewAddress(fromString)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
+		}
+		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 	}
 
 	// Parse the to address (if set)
@@ -112,15 +122,9 @@ func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string,
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgInvalidToAddress, toString, err)
 		}
+		tx.To = to
 	}
 
-	return &ethsigner.Transaction{
-		From:     json.RawMessage(fmt.Sprintf(`"%s"`, from)),
-		To:       to,
-		Nonce:    (*ethtypes.HexInteger)(nonce),
-		GasLimit: (*ethtypes.HexInteger)(gas),
-		Value:    (*ethtypes.HexInteger)(value),
-		Data:     data,
-	}, nil
+	return tx, nil
 
 }

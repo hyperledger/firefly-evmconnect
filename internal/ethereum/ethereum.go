@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -93,6 +94,13 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	default:
 		return nil, i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
 	}
+	c.serializer.SetDefaultNameGenerator(func(idx int) string {
+		name := "output"
+		if idx > 0 {
+			name = fmt.Sprintf("%s%v", name, idx)
+		}
+		return name
+	})
 
 	c.blockListener = newBlockListener(ctx, c, conf)
 

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -284,11 +285,14 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	log.L(ctx).Infof("Listener %s detected event '%s'", l.id, protoID)
 	data := l.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
 
+	signature := strings.Split(l.config.signature, ":")[1]
+
 	info := eventInfo{
 		logJSONRPC:      *ethLog,
 		DeprecatedSubID: l.id,
 		ListenerID:      l.id,
 		ListenerName:    l.config.name,
+		Signature:       signature,
 	}
 
 	if l.c.eventBlockTimestamps {
