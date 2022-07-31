@@ -72,13 +72,16 @@ func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, 
 		return nil
 	}
 	gasPriceObject := input.JSONObjectNowarn()
-	tx.MaxPriorityFeePerGas = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
-	tx.MaxFeePerGas = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
+	maxPriorityFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
+	maxFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
 	if tx.MaxPriorityFeePerGas.BigInt().Sign() > 0 || tx.MaxFeePerGas.BigInt().Sign() > 0 {
+		tx.MaxPriorityFeePerGas = maxPriorityFeePerGas
+		tx.MaxFeePerGas = maxFeePerGas
 		log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas)
 		return nil
 	}
 	tx.GasPrice = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("gasPrice"))
+	log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s gasPrice=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas, tx.GasPrice)
 	if tx.GasPrice.BigInt().Sign() == 0 {
 		err := json.Unmarshal(input.Bytes(), &tx.GasPrice)
 		if err != nil {

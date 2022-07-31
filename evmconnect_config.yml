@@ -1,0 +1,15 @@
+log:
+  level: debug
+connector:
+  url: http://127.0.0.1:5100
+manager:
+  name: bob
+persistence:
+  leveldb:
+    # path: ./.leveldb // SET BY ENV VARIABLE
+ffcore:
+  url: http://127.0.0.1:5101
+  namespaces:
+  - default
+confirmations:
+  required: 0 
