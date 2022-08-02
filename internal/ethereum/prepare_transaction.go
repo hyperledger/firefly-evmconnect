@@ -106,14 +106,11 @@ func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string,
 	}
 
 	// Parse the from address (if set)
-	var from *ethtypes.Address0xHex
-	if fromString != "" {
-		from, err = ethtypes.NewAddress(fromString)
-		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
-		}
-		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
+	from, err := ethtypes.NewAddress(fromString)
+	if err != nil {
+		return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
 	}
+	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 
 	// Parse the to address (if set)
 	var to *ethtypes.Address0xHex

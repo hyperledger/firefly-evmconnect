@@ -74,7 +74,7 @@ func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, 
 	gasPriceObject := input.JSONObjectNowarn()
 	maxPriorityFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
 	maxFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
-	if tx.MaxPriorityFeePerGas.BigInt().Sign() > 0 || tx.MaxFeePerGas.BigInt().Sign() > 0 {
+	if maxPriorityFeePerGas.BigInt().Sign() > 0 || maxFeePerGas.BigInt().Sign() > 0 {
 		tx.MaxPriorityFeePerGas = maxPriorityFeePerGas
 		tx.MaxFeePerGas = maxFeePerGas
 		log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas)

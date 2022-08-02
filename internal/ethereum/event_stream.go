@@ -44,14 +44,9 @@ type eventFilter struct {
 // eventInfo is the top-level structure we pass to applications for each event (through the FFCAPI framework)
 type eventInfo struct {
 	logJSONRPC
-	DeprecatedSubID *fftypes.UUID          `json:"subId"`                 // ID of the listener - deprecated "subscription" naming
-	ListenerID      *fftypes.UUID          `json:"listenerId"`            // ID of the listener
-	ListenerName    string                 `json:"listenerName"`          // name of the listener
-	Signature       string                 `json:"signature"`             // event signature string
-	Timestamp       uint64                 `json:"timestamp,omitempty"`   // block timestamp, if enabled in the configuration
-	InputMethod     string                 `json:"inputMethod,omitempty"` // the method invoked, if it matched one of the signatures in the listener definition
-	InputArgs       *fftypes.JSONAny       `json:"inputArgs,omitempty"`   // the method parameters, if the method matched one of the signatures in the listener definition
-	InputSigner     *ethtypes.Address0xHex `json:"inputSigner,omitempty"` // the signing `from` address of the transaction
+	InputMethod string                 `json:"inputMethod,omitempty"` // the method invoked, if it matched one of the signatures in the listener definition
+	InputArgs   *fftypes.JSONAny       `json:"inputArgs,omitempty"`   // the method parameters, if the method matched one of the signatures in the listener definition
+	InputSigner *ethtypes.Address0xHex `json:"inputSigner,omitempty"` // the signing `from` address of the transaction
 }
 
 // eventStream is the state we hold in memory for each eventStream

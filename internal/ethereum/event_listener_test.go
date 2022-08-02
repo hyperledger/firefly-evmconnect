@@ -280,9 +280,7 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 
 	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
-	ei := &eventInfo{}
-	err = json.Unmarshal(ev.Event.Info.Bytes(), &ei)
-	assert.NoError(t, err)
+	ei := ev.Event.Info.(*eventInfo)
 	assert.NotNil(t, ei.InputArgs)
 	assert.Equal(t, `{"_to":"0xd0f2f5103fd050739a9fb567251bc460cc24d091","_value":"1000"}`, ei.InputArgs.String())
 	assert.Equal(t, `transfer(address,uint256)`, ei.InputMethod)
@@ -307,8 +305,7 @@ func TestFilterEnrichEthLogTXInfoFail(t *testing.T) {
 
 	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
-	ei := &eventInfo{}
-	err = json.Unmarshal(ev.Event.Info.Bytes(), &ei)
+	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)
 
 }
@@ -339,9 +336,7 @@ func TestFilterEnrichEthLogMethodBadInputTooShort(t *testing.T) {
 
 	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
-	ei := &eventInfo{}
-	err = json.Unmarshal(ev.Event.Info.Bytes(), &ei)
-	assert.NoError(t, err)
+	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)
 
 }
@@ -372,9 +367,7 @@ func TestFilterEnrichEthLogMethodBadInputTooMismatchFunctionID(t *testing.T) {
 
 	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
-	ei := &eventInfo{}
-	err = json.Unmarshal(ev.Event.Info.Bytes(), &ei)
-	assert.NoError(t, err)
+	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)
 
 }
@@ -405,9 +398,7 @@ func TestFilterEnrichEthLogMethodBadInputABIData(t *testing.T) {
 
 	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
-	ei := &eventInfo{}
-	err = json.Unmarshal(ev.Event.Info.Bytes(), &ei)
-	assert.NoError(t, err)
+	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)
 
 }

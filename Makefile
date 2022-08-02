@@ -22,15 +22,18 @@ ${MOCKERY}:
 		$(VGO) install github.com/vektra/mockery/cmd/mockery@latest
 ${LINT}:
 		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+mockpaths:
+		$(eval FFTM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/hyperledger/firefly-transaction-manager/pkg/fftm))
 
 
 define makemock
 mocks: mocks-$(strip $(1))-$(strip $(2))
-mocks-$(strip $(1))-$(strip $(2)): ${MOCKERY}
+mocks-$(strip $(1))-$(strip $(2)): ${MOCKERY} mockpaths
 	${MOCKERY} --case underscore --dir $(1) --name $(2) --outpkg $(3) --output mocks/$(strip $(3))
 endef
 
 $(eval $(call makemock, internal/jsonrpc,     Client,    jsonrpcmocks))
+$(eval $(call makemock, $$(FFTM_PATH),        Manager,   fftmmocks))
 
 firefly-evmconnect: ${GOFILES}
 		$(VGO) build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v ./evmconnect 

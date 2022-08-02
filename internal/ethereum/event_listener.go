@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
-	"strings"
 	"sync"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -285,22 +284,17 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	log.L(ctx).Infof("Listener %s detected event '%s'", l.id, protoID)
 	data := l.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
 
-	signature := strings.Split(l.config.signature, ":")[1]
-
 	info := eventInfo{
-		logJSONRPC:      *ethLog,
-		DeprecatedSubID: l.id,
-		ListenerID:      l.id,
-		ListenerName:    l.config.name,
-		Signature:       signature,
+		logJSONRPC: *ethLog,
 	}
 
+	var timestamp *fftypes.FFTime
 	if l.c.eventBlockTimestamps {
 		bi, err := l.c.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if bi == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
 		} else {
-			info.Timestamp = bi.Timestamp.BigInt().Uint64()
+			timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
 		}
 	}
 
@@ -314,7 +308,6 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 		}
 	}
 
-	infoBytes, _ := json.Marshal(&info)
 	return &ffcapi.ListenerEvent{
 		Checkpoint: &listenerCheckpoint{
 			Block:            blockNumber,
@@ -322,15 +315,16 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 			LogIndex:         logIndex,
 		},
 		Event: &ffcapi.Event{
-			EventID: ffcapi.EventID{
+			ID: ffcapi.EventID{
 				ListenerID:       l.id,
 				BlockHash:        ethLog.BlockHash.String(),
 				TransactionHash:  ethLog.TransactionHash.String(),
 				BlockNumber:      uint64(blockNumber),
 				TransactionIndex: uint64(transactionIndex),
 				LogIndex:         uint64(logIndex),
+				Timestamp:        timestamp,
 			},
-			Info: fftypes.JSONAnyPtrBytes(infoBytes),
+			Info: &info,
 			Data: data,
 		},
 	}, true

@@ -48,9 +48,12 @@ const sampleExecQuery = `{
 		"name":"set",
 		"outputs":[
 			{
-				"internalType":" uint256",
-				"name": "y",
+				"internalType":"uint256",
+				"name": "",
 				"type": "uint256"
+			},
+			{
+				"type": "string"
 			}
 		],
 		"stateMutability":"nonpayable",
@@ -71,17 +74,18 @@ func TestExecQueryOKResponse(t *testing.T) {
 		}),
 		"latest").
 		Run(func(args mock.Arguments) {
-			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d")
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b68656c6c6f20776f726c64000000000000000000000000000000000000000000")
 		}).
 		Return(nil)
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(sampleExecQuery), &req)
 	assert.NoError(t, err)
+
 	res, reason, err := c.QueryInvoke(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.JSONEq(t, `{"y": "3131961357"}`, res.Outputs.String())
+	assert.JSONEq(t, `{"output": "3131961357", "output1":"hello world"}`, res.Outputs.String())
 
 }
 

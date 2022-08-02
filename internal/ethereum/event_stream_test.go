@@ -257,9 +257,9 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	assert.True(t, l.catchup)
 
 	e := <-events
-	assert.Equal(t, uint64(1024), e.Event.BlockNumber)
-	assert.Equal(t, uint64(64), e.Event.TransactionIndex)
-	assert.Equal(t, uint64(2), e.Event.LogIndex)
+	assert.Equal(t, uint64(1024), e.Event.ID.BlockNumber)
+	assert.Equal(t, uint64(64), e.Event.ID.TransactionIndex)
+	assert.Equal(t, uint64(2), e.Event.ID.LogIndex)
 	assert.Equal(t, int64(1024), e.Checkpoint.(*listenerCheckpoint).Block)
 	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
 	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)
@@ -345,9 +345,9 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	defer done()
 
 	e := <-events
-	assert.Equal(t, uint64(1024), e.Event.BlockNumber)
-	assert.Equal(t, uint64(64), e.Event.TransactionIndex)
-	assert.Equal(t, uint64(2), e.Event.LogIndex)
+	assert.Equal(t, uint64(1024), e.Event.ID.BlockNumber)
+	assert.Equal(t, uint64(64), e.Event.ID.TransactionIndex)
+	assert.Equal(t, uint64(2), e.Event.ID.LogIndex)
 	assert.Equal(t, int64(1024), e.Checkpoint.(*listenerCheckpoint).Block)
 	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
 	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)

@@ -2,8 +2,6 @@ connector:
   url: http://localhost:8545
 api:
   address: :::::::wrong
-manager:
-  name: unit-test
 persistence:
   leveldb:
     path: "../test/ldb"

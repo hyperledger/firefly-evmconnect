@@ -17,10 +17,13 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/firefly-evmconnect/mocks/fftmmocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,7 +82,9 @@ func TestRunBadConfirmationsConfig(t *testing.T) {
 	rootCmd.SetArgs([]string{"-f", "../test/fail-start.evmconnect.yaml"})
 	defer rootCmd.SetArgs([]string{})
 
-	err := Execute()
-	assert.Regexp(t, "FF21017", err)
+	mft := &fftmmocks.Manager{}
+	mft.On("Start").Return(fmt.Errorf("pop"))
+	err := runManager(context.Background(), mft)
+	assert.Regexp(t, "pop", err)
 
 }

@@ -103,7 +103,11 @@ func run() error {
 		cancelCtx()
 	}()
 
-	err = m.Start()
+	return runManager(ctx, m)
+}
+
+func runManager(ctx context.Context, m fftm.Manager) error {
+	err := m.Start()
 	if err != nil {
 		return err
 	}

@@ -5,9 +5,9 @@ go 1.17
 require (
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hyperledger/firefly-common v0.1.13
-	github.com/hyperledger/firefly-signer v0.9.11
-	github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220711130525-41864b2cad5b
+	github.com/hyperledger/firefly-common v0.1.16-0.20220802021705-fde9d1e46229
+	github.com/hyperledger/firefly-signer v0.9.13-0.20220715205703-0aa53d8707dd
+	github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220802015016-8dd773720a7d
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1
@@ -31,7 +31,6 @@ require (
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hyperledger/firefly v1.0.1-0.20220505194321-9f59036d0b4e // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/invopop/yaml v0.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -59,6 +58,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
