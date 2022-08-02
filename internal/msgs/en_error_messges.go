@@ -64,4 +64,5 @@ var (
 	MsgListenerNotInitialized    = ffe("FF23044", "Event listener %s not initialized in event stream %s")
 	MsgStreamNotStopped          = ffe("FF23045", "Event stream %s not stopped")
 	MsgTimedOutQueryingChainHead = ffe("FF23046", "Timed out waiting for chain head block number")
+	MsgDecodeBytecodeFailed      = ffe("FF23047", "Failed to decode 'bytecode' as hex or Base64")
 )
