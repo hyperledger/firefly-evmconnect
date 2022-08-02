@@ -309,7 +309,7 @@ func (es *eventStream) streamLoop() {
 				if filter != "" {
 					uninstallFilter()
 				}
-				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new
+				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new filter ID
 				// Determine the earliest block we need to poll from
 				fromBlock := int64(-1)
 				for _, l := range ag.listeners {

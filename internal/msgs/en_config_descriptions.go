@@ -36,6 +36,6 @@ var (
 	ConfigEventsBlockTimestamps       = ffc("config.connector.events.blockTimestamps", "Whether to include the block timestamps in the event information", i18n.BooleanType)
 	ConfigEventsCatchupPageSize       = ffc("config.connector.events.catchupPageSize", "Number of blocks to query per poll when catching up to the head of the blockchain", i18n.IntType)
 	ConfigEventsCatchupThreshold      = ffc("config.connector.events.catchupThreshold", "How many blocks behind the chain head an event stream or listener must be on startup, to enter catchup mode", i18n.IntType)
-	ConfigEventsCheckpointBlockGap    = ffc("config.connector.events.checkpointBlockGap", "The number of blocks at the head of the chain that should be considered unstable for re-org, such that a checkpoint for an inactive listener should always be this many blocks behind the chain to avoid missing events on restart (in the case a re-org happens that includes new matching events at the head of the chain)", i18n.IntType)
+	ConfigEventsCheckpointBlockGap    = ffc("config.connector.events.checkpointBlockGap", "The number of blocks at the head of the chain that should be considered unstable (could be dropped form the canonical chain after a re-org). Unless events with a full set of confirmations are detected, the restart checkpoint will this many blocks behind the chain head.", i18n.IntType)
 	ConfigEventsFilterPollingInterval = ffc("config.connector.events.filterPollingInterval", "The interval between polling calls to a filter, when checking for newly arrived events", i18n.TimeDurationType)
 )

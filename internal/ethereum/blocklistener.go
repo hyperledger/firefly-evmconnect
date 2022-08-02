@@ -34,7 +34,7 @@ type blockUpdateConsumer struct {
 	updates chan<- *ffcapi.BlockHashEvent
 }
 
-// blockListener has two function:
+// blockListener has two functions:
 // 1) To establish and keep track of what the head block height of the blockchain is, so event streams know how far from the head they are
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
