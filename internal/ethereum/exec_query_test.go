@@ -17,12 +17,13 @@
 package ethereum
 
 import (
-	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -37,13 +38,6 @@ const sampleExecQuery = `{
 	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
 	"nonce": "222",
 	"method": {
-		"inputs": [],
-		"name":"do",
-		"outputs":[],
-		"stateMutability":"nonpayable",
-		"type":"function"
-	},
-	"method": {
 		"inputs": [
 			{
 				"internalType":" uint256",
@@ -54,9 +48,12 @@ const sampleExecQuery = `{
 		"name":"set",
 		"outputs":[
 			{
-				"internalType":" uint256",
-				"name": "y",
+				"internalType":"uint256",
+				"name": "",
 				"type": "uint256"
+			},
+			{
+				"type": "string"
 			}
 		],
 		"stateMutability":"nonpayable",
@@ -67,8 +64,8 @@ const sampleExecQuery = `{
 
 func TestExecQueryOKResponse(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -77,21 +74,25 @@ func TestExecQueryOKResponse(t *testing.T) {
 		}),
 		"latest").
 		Run(func(args mock.Arguments) {
-			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d")
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b68656c6c6f20776f726c64000000000000000000000000000000000000000000")
 		}).
 		Return(nil)
 
-	iRes, reason, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+
+	res, reason, err := c.QueryInvoke(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.JSONEq(t, `{"y": "3131961357"}`, iRes.(*ffcapi.ExecQueryResponse).Outputs.String())
+	assert.JSONEq(t, `{"output": "3131961357", "output1":"hello world"}`, res.Outputs.String())
 
 }
 
 func TestExecQueryOKNilResponse(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -104,9 +105,145 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 		}).
 		Return(nil)
 
-	iRes, reason, err := c.execQuery(ctx, []byte(sampleExecQuery))
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.QueryInvoke(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.JSONEq(t, "null", iRes.(*ffcapi.ExecQueryResponse).Outputs.String())
+	assert.JSONEq(t, "null", res.Outputs.String())
+
+}
+
+func TestExecQueryBadRevertData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Regexp(t, "FF23022.*0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d", err)
+
+}
+
+func TestExecQueryBadReturnData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(`{
+			"ffcapi": {
+				"version": "v1.0.0",
+				"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+				"type": "exec_query"
+			},
+			"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+			"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+			"nonce": "222",
+			"method": {
+				"inputs": [],
+				"name":"set",
+				"outputs":[{"type":"uint256[10]"}],
+				"stateMutability":"nonpayable",
+				"type":"function"
+			},
+			"params": [ ]
+		}`), &req)
+	assert.NoError(t, err)
+
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Empty(t, reason)
+	assert.Regexp(t, "FF23023", err)
+
+}
+
+func TestExecQueryFailCall(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestExecQueryFailBadToAddress(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(`{
+		"ffcapi": {
+			"version": "v1.0.0",
+			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+			"type": "exec_query"
+		},
+		"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+		"to": "wrong",
+		"nonce": "222",
+		"method": {
+			"inputs": [],
+			"name":"set",
+			"outputs":[],
+			"stateMutability":"nonpayable",
+			"type":"function"
+		},
+		"params": [ ]
+	}`), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
+	assert.Regexp(t, "FF23020", err)
+
+}
+
+func TestExecQueryFailBadToParams(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(`{
+		"ffcapi": {
+			"version": "v1.0.0",
+			"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+			"type": "exec_query"
+		},
+		"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+		"to": "wrong",
+		"nonce": "222",
+		"method": {
+			"inputs": [],
+			"name":"set",
+			"outputs":[],
+			"stateMutability":"nonpayable",
+			"type":"function"
+		},
+		"params": [ "unexpected extra param" ]
+	}`), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
+	assert.Regexp(t, "FF22037", err)
 
 }

@@ -18,31 +18,24 @@ package ethereum
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) getGasPrice(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.GetGasPriceRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
+func (c *ethConnector) GasPriceEstimate(ctx context.Context, req *ffcapi.GasPriceEstimateRequest) (*ffcapi.GasPriceEstimateResponse, ffcapi.ErrorReason, error) {
 
 	// Note we use simple (pre London fork) gas fee approach.
 	// See https://github.com/ethereum/pm/issues/328#issuecomment-853234014 for a bit of color
 	var gasPrice ethtypes.HexInteger
-	err = c.backend.Invoke(ctx, &gasPrice, "eth_gasPrice")
+	err := c.backend.Invoke(ctx, &gasPrice, "eth_gasPrice")
 	if err != nil {
 		return nil, "", err
 	}
 
-	return &ffcapi.GetGasPriceResponse{
+	return &ffcapi.GasPriceEstimateResponse{
 		GasPrice: fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, gasPrice.BigInt().Text(10))),
 	}, "", nil
 

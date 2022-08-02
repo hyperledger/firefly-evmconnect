@@ -18,28 +18,21 @@ package ethereum
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) getNextNonce(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.GetNextNonceRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
+func (c *ethConnector) NextNonceForSigner(ctx context.Context, req *ffcapi.NextNonceForSignerRequest) (*ffcapi.NextNonceForSignerResponse, ffcapi.ErrorReason, error) {
 
 	var txnCount ethtypes.HexInteger
-	err = c.backend.Invoke(ctx, &txnCount, "eth_getTransactionCount", req.Signer, "pending")
+	err := c.backend.Invoke(ctx, &txnCount, "eth_getTransactionCount", req.Signer, "pending")
 	if err != nil {
 		return nil, "", err
 	}
 
-	return &ffcapi.GetNextNonceResponse{
+	return &ffcapi.NextNonceForSignerResponse{
 		Nonce: (*fftypes.FFBigInt)(&txnCount),
 	}, "", nil
 

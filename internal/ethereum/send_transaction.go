@@ -22,19 +22,16 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) sendTransaction(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.SendTransactionRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
+func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.TransactionSendRequest) (*ffcapi.TransactionSendResponse, ffcapi.ErrorReason, error) {
 
 	txData, err := hex.DecodeString(strings.TrimPrefix(req.TransactionData, "0x"))
 	if err != nil {
@@ -56,8 +53,41 @@ func (c *ethConnector) sendTransaction(ctx context.Context, payload []byte) (int
 	if err != nil {
 		return nil, mapError(sendRPCMethods, err), err
 	}
-	return &ffcapi.SendTransactionResponse{
+	return &ffcapi.TransactionSendResponse{
 		TransactionHash: txHash.String(),
 	}, "", nil
 
+}
+
+// mapGasPrice handles a variety of inputs from the Transaction Manager policy engine
+//   sending the FFCAPI request. Specifically:
+//   - {"maxFeePerGas": "12345", "maxPriorityFeePerGas": "2345"} - EIP-1559 gas price
+//   - {"gasPrice": "12345"} - legacy gas price
+//   - "12345" - same as  {"gasPrice": "12345"}
+//   - nil - same as {"gasPrice": "0"}
+// Anything else will return an error
+func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, tx *ethsigner.Transaction) error {
+	if input == nil {
+		tx.GasPrice = ethtypes.NewHexInteger64(0)
+		return nil
+	}
+	gasPriceObject := input.JSONObjectNowarn()
+	maxPriorityFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
+	maxFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
+	if maxPriorityFeePerGas.BigInt().Sign() > 0 || maxFeePerGas.BigInt().Sign() > 0 {
+		tx.MaxPriorityFeePerGas = maxPriorityFeePerGas
+		tx.MaxFeePerGas = maxFeePerGas
+		log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas)
+		return nil
+	}
+	tx.GasPrice = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("gasPrice"))
+	log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s gasPrice=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas, tx.GasPrice)
+	if tx.GasPrice.BigInt().Sign() == 0 {
+		err := json.Unmarshal(input.Bytes(), &tx.GasPrice)
+		if err != nil {
+			return i18n.NewError(ctx, msgs.MsgGasPriceError, input.String())
+		}
+	}
+	log.L(ctx).Debugf("gasPrice=%s", tx.GasPrice)
+	return nil
 }

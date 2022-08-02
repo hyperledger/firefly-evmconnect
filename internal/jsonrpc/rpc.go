@@ -78,15 +78,16 @@ func (r *jsonRPC) Invoke(ctx context.Context, result interface{}, method string,
 		Method:  method,
 		Params:  params,
 	}
-	var rpcRes RPCResponse
+	rpcRes := &RPCResponse{}
 
 	log.L(ctx).Infof("RPC:%s:%s --> %s", rpcReq.ID, rpcReq.ID, rpcReq.Method)
 	res, err := r.httpClient.R().
 		SetContext(ctx).
-		SetBody(&rpcReq).
-		SetResult(rpcRes).
+		SetBody(rpcReq).
+		SetResult(&rpcRes).
 		SetError(rpcRes).
 		Post("")
+
 	// Restore the original ID
 	rpcRes.ID = rpcReq.ID
 	if err != nil {

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -29,15 +28,10 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) prepareTransaction(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.PrepareTransactionRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
+func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.TransactionPrepareRequest) (*ffcapi.TransactionPrepareResponse, ffcapi.ErrorReason, error) {
 
 	// Parse the input JSON data, to build the call data
 	callData, method, err := c.prepareCallData(ctx, &req.TransactionInput)
@@ -61,7 +55,7 @@ func (c *ethConnector) prepareTransaction(ctx context.Context, payload []byte) (
 	}
 	log.L(ctx).Infof("Prepared transaction method=%s dataLen=%d gas=%s", method.String(), len(callData), req.Gas.Int())
 
-	return &ffcapi.PrepareTransactionResponse{
+	return &ffcapi.TransactionPrepareResponse{
 		Gas:             req.Gas,
 		TransactionData: ethtypes.HexBytes0xPrefix(callData).String(),
 	}, "", nil
@@ -72,7 +66,7 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 	// Parse the method ABI
 	var method *abi.Entry
-	err := json.Unmarshal([]byte(req.Method), &method)
+	err := json.Unmarshal(req.Method.Bytes(), &method)
 	if err != nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
 	}
@@ -90,11 +84,11 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 	// Match the parameters to the ABI call data for the method.
 	// Note the FireFly ABI decoding package handles formatting errors / translation etc.
+	var callData []byte
 	paramValues, err := method.Inputs.ParseExternalDataCtx(ctx, ethParams)
-	if err != nil {
-		return nil, nil, err
+	if err == nil {
+		callData, err = method.EncodeCallDataCtx(ctx, paramValues)
 	}
-	callData, err := method.EncodeCallDataCtx(ctx, paramValues)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -103,13 +97,20 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 }
 
-func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string, nonce, gas, value *fftypes.FFBigInt, data []byte) (*ethsigner.Transaction, error) {
+func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string, nonce, gas, value *fftypes.FFBigInt, data []byte) (tx *ethsigner.Transaction, err error) {
+	tx = &ethsigner.Transaction{
+		Nonce:    (*ethtypes.HexInteger)(nonce),
+		GasLimit: (*ethtypes.HexInteger)(gas),
+		Value:    (*ethtypes.HexInteger)(value),
+		Data:     data,
+	}
 
-	// Verify the from address, and normalize formatting to pass downstream
+	// Parse the from address (if set)
 	from, err := ethtypes.NewAddress(fromString)
 	if err != nil {
 		return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
 	}
+	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 
 	// Parse the to address (if set)
 	var to *ethtypes.Address0xHex
@@ -118,45 +119,9 @@ func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string,
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgInvalidToAddress, toString, err)
 		}
+		tx.To = to
 	}
 
-	return &ethsigner.Transaction{
-		From:     json.RawMessage(fmt.Sprintf(`"%s"`, from)),
-		To:       to,
-		Nonce:    (*ethtypes.HexInteger)(nonce),
-		GasLimit: (*ethtypes.HexInteger)(gas),
-		Value:    (*ethtypes.HexInteger)(value),
-		Data:     data,
-	}, nil
+	return tx, nil
 
-}
-
-// mapGasPrice handles a variety of inputs from the Transaction Manager policy engine
-//   sending the FFCAPI request. Specifically:
-//   - {"maxFeePerGas": "12345", "maxPriorityFeePerGas": "2345"} - EIP-1559 gas price
-//   - {"gasPrice": "12345"} - legacy gas price
-//   - "12345" - same as  {"gasPrice": "12345"}
-//   - nil - same as {"gasPrice": "0"}
-// Anything else will return an error
-func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, tx *ethsigner.Transaction) error {
-	if input == nil {
-		tx.GasPrice = ethtypes.NewHexInteger64(0)
-		return nil
-	}
-	gasPriceObject := input.JSONObjectNowarn()
-	tx.MaxPriorityFeePerGas = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
-	tx.MaxFeePerGas = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
-	if tx.MaxPriorityFeePerGas.BigInt().Sign() > 0 || tx.MaxFeePerGas.BigInt().Sign() > 0 {
-		log.L(ctx).Debugf("maxPriorityFeePerGas=%s maxFeePerGas=%s", tx.MaxPriorityFeePerGas, tx.MaxFeePerGas)
-		return nil
-	}
-	tx.GasPrice = (*ethtypes.HexInteger)(gasPriceObject.GetInteger("gasPrice"))
-	if tx.GasPrice.BigInt().Sign() == 0 {
-		err := json.Unmarshal(input.Bytes(), &tx.GasPrice)
-		if err != nil {
-			return i18n.NewError(ctx, msgs.MsgGasPriceError, input.String())
-		}
-	}
-	log.L(ctx).Debugf("gasPrice=%s", tx.GasPrice)
-	return nil
 }
