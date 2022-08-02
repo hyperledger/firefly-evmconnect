@@ -132,9 +132,9 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 
 func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.ContractDeployInput) ([]byte, *abi.Entry, error) {
 	// Parse the bytecode as a hex string, or fallback to Base64
-	bytecode, err := hex.DecodeString(strings.TrimPrefix(req.Bytecode, "0x"))
+	bytecode, err := hex.DecodeString(strings.TrimPrefix(req.Bytecode.String(), "0x"))
 	if err != nil {
-		bytecode, err = base64.StdEncoding.DecodeString(req.Bytecode)
+		bytecode, err = base64.StdEncoding.DecodeString(req.Bytecode.String())
 		if err != nil {
 			return nil, nil, i18n.NewError(ctx, msgs.MsgDecodeBytecodeFailed)
 		}
