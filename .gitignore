@@ -5,3 +5,4 @@ coverage.txt
 .DS_Store
 __debug*
 .leveldb
+.vscode/*.log
