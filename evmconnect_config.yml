@@ -10,4 +10,8 @@ ffcore:
   namespaces:
   - default
 confirmations:
-  required: 0 
+  required: 0
+policyengine.simple:
+  fixedGasPrice: 0
+  gasOracle:
+    mode: fixed
