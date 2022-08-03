@@ -36,9 +36,10 @@ import (
 
 // eventFilter is our Ethereum specific filter options - an array of these can be configured on each listener
 type eventFilter struct {
-	Event   *abi.Entry                `json:"event"`             // The ABI spec of the event to listen to
-	Address *ethtypes.Address0xHex    `json:"address,omitempty"` // An optional address to restrict the
-	Topic0  ethtypes.HexBytes0xPrefix `json:"topic0"`            // Topic 0 match
+	Event     *abi.Entry                `json:"event"`             // The ABI spec of the event to listen to
+	Address   *ethtypes.Address0xHex    `json:"address,omitempty"` // An optional address to restrict the
+	Topic0    ethtypes.HexBytes0xPrefix `json:"topic0"`            // Topic 0 match
+	Signature string                    `json:"signature"`         // The cached signature of this event
 }
 
 // eventInfo is the top-level structure we pass to applications for each event (through the FFCAPI framework)
@@ -88,6 +89,7 @@ func parseEventFilters(ctx context.Context, filters []fftypes.JSONAny) (string, 
 		}
 		if err == nil {
 			ethFilters[i].Topic0, err = ethFilters[i].Event.SignatureHashCtx(ctx)
+			ethFilters[i].Signature = ethFilters[i].Event.String()
 		}
 		if err != nil {
 			return "", nil, i18n.NewError(ctx, msgs.MsgInvalidEventFilter, err)
