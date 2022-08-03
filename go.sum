@@ -288,8 +288,9 @@ github.com/hashicorp/serf v0.9.6/go.mod h1:TXZNMjZQijwlDvp+r0b63xZ45H7JmCmgg4gpT
 github.com/hashicorp/serf v0.9.7/go.mod h1:TXZNMjZQijwlDvp+r0b63xZ45H7JmCmgg4gpTwn9UV4=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/hyperledger/firefly-common v0.1.13/go.mod h1:2NqPi5Ud9H6rSlZXkLbotxW7z4EAD89p3/8oNOpm9Gs=
-github.com/hyperledger/firefly-common v0.1.16 h1:21xidDEKrJhtGdBSRqHN4PfDi7aYxF0HOFuAa04V1AE=
 github.com/hyperledger/firefly-common v0.1.16/go.mod h1:MNbaI2spBsdZYOub6Duj9xueE7Qyu9itOmJ4vE8tjYw=
+github.com/hyperledger/firefly-common v0.1.17-0.20220803213701-6643169efe7d h1:Nn0leFm3fwC9mUpP7oKAEjxPMynHDJ7P8GeA2Jj51Z8=
+github.com/hyperledger/firefly-common v0.1.17-0.20220803213701-6643169efe7d/go.mod h1:MNbaI2spBsdZYOub6Duj9xueE7Qyu9itOmJ4vE8tjYw=
 github.com/hyperledger/firefly-signer v0.9.13 h1:yvKxYTsEmE0XWl0vcZBQV353YmmePvWwIPMr4Lie67o=
 github.com/hyperledger/firefly-signer v0.9.13/go.mod h1:GPQRUZOFOAjkLmg8GDjZUjEdUD0gcar+CSVhwltIwyw=
 github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220803210053-4cc57d4e0ff5 h1:SFEdXxE/2Ehgur/gRcKvUk1wQzm0JSE9XCDDlpeB6zo=
