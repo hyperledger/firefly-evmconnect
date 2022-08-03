@@ -38,7 +38,7 @@ func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.Transact
 		return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgInvalidTXData, req.TransactionData, err)
 	}
 
-	tx, err := c.buildTx(ctx, req.From, req.To, req.Nonce, req.Gas, req.Value, txData)
+	tx, err := c.buildTx(ctx, txTypePrePrepared, req.From, req.To, req.Nonce, req.Gas, req.Value, txData)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}

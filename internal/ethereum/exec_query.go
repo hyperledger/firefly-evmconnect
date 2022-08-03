@@ -53,7 +53,7 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 	}
 
 	// Build the base transaction object
-	tx, err := c.buildTx(ctx, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
+	tx, err := c.buildTx(ctx, txTypeQuery, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}

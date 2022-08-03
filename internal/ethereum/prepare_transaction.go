@@ -34,6 +34,15 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
+type txType int
+
+const (
+	txTypeQuery txType = iota
+	txTypeDeployContract
+	txTypeInvokeContract
+	txTypePrePrepared
+)
+
 func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.TransactionPrepareRequest) (*ffcapi.TransactionPrepareResponse, ffcapi.ErrorReason, error) {
 
 	// Parse the input JSON data, to build the call data
@@ -43,7 +52,7 @@ func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.Trans
 	}
 
 	// Build the base transaction object
-	tx, err := c.buildTx(ctx, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
+	tx, err := c.buildTx(ctx, txTypeInvokeContract, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
@@ -74,7 +83,7 @@ func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.Co
 	}
 
 	// Build the base transaction object
-	tx, err := c.buildTx(ctx, req.From, "", req.Nonce, req.Gas, req.Value, callData)
+	tx, err := c.buildTx(ctx, txTypeDeployContract, req.From, "", req.Nonce, req.Gas, req.Value, callData)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
@@ -187,7 +196,7 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 	return callData, method, err
 }
 
-func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string, nonce, gas, value *fftypes.FFBigInt, data []byte) (tx *ethsigner.Transaction, err error) {
+func (c *ethConnector) buildTx(ctx context.Context, txType txType, fromString, toString string, nonce, gas, value *fftypes.FFBigInt, data []byte) (tx *ethsigner.Transaction, err error) {
 	tx = &ethsigner.Transaction{
 		Nonce:    (*ethtypes.HexInteger)(nonce),
 		GasLimit: (*ethtypes.HexInteger)(gas),
@@ -195,16 +204,18 @@ func (c *ethConnector) buildTx(ctx context.Context, fromString, toString string,
 		Data:     data,
 	}
 
-	// Parse the from address (if set)
-	from, err := ethtypes.NewAddress(fromString)
-	if err != nil {
-		return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
+	// Parse the from address
+	if txType != txTypeQuery {
+		from, err := ethtypes.NewAddress(fromString)
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
+		}
+		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 	}
-	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 
-	// Parse the to address (if set)
+	// Parse the to address - required for preparing an invoke, and must be valid if set
 	var to *ethtypes.Address0xHex
-	if toString != "" {
+	if txType != txTypeDeployContract && (txType != txTypePrePrepared || toString != "") {
 		to, err = ethtypes.NewAddress(toString)
 		if err != nil {
 			return nil, i18n.NewError(ctx, msgs.MsgInvalidToAddress, toString, err)
