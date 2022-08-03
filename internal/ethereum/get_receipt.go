@@ -42,6 +42,19 @@ type txReceiptJSONRPC struct {
 	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
 }
 
+// receiptExtraInfo is the version of the receipt we store under the TX.
+// - We omit the full logs from the JSON/RPC
+// - We omit fields already in the standardized cross-blockchain section
+// - We format numbers as decimals
+type receiptExtraInfo struct {
+	ContractAddress   *ethtypes.Address0xHex `json:"contractAddress"`
+	CumulativeGasUsed *fftypes.FFBigInt      `json:"cumulativeGasUsed"`
+	From              *ethtypes.Address0xHex `json:"from"`
+	To                *ethtypes.Address0xHex `json:"to"`
+	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
+	Status            *fftypes.FFBigInt      `json:"status"`
+}
+
 // txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
 type txInfoJSONRPC struct {
 	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
@@ -78,7 +91,15 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	}
 	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
 
-	fullReceipt, _ := json.Marshal(&ethReceipt)
+	ethReceipt.Logs = nil
+	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
+		ContractAddress:   ethReceipt.ContractAddress,
+		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
+		From:              ethReceipt.From,
+		To:                ethReceipt.To,
+		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
+		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+	})
 
 	var txIndex int64
 	if ethReceipt.TransactionIndex != nil {
