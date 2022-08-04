@@ -77,7 +77,7 @@ func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.Trans
 func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.ContractDeployPrepareRequest) (*ffcapi.TransactionPrepareResponse, ffcapi.ErrorReason, error) {
 
 	// Parse the input JSON data, to build the call data
-	callData, method, err := c.prepareDeployData(ctx, &req.ContractDeployInput)
+	callData, method, err := c.prepareDeployData(ctx, req)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
@@ -139,10 +139,10 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 	return callData, method, err
 }
 
-func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.ContractDeployInput) ([]byte, *abi.Entry, error) {
+func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.ContractDeployPrepareRequest) ([]byte, *abi.Entry, error) {
 	// Parse the bytecode as a hex string, or fallback to Base64
 	var bytecodeString string
-	if err := req.Bytecode.Unmarshal(ctx, &bytecodeString); err != nil {
+	if err := req.Contract.Unmarshal(ctx, &bytecodeString); err != nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgDecodeBytecodeFailed)
 	}
 	bytecode, err := hex.DecodeString(strings.TrimPrefix(bytecodeString, "0x"))
@@ -155,7 +155,7 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 
 	// Parse the ABI
 	var a *abi.ABI
-	err = json.Unmarshal(req.ABI.Bytes(), &a)
+	err = json.Unmarshal(req.Definition.Bytes(), &a)
 	if err != nil {
 		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
 	}
