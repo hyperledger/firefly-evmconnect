@@ -5,9 +5,9 @@ go 1.17
 require (
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hyperledger/firefly-common v0.1.17-0.20220803213701-6643169efe7d
+	github.com/hyperledger/firefly-common v0.1.17-0.20220805185753-03f19f4c325c
 	github.com/hyperledger/firefly-signer v0.9.13
-	github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220804212653-ad38af735a2c
+	github.com/hyperledger/firefly-transaction-manager v0.9.3-0.20220805021852-4bfe60cfbe81
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1
@@ -62,3 +62,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/hyperledger/firefly-transaction-manager => ../firefly-transaction-manager
+
+replace github.com/hyperledger/firefly-signer => ../firefly-signer

@@ -50,6 +50,9 @@ func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.Transact
 
 	var txHash ethtypes.HexBytes0xPrefix
 	err = c.backend.Invoke(ctx, &txHash, "eth_sendTransaction", tx)
+	if err == nil && len(txHash) != 32 {
+		err = i18n.NewError(ctx, msgs.MsgInvalidTXHashReturned, len(txHash))
+	}
 	if err != nil {
 		return nil, mapError(sendRPCMethods, err), err
 	}

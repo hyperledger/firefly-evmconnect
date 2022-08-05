@@ -104,7 +104,7 @@ const sampleSendTXGasPriceLegacy = `{
 	}
 }`
 
-func TestSendTransactionOK(t *testing.T) {
+func TestSendTransactionBadHash(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
@@ -122,11 +122,37 @@ func TestSendTransactionOK(t *testing.T) {
 	var req ffcapi.TransactionSendRequest
 	err := json.Unmarshal([]byte(sampleSendTX), &req)
 	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "FF23048", err)
+	assert.Empty(t, reason)
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestSendTransactionOK(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
+			return true
+		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc")
+		}).
+		Return(nil)
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTX), &req)
+	assert.NoError(t, err)
 	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	assert.Equal(t, "0x123456", res.TransactionHash)
+	assert.Equal(t, "0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc", res.TransactionHash)
 
 	mRPC.AssertExpectations(t)
 
@@ -236,6 +262,9 @@ func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 			assert.Equal(t, int64(12345), tx.MaxPriorityFeePerGas.BigInt().Int64())
 			return true
 		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc")
+		}).
 		Return(nil)
 
 	var req ffcapi.TransactionSendRequest
@@ -258,6 +287,9 @@ func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
 			assert.Equal(t, int64(65535), tx.GasPrice.BigInt().Int64())
 			return true
 		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc")
+		}).
 		Return(nil)
 
 	var req ffcapi.TransactionSendRequest

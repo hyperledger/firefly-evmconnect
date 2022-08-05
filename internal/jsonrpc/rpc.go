@@ -95,7 +95,8 @@ func (r *jsonRPC) Invoke(ctx context.Context, result interface{}, method string,
 		log.L(ctx).Errorf("RPC[%d] <-- ERROR: %s", id, err)
 		return err
 	}
-	if res.IsError() {
+	// JSON/RPC allows errors to be returned with a 200 status code, as well as other status codes
+	if res.IsError() || rpcRes.Error != nil && rpcRes.Error.Message != "" {
 		log.L(ctx).Errorf("RPC[%d] <-- [%d]: %s", id, res.StatusCode(), rpcRes.Message())
 		err := fmt.Errorf(rpcRes.Message())
 		return err
