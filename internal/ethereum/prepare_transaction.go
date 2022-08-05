@@ -96,7 +96,6 @@ func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.Co
 		}
 		req.Gas = (*fftypes.FFBigInt)(gas)
 	}
-	log.L(ctx).Infof("Prepared transaction method=%s dataLen=%d gas=%s", method.String(), len(callData), req.Gas.Int())
 
 	return &ffcapi.TransactionPrepareResponse{
 		Gas:             req.Gas,
