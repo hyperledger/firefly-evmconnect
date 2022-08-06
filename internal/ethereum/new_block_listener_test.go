@@ -20,14 +20,29 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestNewBlockListenerOK(t *testing.T) {
 
-	ctx, c, _, done := newTestConnector(t)
+	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	}).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{}
+	}).Maybe()
 
 	req := &ffcapi.NewBlockListenerRequest{
 		ID:              fftypes.NewUUID(),

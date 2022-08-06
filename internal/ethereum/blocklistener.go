@@ -210,3 +210,12 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) int64 {
 	bl.mux.Unlock()
 	return highestBlock
 }
+
+func (bl *blockListener) waitClosed() {
+	bl.mux.Lock()
+	listenLoopDone := bl.listenLoopDone
+	bl.mux.Unlock()
+	if listenLoopDone != nil {
+		<-listenLoopDone
+	}
+}

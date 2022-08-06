@@ -40,7 +40,7 @@ const (
 // deal with the differences between client implementations.
 func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 
-	errString := err.Error()
+	errString := strings.ToLower(err.Error())
 
 	switch methodType {
 	case filterRPCMethods:

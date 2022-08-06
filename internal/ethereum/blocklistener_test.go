@@ -167,7 +167,7 @@ func TestBlockListenerClosed(t *testing.T) {
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		if len(bl.consumers) == 0 {
-			done() // Close after we've processed the log
+			go done() // Close after we've processed the log
 		}
 	})
 
@@ -188,8 +188,7 @@ func TestBlockListenerClosed(t *testing.T) {
 		updates: updates,
 	})
 
-	<-bl.listenLoopDone
-
+	c.WaitClosed()
 	mRPC.AssertExpectations(t)
 
 }
@@ -215,7 +214,7 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 		}
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		done() // Close after we've processed the log
+		go done() // Close after we've processed the log
 	})
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
@@ -224,7 +223,7 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 
 	bl.checkStartedLocked()
 
-	<-bl.listenLoopDone
+	c.WaitClosed()
 
 	mRPC.AssertExpectations(t)
 
@@ -251,7 +250,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 		}
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		done() // Close after we've processed the log
+		go done() // Close after we've processed the log
 	})
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
@@ -260,7 +259,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 	bl.checkStartedLocked()
 
-	<-bl.listenLoopDone
+	c.WaitClosed()
 
 	mRPC.AssertExpectations(t)
 
@@ -286,12 +285,12 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(fmt.Errorf("filter not found")).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		done() // Close after we've processed the log
+		go done() // Close after we've processed the log
 	})
 
 	bl.checkStartedLocked()
 
-	<-bl.listenLoopDone
+	c.WaitClosed()
 
 	mRPC.AssertExpectations(t)
 
@@ -308,12 +307,12 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(fmt.Errorf("pop")).Run(func(args mock.Arguments) {
-		done()
+		go done()
 	})
 
 	bl.checkStartedLocked()
 
-	<-bl.listenLoopDone
+	c.WaitClosed()
 
 	mRPC.AssertExpectations(t)
 

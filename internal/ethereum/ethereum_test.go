@@ -45,6 +45,7 @@ func newTestConnector(t *testing.T) (context.Context, *ethConnector, *jsonrpcmoc
 	return ctx, c, mRPC, func() {
 		done()
 		mRPC.AssertExpectations(t)
+		c.WaitClosed()
 	}
 
 }
