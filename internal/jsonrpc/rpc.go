@@ -80,7 +80,7 @@ func (r *jsonRPC) Invoke(ctx context.Context, result interface{}, method string,
 	}
 	rpcRes := &RPCResponse{}
 
-	log.L(ctx).Infof("RPC:%s:%s --> %s", rpcReq.ID, rpcReq.ID, rpcReq.Method)
+	log.L(ctx).Debugf("RPC:%s:%s --> %s", rpcReq.ID, rpcReq.ID, rpcReq.Method)
 	res, err := r.httpClient.R().
 		SetContext(ctx).
 		SetBody(rpcReq).
@@ -101,7 +101,7 @@ func (r *jsonRPC) Invoke(ctx context.Context, result interface{}, method string,
 		err := fmt.Errorf(rpcRes.Message())
 		return err
 	}
-	log.L(ctx).Infof("RPC[%d] <-- [%d] OK", id, res.StatusCode())
+	log.L(ctx).Debugf("RPC[%d] <-- [%d] OK", id, res.StatusCode())
 	if rpcRes.Result == nil {
 		return nil
 	}
