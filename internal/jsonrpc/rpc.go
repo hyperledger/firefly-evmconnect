@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/sirupsen/logrus"
 )
 
 type Client interface {
@@ -81,6 +82,10 @@ func (r *jsonRPC) Invoke(ctx context.Context, result interface{}, method string,
 	rpcRes := &RPCResponse{}
 
 	log.L(ctx).Debugf("RPC:%s:%s --> %s", rpcReq.ID, rpcReq.ID, rpcReq.Method)
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		jsonInput, _ := json.Marshal(rpcReq)
+		log.L(ctx).Tracef("RPC:%s:%s INPUT: %s", rpcReq.ID, rpcReq.ID, jsonInput)
+	}
 	res, err := r.httpClient.R().
 		SetContext(ctx).
 		SetBody(rpcReq).
@@ -94,6 +99,10 @@ func (r *jsonRPC) Invoke(ctx context.Context, result interface{}, method string,
 		err := i18n.NewError(ctx, msgs.MsgRPCRequestFailed)
 		log.L(ctx).Errorf("RPC[%d] <-- ERROR: %s", id, err)
 		return err
+	}
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		jsonOutput, _ := json.Marshal(rpcRes)
+		log.L(ctx).Tracef("RPC:%s:%s OUTPUT: %s", rpcReq.ID, rpcReq.ID, jsonOutput)
 	}
 	// JSON/RPC allows errors to be returned with a 200 status code, as well as other status codes
 	if res.IsError() || rpcRes.Error != nil && rpcRes.Error.Message != "" {
