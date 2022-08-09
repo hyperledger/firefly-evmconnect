@@ -164,10 +164,12 @@ func (l *listener) getHWMCheckpoint() *listenerCheckpoint {
 	}
 }
 
-func (l *listener) setHWM(hwmBlock int64) {
+func (l *listener) moveHWM(hwmBlock int64) {
 	l.hwmMux.Lock()
 	defer l.hwmMux.Unlock()
-	l.hwmBlock = hwmBlock
+	if hwmBlock > l.hwmBlock {
+		l.hwmBlock = hwmBlock
+	}
 }
 
 // listenerCatchupLoop reads pages of blocks at a time, until it gets within the configured catchup-threshold

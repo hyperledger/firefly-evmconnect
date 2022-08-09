@@ -309,6 +309,9 @@ func (es *eventStream) streamLoop() {
 			// High water mark is a point safely behind the head of the chain in this case,
 			// where re-orgs are not expected.
 			hwmBlock := es.c.blockListener.getHighestBlock(es.ctx) - es.c.checkpointBlockGap
+			if hwmBlock < 0 {
+				hwmBlock = 0
+			}
 
 			// Re-establish the filter if we need to
 			if filter == "" || listenerChanged {
@@ -401,9 +404,9 @@ func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ff
 		}
 	}
 
-	// Set the HWM on all the listeners
+	// Move the HWM on all each listener forwards, if they are behind the base HWM for the event stream itself
 	for _, l := range ag.listeners {
-		l.setHWM(hwm)
+		l.moveHWM(hwm)
 	}
 
 	return false
