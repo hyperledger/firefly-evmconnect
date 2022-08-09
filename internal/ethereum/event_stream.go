@@ -227,6 +227,11 @@ func (es *eventStream) leadGroupCatchup() bool {
 		// Build the aggregated listener list (doesn't matter if it's changed, as we build the list each time)
 		_ = es.buildReuseLeadGroupListener(&lastUpdate, &ag)
 
+		if len(ag.listeners) == 0 {
+			log.L(es.ctx).Infof("Lead group is currently empty")
+			return false
+		}
+
 		// Determine the earliest block we need to poll from
 		fromBlock := int64(-1)
 		for _, l := range ag.listeners {
@@ -446,10 +451,6 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 }
 
 func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedListener, fromBlock, toBlock int64) (ffcapi.ListenerEvents, error) {
-
-	if len(ag.signatureSet) == 0 {
-		return nil, nil
-	}
 
 	var ethLogs []*logJSONRPC
 	err := es.c.backend.Invoke(ctx, &ethLogs, "eth_getLogs", &logFilterJSONRPC{

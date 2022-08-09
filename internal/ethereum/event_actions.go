@@ -92,20 +92,21 @@ func (c *ethConnector) EventStreamStopped(ctx context.Context, req *ffcapi.Event
 		default:
 			return nil, ffcapi.ErrorReason(""), i18n.NewError(ctx, msgs.MsgStreamNotStopped, req.ID)
 		}
-	}
-	c.mux.Lock()
-	delete(c.eventStreams, *req.ID)
-	listeners := make([]*listener, 0)
-	for _, l := range es.listeners {
-		listeners = append(listeners, l)
-	}
-	c.mux.Unlock()
-	// Wait for stream loop to complete
-	<-es.streamLoopDone
-	// Wait for any listener catchup loops
-	for _, l := range listeners {
-		if l.catchupLoopDone != nil {
-			<-l.catchupLoopDone
+
+		c.mux.Lock()
+		delete(c.eventStreams, *req.ID)
+		listeners := make([]*listener, 0)
+		for _, l := range es.listeners {
+			listeners = append(listeners, l)
+		}
+		c.mux.Unlock()
+		// Wait for stream loop to complete
+		<-es.streamLoopDone
+		// Wait for any listener catchup loops
+		for _, l := range listeners {
+			if l.catchupLoopDone != nil {
+				<-l.catchupLoopDone
+			}
 		}
 	}
 	return &ffcapi.EventStreamStoppedResponse{}, "", nil

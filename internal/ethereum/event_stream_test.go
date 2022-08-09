@@ -286,6 +286,40 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	}
 }
 
+func TestExitDuringCatchup(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "12001", // this will establish the position of the head group, starting in catchup, then moving to normal
+		},
+	}
+
+	_, _, mRPC, done := testEventStream(t, l1req)
+
+	completed := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		ethLogs := make([]*logJSONRPC, 0)
+		filter := *args[3].(*logFilterJSONRPC)
+		fromBlock := filter.FromBlock.BigInt().Int64()
+		switch fromBlock {
+		default:
+			go func() {
+				done()
+				close(completed)
+			}()
+		}
+		*args[1].(*[]*logJSONRPC) = ethLogs
+	}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil)
+
+	<-completed
+}
+
 func TestLeadGroupDeliverEvents(t *testing.T) {
 
 	l1req := &ffcapi.EventListenerAddRequest{
