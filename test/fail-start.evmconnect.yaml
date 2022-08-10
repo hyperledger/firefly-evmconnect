@@ -5,3 +5,6 @@ api:
 persistence:
   leveldb:
     path: "../test/ldb"
+operations:
+  fullScan:
+    startupMaxRetries: 0

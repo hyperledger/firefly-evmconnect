@@ -19,7 +19,7 @@ package ethereum
 import (
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 type ethRPCMethodCategory int
@@ -40,14 +40,13 @@ const (
 // deal with the differences between client implementations.
 func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 
-	errString := err.Error()
+	errString := strings.ToLower(err.Error())
 
 	switch methodType {
 	case filterRPCMethods:
 		if strings.Contains(errString, "filter not found") {
 			return ffcapi.ErrorReasonNotFound
 		}
-		return ""
 	case sendRPCMethods:
 		switch {
 		case strings.Contains(errString, "nonce too low"):
@@ -58,8 +57,6 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 			return ffcapi.ErrorReasonTransactionUnderpriced
 		case strings.Contains(errString, "known transaction"):
 			return ffcapi.ErrorKnownTransaction
-		default:
-			return ""
 		}
 	}
 

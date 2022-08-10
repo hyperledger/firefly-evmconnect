@@ -18,28 +18,29 @@ package ethereum
 
 import (
 	"context"
-	"encoding/json"
+	"time"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-common/pkg/log"
 )
 
-func (c *ethConnector) createBlockListener(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.CreateBlockListenerRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
+func (c *ethConnector) doFailureDelay(ctx context.Context, failureCount int) bool {
+	if failureCount <= 0 {
+		return false
 	}
 
-	var listenerID ethtypes.HexInteger
-	err = c.backend.Invoke(ctx, &listenerID, "eth_newBlockFilter")
-	if err != nil {
-		return nil, "", err
+	retryDelay := c.retry.InitialDelay
+	for i := 0; i < (failureCount - 1); i++ {
+		retryDelay = time.Duration(float64(retryDelay) * c.retry.Factor)
+		if retryDelay > c.retry.MaximumDelay {
+			retryDelay = c.retry.MaximumDelay
+			break
+		}
 	}
-
-	return &ffcapi.CreateBlockListenerResponse{
-		ListenerID: listenerID.String(),
-	}, "", nil
-
+	log.L(ctx).Debugf("Retrying after %.2f (failures=%d)", retryDelay.Seconds(), failureCount)
+	select {
+	case <-time.After(retryDelay):
+		return false
+	case <-ctx.Done():
+		return true
+	}
 }

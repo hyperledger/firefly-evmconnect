@@ -14,19 +14,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ffcserver
+package ethereum
 
 import (
-	"github.com/hyperledger/firefly-common/pkg/config"
-	"github.com/hyperledger/firefly-common/pkg/httpserver"
+	"context"
+
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-const (
-	DefaultListenerPort = 5102
-)
+func (c *ethConnector) NewBlockListener(ctx context.Context, req *ffcapi.NewBlockListenerRequest) (*ffcapi.NewBlockListenerResponse, ffcapi.ErrorReason, error) {
+	// Add the block consumer
+	c.blockListener.addConsumer(&blockUpdateConsumer{
+		id:      req.ID,
+		ctx:     req.ListenerContext,
+		updates: req.BlockListener,
+	})
 
-func InitConfig(conf, corsConf config.Section) {
-	httpserver.InitHTTPConfig(conf, DefaultListenerPort)
-	httpserver.InitCORSConfig(corsConf)
-
+	return &ffcapi.NewBlockListenerResponse{}, "", nil
 }

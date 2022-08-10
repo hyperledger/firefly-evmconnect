@@ -24,14 +24,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	ConfigConnectors        = "connectors"
-	ConfigConnectorType     = "type"
-	ConfigConnectorServer   = "server"
-	ConfigConnectorEthereum = "ethereum"
-	ConfigCORS              = "cors"
-)
-
 func configCommand() *cobra.Command {
 	versionCmd := &cobra.Command{
 		Use:   "docs",

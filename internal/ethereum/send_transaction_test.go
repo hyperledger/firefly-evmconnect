@@ -17,13 +17,13 @@
 package ethereum
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -79,10 +79,35 @@ const sampleSendTXBadGasPrice = `{
 	"gasPrice": "not a number"
 }`
 
-func TestSendTransactionOK(t *testing.T) {
+const sampleSendTXGasPriceEIP1559 = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "send_transaction"
+	},
+	"from": "0x3088C3B2361e5b12c5270fA0692d2Fa6b29bdB63",
+	"gasPrice": {
+		"maxPriorityFeePerGas": 12345,
+		"maxFeePerGas": "0xffff"
+	}
+}`
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+const sampleSendTXGasPriceLegacy = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "send_transaction"
+	},
+	"from": "0x3088C3B2361e5b12c5270fA0692d2Fa6b29bdB63",
+	"gasPrice": {
+		"gasPrice": "0xffff"
+	}
+}`
+
+func TestSendTransactionBadHash(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -94,12 +119,40 @@ func TestSendTransactionOK(t *testing.T) {
 		}).
 		Return(nil)
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTX))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTX), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "FF23048", err)
+	assert.Empty(t, reason)
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestSendTransactionOK(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
+			return true
+		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc")
+		}).
+		Return(nil)
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTX), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.SendTransactionResponse)
-	assert.Equal(t, "0x123456", res.TransactionHash)
+	assert.Equal(t, "0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc", res.TransactionHash)
 
 	mRPC.AssertExpectations(t)
 
@@ -107,8 +160,8 @@ func TestSendTransactionOK(t *testing.T) {
 
 func TestSendTransactionFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -117,10 +170,13 @@ func TestSendTransactionFail(t *testing.T) {
 		})).
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTX))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTX), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 	mRPC.AssertExpectations(t)
 
@@ -137,60 +193,111 @@ func TestSendErrorMapping(t *testing.T) {
 
 func TestSendTransactionBadFrom(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadFrom))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadFrom), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23019", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
 func TestSendTransactionBadTo(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadTo))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadTo), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23020", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
 func TestSendTransactionBadData(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadData))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadData), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23018", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
 func TestSendTransactionBadGasPrice(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte(sampleSendTXBadGasPrice))
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXBadGasPrice), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
 	assert.Regexp(t, "FF23015", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }
 
-func TestSendTransactionBadPayload(t *testing.T) {
+func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
-	iRes, reason, err := c.sendTransaction(ctx, []byte("!not json!"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, int64(65535), tx.MaxFeePerGas.BigInt().Int64())
+			assert.Equal(t, int64(12345), tx.MaxPriorityFeePerGas.BigInt().Int64())
+			return true
+		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc")
+		}).
+		Return(nil)
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXGasPriceEIP1559), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.NotNil(t, res)
+
+}
+
+func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, int64(65535), tx.GasPrice.BigInt().Int64())
+			return true
+		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x3e2398ff4a875a8b9f87a6eeaaa41a139a68adeb509731300d4b90d1bdc1c4fc")
+		}).
+		Return(nil)
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendTXGasPriceLegacy), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionSend(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.NotNil(t, res)
 
 }

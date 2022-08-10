@@ -19,9 +19,7 @@ package ethereum
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
@@ -29,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 var (
@@ -43,17 +42,10 @@ var (
 			},
 		},
 	}
-	defaultErrorID = defaultError.IDBytes()
+	defaultErrorID = defaultError.FunctionSelectorBytes()
 )
 
-func (c *ethConnector) execQuery(ctx context.Context, payload []byte) (interface{}, ffcapi.ErrorReason, error) {
-
-	var req ffcapi.ExecQueryRequest
-	err := json.Unmarshal(payload, &req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
-
+func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeRequest) (*ffcapi.QueryInvokeResponse, ffcapi.ErrorReason, error) {
 	// Parse the input JSON data, to build the call data
 	callData, method, err := c.prepareCallData(ctx, &req.TransactionInput)
 	if err != nil {
@@ -61,7 +53,7 @@ func (c *ethConnector) execQuery(ctx context.Context, payload []byte) (interface
 	}
 
 	// Build the base transaction object
-	tx, err := c.buildTx(ctx, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
+	tx, err := c.buildTx(ctx, txTypeQuery, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
@@ -72,7 +64,7 @@ func (c *ethConnector) execQuery(ctx context.Context, payload []byte) (interface
 		return nil, reason, err
 	}
 
-	return &ffcapi.ExecQueryResponse{
+	return &ffcapi.QueryInvokeResponse{
 		Outputs: outputs,
 	}, "", nil
 
@@ -114,15 +106,14 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 	}
 
 	// Parse the data against the outputs
+	var jsonData []byte
 	outputValueTree, err := method.Outputs.DecodeABIDataCtx(ctx, outputData, 0)
+	if err == nil {
+		// Serialize down to JSON, and wrap in a JSONAny
+		jsonData, err = c.serializer.SerializeJSONCtx(ctx, outputValueTree)
+	}
 	if err != nil {
 		log.L(ctx).Warnf("Invalid return data: %s", outputData)
-		return nil, "", i18n.NewError(ctx, msgs.MsgReturnDataInvalid, err)
-	}
-
-	// Serialize down to JSON, and wrap in a JSONAny
-	jsonData, err := c.serializer.SerializeJSONCtx(ctx, outputValueTree)
-	if err != nil {
 		return nil, "", i18n.NewError(ctx, msgs.MsgReturnDataInvalid, err)
 	}
 	return fftypes.JSONAnyPtrBytes(jsonData), "", nil

@@ -23,20 +23,85 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-evmconnect/mocks/jsonrpcmocks"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestConnector(t *testing.T) (*ethConnector, *jsonrpcmocks.Client) {
+func strPtr(s string) *string { return &s }
+
+func newTestConnector(t *testing.T) (context.Context, *ethConnector, *jsonrpcmocks.Client, func()) {
 
 	mRPC := &jsonrpcmocks.Client{}
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
 	InitConfig(conf)
-	c := &ethConnector{}
-	conf.Set(ffresty.HTTPConfigURL, "http://backend.example.invalid")
-	err := c.Init(context.Background(), conf)
+	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
+	conf.Set(BlockPollingInterval, "1h") // Disable for tests that are not using it
+	ctx, done := context.WithCancel(context.Background())
+	cc, err := NewEthereumConnector(ctx, conf)
 	assert.NoError(t, err)
+	c := cc.(*ethConnector)
 	c.backend = mRPC
-	return c, mRPC
+	return ctx, c, mRPC, func() {
+		done()
+		mRPC.AssertExpectations(t)
+		c.WaitClosed()
+	}
+
+}
+
+func TestConnectorInit(t *testing.T) {
+
+	config.RootConfigReset()
+	conf := config.RootSection("unittest")
+	InitConfig(conf)
+
+	cc, err := NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23025", err)
+
+	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
+	conf.Set(EventsCatchupThreshold, 1)
+	conf.Set(EventsCatchupPageSize, 500)
+
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(500), cc.(*ethConnector).catchupThreshold) // set to page size
+
+	params := &abi.ParameterArray{
+		{Name: "x", Type: "uint256"},
+		{Name: "y", Type: "uint256"},
+	}
+	cv, err := params.ParseJSON([]byte(`{"x":12345,"y":23456}`))
+	assert.NoError(t, err)
+
+	conf.Set(ConfigDataFormat, "map")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.NoError(t, err)
+	jv, err := cc.(*ethConnector).serializer.SerializeJSON(cv)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"x":"12345","y":"23456"}`, string(jv))
+
+	conf.Set(ConfigDataFormat, "flat_array")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.NoError(t, err)
+	jv, err = cc.(*ethConnector).serializer.SerializeJSON(cv)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `["12345","23456"]`, string(jv))
+
+	conf.Set(ConfigDataFormat, "self_describing")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.NoError(t, err)
+	jv, err = cc.(*ethConnector).serializer.SerializeJSON(cv)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[{"name":"x","type":"uint256","value":"12345"},{"name":"y","type":"uint256","value":"23456"}]`, string(jv))
+
+	conf.Set(ConfigDataFormat, "wrong")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23032.*wrong", err)
+
+	conf.Set(ConfigDataFormat, "map")
+	conf.Set(BlockCacheSize, "-1")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23040", err)
 
 }

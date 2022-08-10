@@ -18,52 +18,72 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"sync"
+	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/config"
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-evmconnect/internal/ffconnector"
+	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-evmconnect/internal/jsonrpc"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 type ethConnector struct {
-	backend             jsonrpc.Client
-	serializer          *abi.Serializer
-	gasEstimationFactor *big.Float
+	backend                    jsonrpc.Client
+	serializer                 *abi.Serializer
+	gasEstimationFactor        *big.Float
+	catchupPageSize            int64
+	catchupThreshold           int64
+	checkpointBlockGap         int64
+	retry                      *retry.Retry
+	eventBlockTimestamps       bool
+	blockListener              *blockListener
+	eventFilterPollingInterval time.Duration
+
+	mux          sync.Mutex
+	eventStreams map[fftypes.UUID]*eventStream
+	blockCache   *lru.Cache
 }
 
-func NewEthereumConnector(conf config.Section) ffconnector.Connector {
-	return &ethConnector{}
-}
-
-func (c *ethConnector) HandlerMap() map[ffcapi.RequestType]ffconnector.FFCHandler {
-	return map[ffcapi.RequestType]ffconnector.FFCHandler{
-		ffcapi.RequestTypeCreateBlockListener:  c.createBlockListener,
-		ffcapi.RequestTypeExecQuery:            c.execQuery,
-		ffcapi.RequestTypeGetBlockInfoByHash:   c.getBlockInfoByHash,
-		ffcapi.RequestTypeGetBlockInfoByNumber: c.getBlockInfoByNumber,
-		ffcapi.RequestTypeGetGasPrice:          c.getGasPrice,
-		ffcapi.RequestTypeGetNewBlockHashes:    c.getNewBlockHashes,
-		ffcapi.RequestTypeGetNextNonce:         c.getNextNonce,
-		ffcapi.RequestTypeGetReceipt:           c.getReceipt,
-		ffcapi.RequestTypePrepareTransaction:   c.prepareTransaction,
-		ffcapi.RequestTypeSendTransaction:      c.sendTransaction,
+func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
+	c := &ethConnector{
+		eventStreams:               make(map[fftypes.UUID]*eventStream),
+		catchupPageSize:            conf.GetInt64(EventsCatchupPageSize),
+		catchupThreshold:           conf.GetInt64(EventsCatchupThreshold),
+		checkpointBlockGap:         conf.GetInt64(EventsCheckpointBlockGap),
+		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
+		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
+		retry: &retry.Retry{
+			InitialDelay: conf.GetDuration(RetryInitDelay),
+			MaximumDelay: conf.GetDuration(RetryMaxDelay),
+			Factor:       conf.GetFloat64(RetryFactor),
+		},
 	}
-}
+	if c.catchupThreshold < c.catchupPageSize {
+		log.L(ctx).Warnf("Catchup threshold %d must be at least as large as the catchup page size %d (overridden to %d)", c.catchupThreshold, c.catchupPageSize, c.catchupPageSize)
+		c.catchupThreshold = c.catchupPageSize
+	}
+	c.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail)
+	}
 
-func (c *ethConnector) Init(ctx context.Context, conf config.Section) error {
 	if conf.GetString(ffresty.HTTPConfigURL) == "" {
-		return i18n.NewError(ctx, msgs.MsgMissingBackendURL)
+		return nil, i18n.NewError(ctx, msgs.MsgMissingBackendURL)
 	}
 	c.gasEstimationFactor = big.NewFloat(conf.GetFloat64(ConfigGasEstimationFactor))
 
 	c.backend = jsonrpc.NewRPCClient(ffresty.New(ctx, conf))
 
-	c.serializer = abi.NewSerializer()
+	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {
 	case "map":
 		c.serializer.SetFormattingMode(abi.FormatAsObjects)
@@ -72,8 +92,27 @@ func (c *ethConnector) Init(ctx context.Context, conf config.Section) error {
 	case "self_describing":
 		c.serializer.SetFormattingMode(abi.FormatAsSelfDescribingArrays)
 	default:
-		return i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
+		return nil, i18n.NewError(ctx, msgs.MsgBadDataFormat, conf.Get(ConfigDataFormat), "map,flat_array,self_describing")
 	}
+	c.serializer.SetDefaultNameGenerator(func(idx int) string {
+		name := "output"
+		if idx > 0 {
+			name = fmt.Sprintf("%s%v", name, idx)
+		}
+		return name
+	})
 
-	return nil
+	c.blockListener = newBlockListener(ctx, c, conf)
+
+	return c, nil
+}
+
+// WaitClosed can be called after cancelling all the contexts, to wait for everything to close down
+func (c *ethConnector) WaitClosed() {
+	if c.blockListener != nil {
+		c.blockListener.waitClosed()
+	}
+	for _, s := range c.eventStreams {
+		<-s.streamLoopDone
+	}
 }

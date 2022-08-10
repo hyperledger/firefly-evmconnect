@@ -27,9 +27,9 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/ethereum"
-	"github.com/hyperledger/firefly-evmconnect/internal/ffconnector"
-	"github.com/hyperledger/firefly-evmconnect/internal/ffcserver"
-	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/fftm"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/policyengines"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/policyengines/simple"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -47,6 +47,8 @@ var rootCmd = &cobra.Command{
 
 var cfgFile string
 
+var connectorConfig config.Section
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "f", "", "config file")
 	rootCmd.AddCommand(versionCommand())
@@ -57,21 +59,11 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-var connectors config.ArraySection
-
 func initConfig() {
-	config.RootConfigReset()
-
-	// Read the configuration
-	connectors = config.RootArray(ConfigConnectors)
-	connectors.AddKnownKey(ConfigConnectorType)
-
-	serverConf := connectors.SubSection(ConfigConnectorServer)
-	corsConf := config.RootSection(ConfigCORS)
-	ffcserver.InitConfig(serverConf, corsConf)
-
-	ethereumConf := connectors.SubSection(ConfigConnectorEthereum)
-	ethereum.InitConfig(ethereumConf)
+	fftm.InitConfig()
+	connectorConfig = config.RootSection("connector")
+	ethereum.InitConfig(connectorConfig)
+	policyengines.RegisterEngine(&simple.PolicyEngineFactory{})
 }
 
 func run() error {
@@ -93,6 +85,16 @@ func run() error {
 		return i18n.WrapError(ctx, err, i18n.MsgConfigFailed)
 	}
 
+	// Init connector
+	c, err := ethereum.NewEthereumConnector(ctx, connectorConfig)
+	if err != nil {
+		return err
+	}
+	m, err := fftm.NewManager(ctx, c)
+	if err != nil {
+		return err
+	}
+
 	// Setup signal handling to cancel the context, which shuts down the API Server
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -101,52 +103,15 @@ func run() error {
 		cancelCtx()
 	}()
 
-	// Initialize the server for each of the connectors defined
-	numConnectors := connectors.ArraySize()
-	serversDone := make(chan error, numConnectors)
-	servers := make([]ffcserver.Server, numConnectors)
-	for i := 0; i < numConnectors; i++ {
-		baseConnectorConf := connectors.ArrayEntry(i)
-		serverConnectorConf := baseConnectorConf.SubSection(ConfigConnectorServer)
-		connectorType := baseConnectorConf.GetString(ConfigConnectorType)
-		childConnectorConf := baseConnectorConf.SubSection(connectorType)
-		var c ffconnector.Connector
-		switch connectorType {
-		case ConfigConnectorEthereum:
-			c = ethereum.NewEthereumConnector(childConnectorConf)
-		default:
-			return i18n.NewError(ctx, msgs.MsgUnknownConnector, connectorType)
-		}
-		err := c.Init(ctx, childConnectorConf)
-		if err == nil {
-			servers[i] = ffcserver.NewServer(serverConnectorConf, c)
-			err = servers[i].Init(ctx, serverConnectorConf, config.RootSection(ConfigCORS))
-		}
-		if err != nil {
-			return err
-		}
-	}
-	// Start all the servers
-	for _, s := range servers {
-		go runServer(s, serversDone)
-	}
-	// Whenever the first one stops (due to ctrl+c or error), stop them all and exit
-	var firstError error
-	for range servers {
-		err = <-serversDone
-		cancelCtx()
-		if firstError == nil {
-			firstError = err
-		}
-	}
-	return firstError
+	return runManager(ctx, m)
 }
 
-func runServer(server ffcserver.Server, done chan error) {
-	err := server.Start()
+func runManager(ctx context.Context, m fftm.Manager) error {
+	err := m.Start()
 	if err != nil {
-		done <- err
-		return
+		return err
 	}
-	done <- server.WaitStopped()
+	<-ctx.Done()
+	m.Close()
+	return nil
 }

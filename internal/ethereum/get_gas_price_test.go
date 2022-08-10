@@ -17,12 +17,12 @@
 package ethereum
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -38,8 +38,8 @@ const sampleGetGasPrice = `{
 
 func TestGetGasPriceOK(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
 		Return(nil).
@@ -47,38 +47,31 @@ func TestGetGasPriceOK(t *testing.T) {
 			(args[1].(*ethtypes.HexInteger)).BigInt().SetString("12345", 10)
 		})
 
-	iRes, reason, err := c.getGasPrice(ctx, []byte(sampleGetGasPrice))
+	var req ffcapi.GasPriceEstimateRequest
+	err := json.Unmarshal([]byte(sampleGetGasPrice), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasPriceEstimate(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 
-	res := iRes.(*ffcapi.GetGasPriceResponse)
 	assert.Equal(t, `"12345"`, res.GasPrice.String())
 
 }
 
 func TestGetGasPriceFail(t *testing.T) {
 
-	c, mRPC := newTestConnector(t)
-	ctx := context.Background()
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
 
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
 		Return(fmt.Errorf("pop"))
 
-	iRes, reason, err := c.getGasPrice(ctx, []byte(sampleGetGasPrice))
+	var req ffcapi.GasPriceEstimateRequest
+	err := json.Unmarshal([]byte(sampleGetGasPrice), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasPriceEstimate(ctx, &req)
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, reason)
-	assert.Nil(t, iRes)
-
-}
-
-func TestGetGasPriceBadPayload(t *testing.T) {
-
-	c, _ := newTestConnector(t)
-	ctx := context.Background()
-
-	iRes, reason, err := c.getGasPrice(ctx, []byte("!json"))
-	assert.Regexp(t, "invalid", err)
-	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
-	assert.Nil(t, iRes)
+	assert.Nil(t, res)
 
 }

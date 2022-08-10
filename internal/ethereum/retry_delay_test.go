@@ -14,18 +14,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ffconnector
+package ethereum
 
 import (
 	"context"
-
-	"github.com/hyperledger/firefly-common/pkg/config"
-	"github.com/hyperledger/firefly-common/pkg/ffcapi"
+	"testing"
+	"time"
 )
 
-type FFCHandler func(ctx context.Context, payload []byte) (res interface{}, reason ffcapi.ErrorReason, err error)
+func TestRetryDelay(t *testing.T) {
 
-type Connector interface {
-	HandlerMap() map[ffcapi.RequestType]FFCHandler
-	Init(ctx context.Context, conf config.Section) (err error)
+	_, c, _, done := newTestConnector(t)
+	defer done()
+
+	c.retry.MaximumDelay = 1 * time.Microsecond
+	c.retry.InitialDelay = 100 * time.Microsecond
+
+	c.doFailureDelay(context.Background(), 1)
+	c.doFailureDelay(context.Background(), 10)
+
 }
