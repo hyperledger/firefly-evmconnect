@@ -239,6 +239,22 @@ func TestSerializeEventDataFail(t *testing.T) {
 
 }
 
+func TestFilterEnrichEthLogBlockBelowHWM(t *testing.T) {
+
+	l, _, _ := newTestListener(t, true)
+
+	var abiEvent *abi.Entry
+	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
+	assert.NoError(t, err)
+
+	l.hwmBlock = 2
+	_, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
+		BlockNumber: ethtypes.NewHexInteger64(1),
+	})
+	assert.False(t, ok)
+
+}
+
 func TestFilterEnrichEthLogAddressMismatch(t *testing.T) {
 
 	l, _, _ := newTestListener(t, true)

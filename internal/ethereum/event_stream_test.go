@@ -391,6 +391,47 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	assert.Equal(t, "1000", e.Event.Data.JSONObject().GetString("value"))
 }
 
+func TestLeadGroupNearBlockZeroEnsureNonNegative(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0xc89E46EEED41b777ca6625d37E1Cc87C5c037828","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "0",
+		},
+	}
+
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	filtered := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*ethtypes.HexInteger) = *ethtypes.NewHexInteger64(10)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			assert.Equal(t, int64(0), args[3].(*logFilterJSONRPC).FromBlock.BigInt().Int64())
+			*args[1].(*string) = "filter_id1"
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Once().Run(func(args mock.Arguments) {
+		close(filtered)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	_, _, _, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+
+	<-filtered
+	mRPC.AssertExpectations(t)
+}
+
 func TestLeadGroupCatchupRetry(t *testing.T) {
 
 	l1req := &ffcapi.EventListenerAddRequest{
