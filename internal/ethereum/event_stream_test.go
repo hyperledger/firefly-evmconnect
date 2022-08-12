@@ -275,11 +275,11 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	for {
 		assert.True(t, time.Since(started) < 5*time.Second)
 		if l.catchup {
-			time.Sleep(1 * time.Microsecond)
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 		if es.headBlock != testHighBlock-es.c.checkpointBlockGap {
-			time.Sleep(1 * time.Microsecond)
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 		break
@@ -348,7 +348,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
 			{
-				BlockNumber:      ethtypes.NewHexInteger64(1024),
+				BlockNumber:      ethtypes.NewHexInteger64(212122),
 				TransactionIndex: ethtypes.NewHexInteger64(64),
 				LogIndex:         ethtypes.NewHexInteger64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
@@ -364,7 +364,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
+			Number: ethtypes.NewHexInteger64(212122),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		}
 	})
@@ -379,10 +379,10 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	defer done()
 
 	e := <-events
-	assert.Equal(t, fftypes.FFuint64(1024), e.Event.ID.BlockNumber)
+	assert.Equal(t, fftypes.FFuint64(212122), e.Event.ID.BlockNumber)
 	assert.Equal(t, fftypes.FFuint64(64), e.Event.ID.TransactionIndex)
 	assert.Equal(t, fftypes.FFuint64(2), e.Event.ID.LogIndex)
-	assert.Equal(t, int64(1024), e.Checkpoint.(*listenerCheckpoint).Block)
+	assert.Equal(t, int64(212122), e.Checkpoint.(*listenerCheckpoint).Block)
 	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
 	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)
 	assert.NotNil(t, e.Event)

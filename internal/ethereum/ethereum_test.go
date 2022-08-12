@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-evmconnect/mocks/jsonrpcmocks"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,6 +38,7 @@ func newTestConnector(t *testing.T) (context.Context, *ethConnector, *jsonrpcmoc
 	InitConfig(conf)
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
 	conf.Set(BlockPollingInterval, "1h") // Disable for tests that are not using it
+	logrus.SetLevel(logrus.DebugLevel)
 	ctx, done := context.WithCancel(context.Background())
 	cc, err := NewEthereumConnector(ctx, conf)
 	assert.NoError(t, err)
