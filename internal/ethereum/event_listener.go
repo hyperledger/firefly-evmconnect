@@ -277,7 +277,7 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
 	logIndex := ethLog.LogIndex.BigInt().Int64()
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
-	if l.hwmBlock > blockNumber {
+	if blockNumber < l.hwmBlock {
 		log.L(ctx).Debugf("Listener %s already delivered event '%s' hwm=%d", l.id, protoID, l.hwmBlock)
 		return nil, false
 	}
