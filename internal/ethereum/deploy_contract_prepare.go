@@ -34,7 +34,7 @@ import (
 func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.ContractDeployPrepareRequest) (res *ffcapi.TransactionPrepareResponse, reason ffcapi.ErrorReason, err error) {
 
 	// Parse the input JSON data, to build the call data
-	callData, method, err := c.prepareDeployData(ctx, req)
+	callData, constructor, err := c.prepareDeployData(ctx, req)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
@@ -45,10 +45,10 @@ func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.Co
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
-	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, method, req.Gas); err != nil {
+	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, constructor, req.Gas); err != nil {
 		return nil, reason, err
 	}
-	log.L(ctx).Infof("Prepared transaction method=%s dataLen=%d gas=%s", method.String(), len(callData), req.Gas.Int())
+	log.L(ctx).Infof("Prepared deploy transaction dataLen=%d gas=%s", len(callData), req.Gas.Int())
 
 	return &ffcapi.TransactionPrepareResponse{
 		Gas:             req.Gas,
@@ -100,10 +100,9 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 	// Note the FireFly ABI decoding package handles formatting errors / translation etc.
 	var callData []byte
 	paramValues, err := method.Inputs.ParseExternalDataCtx(ctx, ethParams)
-	if err != nil {
-		return nil, nil, err
+	if err == nil {
+		callData, err = paramValues.EncodeABIData()
 	}
-	callData, err = paramValues.EncodeABIData()
 	if err != nil {
 		return nil, nil, err
 	}

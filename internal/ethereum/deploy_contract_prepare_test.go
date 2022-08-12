@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
@@ -90,5 +91,150 @@ func TestDeployContractPrepareWithEstimateRevert(t *testing.T) {
 	assert.Regexp(t, "FF23021", err)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
 	assert.Nil(t, res)
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestDeployContractPrepareBadBytecode(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Contract = fftypes.JSONAnyPtr(`! not a string containing bytecode`)
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF23047", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestDeployContractPrepareBadBytecodeNotHex(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Contract = fftypes.JSONAnyPtr(`"!hex"`)
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF23047", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestDeployContractPrepareBadABIDefinition(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Definition = fftypes.JSONAnyPtr(`[`)
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF23013", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestDeployContractPrepareEstimateNoConstructor(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*(args[1].(*ethtypes.HexInteger)) = *ethtypes.NewHexInteger64(12345)
+	})
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	assert.NoError(t, err)
+	req.Definition = fftypes.JSONAnyPtr(`[]`)
+	req.Gas = nil
+	res, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	fGasEstimate, _ := c.gasEstimationFactor.Float64()
+	assert.Equal(t, int64(float64(12345)*fGasEstimate), res.Gas.Int64())
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestDeployContractPrepareBadParamsJSON(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Params = []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"!wrong`)}
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF23014", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestDeployContractPrepareBadParamType(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Params = []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"!wrong"`)}
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF22030", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestDeployContractPrepareBadFrom(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.From = "!not an address"
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF23019", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestDeployContractPrepareBadABIType(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Definition = fftypes.JSONAnyPtr(`[{
+		"type": "constructor",
+		"inputs": [{
+			"type": "!wrong"
+		}]
+	}]`)
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF22025", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
 
 }
