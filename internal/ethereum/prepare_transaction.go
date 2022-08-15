@@ -18,11 +18,8 @@ package ethereum
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -43,7 +40,7 @@ const (
 	txTypePrePrepared
 )
 
-func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.TransactionPrepareRequest) (*ffcapi.TransactionPrepareResponse, ffcapi.ErrorReason, error) {
+func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.TransactionPrepareRequest) (res *ffcapi.TransactionPrepareResponse, reason ffcapi.ErrorReason, err error) {
 
 	// Parse the input JSON data, to build the call data
 	callData, method, err := c.prepareCallData(ctx, &req.TransactionInput)
@@ -57,13 +54,8 @@ func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.Trans
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
-	if req.Gas == nil || req.Gas.Int().Sign() == 0 {
-		// If a value for gas has not been supplied, do a gas estimate
-		gas, reason, err := c.estimateGas(ctx, tx, method)
-		if err != nil {
-			return nil, reason, err
-		}
-		req.Gas = (*fftypes.FFBigInt)(gas)
+	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, method, req.Gas); err != nil {
+		return nil, reason, err
 	}
 	log.L(ctx).Infof("Prepared transaction method=%s dataLen=%d gas=%s", method.String(), len(callData), req.Gas.Int())
 
@@ -74,34 +66,16 @@ func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.Trans
 
 }
 
-func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.ContractDeployPrepareRequest) (*ffcapi.TransactionPrepareResponse, ffcapi.ErrorReason, error) {
-
-	// Parse the input JSON data, to build the call data
-	callData, method, err := c.prepareDeployData(ctx, req)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
-
-	// Build the base transaction object
-	tx, err := c.buildTx(ctx, txTypeDeployContract, req.From, "", req.Nonce, req.Gas, req.Value, callData)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
-
-	if req.Gas == nil || req.Gas.Int().Sign() == 0 {
+func (c *ethConnector) ensureGasEstimate(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, gasRequest *fftypes.FFBigInt) (*fftypes.FFBigInt, ffcapi.ErrorReason, error) {
+	if gasRequest == nil || gasRequest.Int().Sign() == 0 {
 		// If a value for gas has not been supplied, do a gas estimate
 		gas, reason, err := c.estimateGas(ctx, tx, method)
 		if err != nil {
 			return nil, reason, err
 		}
-		req.Gas = (*fftypes.FFBigInt)(gas)
+		gasRequest = (*fftypes.FFBigInt)(gas)
 	}
-
-	return &ffcapi.TransactionPrepareResponse{
-		Gas:             req.Gas,
-		TransactionData: ethtypes.HexBytes0xPrefix(callData).String(),
-	}, "", nil
-
+	return gasRequest, ffcapi.ErrorReason(""), nil
 }
 
 func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.TransactionInput) ([]byte, *abi.Entry, error) {
@@ -134,63 +108,6 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 	if err != nil {
 		return nil, nil, err
 	}
-
-	return callData, method, err
-}
-
-func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.ContractDeployPrepareRequest) ([]byte, *abi.Entry, error) {
-	// Parse the bytecode as a hex string, or fallback to Base64
-	var bytecodeString string
-	if err := req.Contract.Unmarshal(ctx, &bytecodeString); err != nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgDecodeBytecodeFailed)
-	}
-	bytecode, err := hex.DecodeString(strings.TrimPrefix(bytecodeString, "0x"))
-	if err != nil {
-		bytecode, err = base64.StdEncoding.DecodeString(bytecodeString)
-		if err != nil {
-			return nil, nil, i18n.NewError(ctx, msgs.MsgDecodeBytecodeFailed)
-		}
-	}
-
-	// Parse the ABI
-	var a *abi.ABI
-	err = json.Unmarshal(req.Definition.Bytes(), &a)
-	if err != nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
-	}
-
-	// Find the constructor in the ABI
-	method := a.Constructor()
-	if method == nil {
-		// Constructors are optional, so if there is none, simply return the bytecode as the calldata
-		return bytecode, nil, nil
-	}
-
-	// Parse the params into the standard semantics of Go JSON unmarshalling, with []interface{}
-	ethParams := make([]interface{}, len(req.Params))
-	for i, p := range req.Params {
-		if p != nil {
-			err := json.Unmarshal([]byte(*p), &ethParams[i])
-			if err != nil {
-				return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalParamFail, i, err)
-			}
-		}
-	}
-
-	// Match the parameters to the ABI call data for the method.
-	// Note the FireFly ABI decoding package handles formatting errors / translation etc.
-	var callData []byte
-	paramValues, err := method.Inputs.ParseExternalDataCtx(ctx, ethParams)
-	if err != nil {
-		return nil, nil, err
-	}
-	callData, err = paramValues.EncodeABIData()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Concatenate bytecode and constructor args for deployment transaction
-	callData = append(bytecode, callData...)
 
 	return callData, method, err
 }

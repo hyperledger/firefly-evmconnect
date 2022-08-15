@@ -273,7 +273,10 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	// Confirm the listener joins the group
 	started := time.Now()
 	for {
-		assert.True(t, time.Since(started) < 5*time.Second)
+		t.Logf("Catchup=%t HeadBlock=%d", l.catchup, es.headBlock)
+		if time.Since(started) > 1*time.Second {
+			assert.Fail(t, "Never exited catchup")
+		}
 		if l.catchup {
 			time.Sleep(1 * time.Millisecond)
 			continue
