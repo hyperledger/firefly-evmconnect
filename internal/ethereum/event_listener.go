@@ -144,7 +144,7 @@ func (l *listener) checkReadyForLeadPackOrRemoved(ctx context.Context) (bool, bo
 	headBlock := l.es.headBlock
 	blockGap := headBlock - l.hwmBlock
 	readyForLead := blockGap < l.c.catchupThreshold
-	log.L(ctx).Debugf("Listener %s head=%d gap=%d readyForLead=%t", l.id, headBlock, blockGap, readyForLead)
+	log.L(ctx).Debugf("Listener %s head=%d hwm=%d (gap=%d) readyForLead=%t", l.id, headBlock, l.hwmBlock, blockGap, readyForLead)
 	return readyForLead, l.removed
 }
 
@@ -272,11 +272,17 @@ func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo
 
 func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool) {
 
-	// Apply a post-filter check to the event
+	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
 	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
 	logIndex := ethLog.LogIndex.BigInt().Int64()
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
+	if blockNumber < l.hwmBlock {
+		log.L(ctx).Debugf("Listener %s already delivered event '%s' hwm=%d", l.id, protoID, l.hwmBlock)
+		return nil, false
+	}
+
+	// Apply a post-filter check to the event
 	topicMatches := len(ethLog.Topics) > 0 && bytes.Equal(ethLog.Topics[0], f.Topic0)
 	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])
 	if !topicMatches || !addrMatches {

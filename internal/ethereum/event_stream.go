@@ -152,6 +152,7 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 	if err := l.ensureHWM(ctx); err != nil {
 		return nil, err
 	}
+	log.L(es.ctx).Infof("Initialized listener '%s' (FromBlock=%s) Block=%d Checkpoint=%+v", l.id, l.config.fromBlock, l.hwmBlock, checkpoint)
 
 	es.updateCount++
 	es.listeners[*req.ListenerID] = l

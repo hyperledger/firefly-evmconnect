@@ -275,11 +275,11 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	for {
 		assert.True(t, time.Since(started) < 5*time.Second)
 		if l.catchup {
-			time.Sleep(1 * time.Microsecond)
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 		if es.headBlock != testHighBlock-es.c.checkpointBlockGap {
-			time.Sleep(1 * time.Microsecond)
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 		break
@@ -348,7 +348,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
 			{
-				BlockNumber:      ethtypes.NewHexInteger64(1024),
+				BlockNumber:      ethtypes.NewHexInteger64(212122),
 				TransactionIndex: ethtypes.NewHexInteger64(64),
 				LogIndex:         ethtypes.NewHexInteger64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
@@ -364,7 +364,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	}).Once()
 	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
+			Number: ethtypes.NewHexInteger64(212122),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		}
 	})
@@ -379,16 +379,57 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	defer done()
 
 	e := <-events
-	assert.Equal(t, fftypes.FFuint64(1024), e.Event.ID.BlockNumber)
+	assert.Equal(t, fftypes.FFuint64(212122), e.Event.ID.BlockNumber)
 	assert.Equal(t, fftypes.FFuint64(64), e.Event.ID.TransactionIndex)
 	assert.Equal(t, fftypes.FFuint64(2), e.Event.ID.LogIndex)
-	assert.Equal(t, int64(1024), e.Checkpoint.(*listenerCheckpoint).Block)
+	assert.Equal(t, int64(212122), e.Checkpoint.(*listenerCheckpoint).Block)
 	assert.Equal(t, int64(64), e.Checkpoint.(*listenerCheckpoint).TransactionIndex)
 	assert.Equal(t, int64(2), e.Checkpoint.(*listenerCheckpoint).LogIndex)
 	assert.NotNil(t, e.Event)
 	assert.Equal(t, "0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4", e.Event.Data.JSONObject().GetString("from"))
 	assert.Equal(t, "0xd0f2f5103fd050739a9fb567251bc460cc24d091", e.Event.Data.JSONObject().GetString("to"))
 	assert.Equal(t, "1000", e.Event.Data.JSONObject().GetString("value"))
+}
+
+func TestLeadGroupNearBlockZeroEnsureNonNegative(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0xc89E46EEED41b777ca6625d37E1Cc87C5c037828","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "0",
+		},
+	}
+
+	ctx, c, mRPC, done := newTestConnector(t)
+
+	filtered := make(chan struct{})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*ethtypes.HexInteger) = *ethtypes.NewHexInteger64(10)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			assert.Equal(t, int64(0), args[3].(*logFilterJSONRPC).FromBlock.BigInt().Int64())
+			*args[1].(*string) = "filter_id1"
+		}).Once()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Once().Run(func(args mock.Arguments) {
+		close(filtered)
+	})
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Maybe()
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	_, _, _, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+
+	<-filtered
+	mRPC.AssertExpectations(t)
 }
 
 func TestLeadGroupCatchupRetry(t *testing.T) {

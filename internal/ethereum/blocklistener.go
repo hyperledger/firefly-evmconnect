@@ -208,6 +208,7 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) int64 {
 	bl.mux.Lock()
 	highestBlock = bl.highestBlock
 	bl.mux.Unlock()
+	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
 	return highestBlock
 }
 
