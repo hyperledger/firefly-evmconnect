@@ -53,14 +53,16 @@ func (c *ethConnector) addToBlockCache(blockInfo *blockInfoJSONRPC) {
 	c.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
 
-func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int64, expectedHashStr string) (*blockInfoJSONRPC, error) {
+func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, error) {
 	var blockInfo *blockInfoJSONRPC
-	cached, ok := c.blockCache.Get(strconv.FormatInt(blockNumber, 10))
-	if ok {
-		blockInfo = cached.(*blockInfoJSONRPC)
-		if expectedHashStr != "" && blockInfo.ParentHash.String() != expectedHashStr {
-			log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedHashStr, blockInfo.ParentHash)
-			blockInfo = nil
+	if allowCache {
+		cached, ok := c.blockCache.Get(strconv.FormatInt(blockNumber, 10))
+		if ok {
+			blockInfo = cached.(*blockInfoJSONRPC)
+			if expectedHashStr != "" && blockInfo.ParentHash.String() != expectedHashStr {
+				log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedHashStr, blockInfo.ParentHash)
+				blockInfo = nil
+			}
 		}
 	}
 
@@ -77,7 +79,7 @@ func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int
 
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), req.ExpectedParentHash)
+	blockInfo, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), true, req.ExpectedParentHash)
 	if err != nil {
 		return nil, ffcapi.ErrorReason(""), err
 	}
