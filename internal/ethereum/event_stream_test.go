@@ -237,7 +237,7 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 				},
 				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			})
-		case 6000:
+		case es.c.catchupPageSize + 1000:
 			close(listenerCaughtUp)
 		default:
 			<-listenerCaughtUp // hold the main group back until we've done the listener catchup
@@ -287,6 +287,35 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		}
 		break
 	}
+}
+
+func TestLeadGroupSteadyStateFallbackToCatchup(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	mockStreamLoopEmpty(mRPC)
+	defer done()
+
+	es := &eventStream{
+		id:        fftypes.NewUUID(),
+		c:         c,
+		ctx:       ctx,
+		events:    make(chan<- *ffcapi.ListenerEvent),
+		headBlock: -1,
+		listeners: map[fftypes.UUID]*listener{
+			*fftypes.NewUUID(): {
+				id: fftypes.NewUUID(),
+				config: listenerConfig{
+					filters: []*eventFilter{
+						{},
+					},
+				},
+			},
+		},
+		streamLoopDone: make(chan struct{}),
+	}
+
+	endedDueToExit := es.leadGroupSteadyState()
+	assert.False(t, endedDueToExit)
 }
 
 func TestExitDuringCatchup(t *testing.T) {

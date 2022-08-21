@@ -270,17 +270,7 @@ func (es *eventStream) leadGroupCatchup() bool {
 
 }
 
-func (es *eventStream) streamLoop() {
-	defer close(es.streamLoopDone)
-
-	// When we first start, we might find our leading pack of listeners are all way behind
-	// the head of the chain. So we run a catchup mode loop to ensure we don't ask the blockchain
-	// node to process an excessive amount of logs
-	exited := es.leadGroupCatchup()
-	if exited {
-		return
-	}
-
+func (es *eventStream) leadGroupSteadyState() bool {
 	var filter string
 	uninstallFilter := func() {
 		var res bool
@@ -292,14 +282,14 @@ func (es *eventStream) streamLoop() {
 	defer uninstallFilter()
 
 	// Then we move into the head mode, where we establish a long-lived filter, and keep polling for changes on it.
+	var ag *aggregatedListener
+	lastUpdate := -1
 	failCount := 0
 	filterRPC := ""
-	lastUpdate := -1
-	var ag *aggregatedListener
 	for {
 		if es.c.doFailureDelay(es.ctx, failCount) {
 			log.L(es.ctx).Debugf("Stream loop exiting")
-			return
+			return true
 		}
 
 		// Build the aggregated listener list if it has changed
@@ -307,6 +297,7 @@ func (es *eventStream) streamLoop() {
 
 		// No need to poll for events, if we don't have any listeners
 		if len(ag.signatureSet) > 0 {
+
 			// High water mark is a point safely behind the head of the chain in this case,
 			// where re-orgs are not expected.
 			hwmBlock := es.c.blockListener.getHighestBlock(es.ctx) - es.c.checkpointBlockGap
@@ -328,6 +319,15 @@ func (es *eventStream) streamLoop() {
 						fromBlock = l.hwmBlock
 					}
 				}
+
+				// Check we're not outside of the steady state window, and need to fall back to catchup mode
+				chainHeadBlock := es.c.blockListener.getHighestBlock(es.ctx)
+				blockGapEstimate := (chainHeadBlock - fromBlock)
+				if blockGapEstimate > es.c.catchupThreshold {
+					log.L(es.ctx).Warnf("Block gap estimate reached %d (above threshold of %d) - reverting to catchup mode", blockGapEstimate, es.c.catchupThreshold)
+					return false
+				}
+
 				// Create the new filter
 				err := es.c.backend.Invoke(es.ctx, &filter, "eth_newFilter", &logFilterJSONRPC{
 					FromBlock: ethtypes.NewHexInteger64(fromBlock),
@@ -364,7 +364,7 @@ func (es *eventStream) streamLoop() {
 			// Dispatch the events
 			if es.dispatchSetHWMCheckExit(ag, events, hwmBlock) {
 				log.L(es.ctx).Debugf("Stream loop exiting")
-				return
+				return true
 			}
 
 			// Update the head block to be the hwm block
@@ -381,9 +381,29 @@ func (es *eventStream) streamLoop() {
 		case <-time.After(es.c.eventFilterPollingInterval):
 		case <-es.ctx.Done():
 			log.L(es.ctx).Debugf("Stream loop stopping")
+			return true
+		}
+	}
+}
+
+func (es *eventStream) streamLoop() {
+	defer close(es.streamLoopDone)
+
+	for {
+		// When we first start, we might find our leading pack of listeners are all way behind
+		// the head of the chain. So we run a catchup mode loop to ensure we don't ask the blockchain
+		// node to process an excessive amount of logs
+		if es.leadGroupCatchup() {
+			return
+		}
+
+		// We then transition to our steady state, filtering from the front of the chain.
+		// But we might fall behind and need to go back to the catchup mode.
+		if es.leadGroupSteadyState() {
 			return
 		}
 	}
+
 }
 
 func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ffcapi.ListenerEvents, hwm int64) (exiting bool) {
