@@ -61,6 +61,7 @@ type eventStream struct {
 	listeners      map[fftypes.UUID]*listener
 	headBlock      int64
 	streamLoopDone chan struct{}
+	catchup        bool
 }
 
 // aggregatedListener is a generated structure that allows use to query/filter logs efficiently across a large number of listeners,
@@ -213,6 +214,10 @@ func (es *eventStream) buildReuseLeadGroupListener(lastUpdate *int, ag **aggrega
 // chain and if it's a way behind then we catch up all this head group as one set (rather than with individual
 // catchup routines as is the case if one listener starts a way behind the pack)
 func (es *eventStream) leadGroupCatchup() bool {
+
+	// For API status, we keep a track of whether we're in catchup mode or not
+	es.catchup = true
+	defer func() { es.catchup = false }()
 
 	var ag *aggregatedListener
 	lastUpdate := -1
@@ -499,5 +504,6 @@ func (es *eventStream) getListenerHWM(ctx context.Context, listenerID *fftypes.U
 	}
 	return &ffcapi.EventListenerHWMResponse{
 		Checkpoint: l.getHWMCheckpoint(),
+		Catchup:    l.catchup || es.catchup, // dirty read of whether the listener is in catchup, or the head group of the stream is in catchup
 	}, "", nil
 }
