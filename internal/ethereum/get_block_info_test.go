@@ -110,6 +110,22 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 
 }
 
+func TestGetBlockInfoByNumberBlockNotFoundError(t *testing.T) {
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
+		Return(fmt.Errorf("cannot query unfinalized data"))
+
+	var req ffcapi.BlockInfoByNumberRequest
+	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.BlockInfoByNumber(ctx, &req)
+	assert.Regexp(t, "FF23011", err)
+	assert.Equal(t, ffcapi.ErrorReasonNotFound, reason)
+	assert.Nil(t, res)
+}
+
 func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
