@@ -68,7 +68,14 @@ func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int
 
 	if blockInfo == nil {
 		err := c.backend.Invoke(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexInteger64(blockNumber), false /* only the txn hashes */)
-		if err != nil || blockInfo == nil {
+		if err != nil {
+			if mapError(blockRPCMethods, err) == ffcapi.ErrorReasonNotFound {
+				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", err)
+				return nil, nil
+			}
+			return nil, err
+		}
+		if blockInfo == nil {
 			return nil, err
 		}
 		c.addToBlockCache(blockInfo)

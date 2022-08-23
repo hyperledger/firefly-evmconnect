@@ -28,6 +28,7 @@ const (
 	filterRPCMethods ethRPCMethodCategory = iota
 	sendRPCMethods
 	callRPCMethods
+	blockRPCMethods
 )
 
 // mapErrorToReason provides a common place for mapping Ethereum client
@@ -57,6 +58,11 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 			return ffcapi.ErrorReasonTransactionUnderpriced
 		case strings.Contains(errString, "known transaction"):
 			return ffcapi.ErrorKnownTransaction
+		}
+	case blockRPCMethods:
+		// https://docs.avax.network/quickstart/integrate-exchange-with-avalanche#determining-finality
+		if strings.Contains(errString, "cannot query unfinalized data") {
+			return ffcapi.ErrorReasonNotFound
 		}
 	}
 
