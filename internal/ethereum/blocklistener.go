@@ -17,6 +17,7 @@
 package ethereum
 
 import (
+	"container/list"
 	"context"
 	"sync"
 	"time"
@@ -46,6 +47,14 @@ type blockListener struct {
 	mux                        sync.Mutex
 	consumers                  map[fftypes.UUID]*blockUpdateConsumer
 	blockPollingInterval       time.Duration
+	unstableHeadLength         int
+	canonicalChain             *list.List
+}
+
+type minimalBlockInfo struct {
+	number     int64
+	hash       string
+	parentHash string
 }
 
 func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) *blockListener {
@@ -56,6 +65,8 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section)
 		highestBlock:               -1,
 		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
 		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
+		canonicalChain:             list.New(),
+		unstableHeadLength:         int(c.checkpointBlockGap),
 	}
 	return bl
 }
@@ -127,10 +138,9 @@ func (bl *blockListener) listenLoop() {
 		}
 
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential}
-		update.BlockHashes = make([]string, 0, len(blockHashes))
+		var notifyPos *list.Element
 		for _, h := range blockHashes {
-			// Do a lookup of the block (which will then go into our cache). This lets us keep the high block watermark updated
-			update.BlockHashes = append(update.BlockHashes, h.String())
+			// Do a lookup of the block (which will then go into our cache).
 			bi, err := bl.c.getBlockInfoByHash(bl.ctx, h.String())
 			switch {
 			case err != nil:
@@ -138,25 +148,31 @@ func (bl *blockListener) listenLoop() {
 			case bi == nil:
 				log.L(bl.ctx).Debugf("Block '%s' no longer available after notification (assuming due to re-org)", h)
 			default:
-				blockHeight := bi.Number.BigInt().Int64()
-				bl.mux.Lock()
-				if blockHeight > bl.highestBlock {
-					bl.highestBlock = blockHeight
+				candidate := bl.reconcileCanonicalChain(bi)
+				// Check this is the lowest position to notify from
+				if candidate != nil && (notifyPos == nil || candidate.Value.(*minimalBlockInfo).number < notifyPos.Value.(*minimalBlockInfo).number) {
+					notifyPos = candidate
 				}
-				bl.mux.Unlock()
 			}
 		}
+		if notifyPos != nil {
+			// We notify for all hashes from the point of change in the chain onwards
+			for notifyPos != nil {
+				update.BlockHashes = append(update.BlockHashes, notifyPos.Value.(*minimalBlockInfo).hash)
+				notifyPos = notifyPos.Next()
+			}
 
-		// Take a copy of the consumers in the lock
-		bl.mux.Lock()
-		consumers := make([]*blockUpdateConsumer, 0, len(bl.consumers))
-		for _, c := range bl.consumers {
-			consumers = append(consumers, c)
+			// Take a copy of the consumers in the lock
+			bl.mux.Lock()
+			consumers := make([]*blockUpdateConsumer, 0, len(bl.consumers))
+			for _, c := range bl.consumers {
+				consumers = append(consumers, c)
+			}
+			bl.mux.Unlock()
+
+			// Spin through delivering the block update
+			bl.dispatchToConsumers(consumers, update)
 		}
-		bl.mux.Unlock()
-
-		// Spin through delivering the block update
-		bl.dispatchToConsumers(consumers, update)
 
 		// Reset retry count when we have a full successful loop
 		failCount = 0
@@ -165,8 +181,197 @@ func (bl *blockListener) listenLoop() {
 	}
 }
 
+// reconcileCanonicalChain takes an update on a block, and reconciles it against the in-memory view of the
+// head of the canonical chain we have. If these blocks do not just fit onto the end of the chain, then we
+// work backwards building a new view and notify about all blocks that are changed in that process.
+func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Element {
+
+	mbi := &minimalBlockInfo{
+		number:     bi.Number.BigInt().Int64(),
+		hash:       bi.Hash.String(),
+		parentHash: bi.ParentHash.String(),
+	}
+	bl.mux.Lock()
+	if mbi.number > bl.highestBlock {
+		bl.highestBlock = mbi.number
+	}
+	bl.mux.Unlock()
+
+	// Find the position of this block in the block sequence
+	pos := bl.canonicalChain.Back()
+	for {
+		if pos == nil || pos.Value == nil {
+			// We've eliminated all the existing chain (if there was any)
+			return bl.handleNewBlock(mbi, nil)
+		}
+		posBlock := pos.Value.(*minimalBlockInfo)
+		switch {
+		case posBlock.number == mbi.number && posBlock.hash == mbi.hash && posBlock.parentHash == mbi.parentHash:
+			// This is a duplicate - no need to notify of anything
+			return nil
+		case posBlock.number == mbi.number:
+			// We are replacing a block in the chain
+			return bl.handleNewBlock(mbi, pos.Prev())
+		case posBlock.number < mbi.number:
+			// We have a position where this block goes
+			return bl.handleNewBlock(mbi, pos)
+		default:
+			// We've not wound back to the point this block fits yet
+			pos = pos.Prev()
+		}
+	}
+}
+
+// handleNewBlock rebuilds the canonical chain around a new block, checking if we need to rebuild our
+// view of the canonical chain behind it, or trimming anything after it that is invalidated by a new fork.
+func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.Element) *list.Element {
+
+	// If we have an existing canonical chain before this point, then we need to check we've not
+	// invalidated that with this block. If we have, then we have to re-verify our whole canonical
+	// chain from the first block. Then notify from the earliest point where it has diverged.
+	if addAfter != nil {
+		prevBlock := addAfter.Value.(*minimalBlockInfo)
+		if prevBlock.number != (mbi.number-1) || prevBlock.hash != mbi.parentHash {
+			log.L(bl.ctx).Infof("Notified of block %d / %s that does not fit after block %d / %s (expected parent: %s)", mbi.number, mbi.hash, prevBlock.number, prevBlock.hash, mbi.parentHash)
+			return bl.rebuildCanonicalChain()
+		}
+	}
+
+	// Ok, we can add this block
+	var newElem *list.Element
+	if addAfter == nil {
+		_ = bl.canonicalChain.Init()
+		newElem = bl.canonicalChain.PushBack(mbi)
+	} else {
+		newElem = bl.canonicalChain.InsertAfter(mbi, addAfter)
+		// Trim everything from this point onwards. Note that the following cases are covered on other paths:
+		// - This was just a duplicate notification of a block that fits into our chain - discarded in reconcileCanonicalChain()
+		// - There was a gap before us in the chain, and the tail is still valid - we would have called rebuildCanonicalChain() above
+		nextElem := newElem.Next()
+		for nextElem != nil {
+			toRemove := nextElem
+			nextElem = nextElem.Next()
+			_ = bl.canonicalChain.Remove(toRemove)
+		}
+	}
+
+	// Trim the amount of history we keep based on the configured amount of instability at the front of the chain
+	for bl.canonicalChain.Len() > bl.unstableHeadLength {
+		_ = bl.canonicalChain.Remove(bl.canonicalChain.Front())
+	}
+
+	log.L(bl.ctx).Debugf("Added block %d / %s parent=%s to in-memory canonical chain (new length=%d)", mbi.number, mbi.hash, mbi.parentHash, bl.canonicalChain.Len())
+
+	return newElem
+
+}
+
+// rebuildCanonicalChain is called (only on non-empty case) when our current chain does not seem to line up with
+// a recent block advertisement. So we need to work backwards to the last point of consistency with the current
+// chain and re-query the chain state from there.
+func (bl *blockListener) rebuildCanonicalChain() *list.Element {
+
+	log.L(bl.ctx).Debugf("Rebuilding in-memory canonical chain")
+
+	// If none of our blocks were valid, start from the first block number we've notified about previously
+	lastValidBlock := bl.trimToLastValidBlock()
+	var nextBlockNumber int64
+	var expectedParentHash string
+	if lastValidBlock != nil {
+		nextBlockNumber = lastValidBlock.number + 1
+		expectedParentHash = lastValidBlock.hash
+	} else {
+		firstBlock := bl.canonicalChain.Front()
+		if firstBlock == nil || firstBlock.Value == nil {
+			return nil
+		}
+		nextBlockNumber = firstBlock.Value.(*minimalBlockInfo).number
+		// Clear out the whole chain
+		bl.canonicalChain = bl.canonicalChain.Init()
+	}
+	var notifyPos *list.Element
+	for {
+		var bi *blockInfoJSONRPC
+		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
+			bi, err = bl.c.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
+			return true, err
+		})
+		if err != nil {
+			return nil // Context must have been cancelled
+		}
+		if bi == nil {
+			log.L(bl.ctx).Debugf("Block listener canonical chain view rebuilt to head at block %d", nextBlockNumber-1)
+			break
+		}
+		mbi := &minimalBlockInfo{
+			number:     bi.Number.BigInt().Int64(),
+			hash:       bi.Hash.String(),
+			parentHash: bi.ParentHash.String(),
+		}
+
+		// It's possible the chain will change while we're doing this, and we fall back to the next block notification
+		// to sort that out.
+		if expectedParentHash != "" && mbi.parentHash != expectedParentHash {
+			log.L(bl.ctx).Debugf("Block listener canonical chain view rebuilt up to new re-org at block %d", nextBlockNumber)
+			break
+		}
+		expectedParentHash = mbi.hash
+		nextBlockNumber++
+
+		// Note we do not trim to a length here, as we need to notify for every block we haven't notified for.
+		// Trimming to a length will happen when we get blocks that slot into our existing view
+		newElem := bl.canonicalChain.PushBack(mbi)
+		if notifyPos == nil {
+			notifyPos = newElem
+		}
+
+		bl.mux.Lock()
+		if mbi.number > bl.highestBlock {
+			bl.highestBlock = mbi.number
+		}
+		bl.mux.Unlock()
+
+	}
+	return notifyPos
+}
+
+func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInfo) {
+	// First remove from the end until we get a block that matches the current un-cached query view from the chain
+	lastElem := bl.canonicalChain.Back()
+	for lastElem != nil && lastElem.Value != nil {
+
+		// Query the block that is no at this blockNumber
+		currentViewBlock := lastElem.Value.(*minimalBlockInfo)
+		var freshBlockInfo *blockInfoJSONRPC
+		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
+			freshBlockInfo, err = bl.c.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
+			return true, err
+		})
+		if err != nil {
+			return nil // Context must have been cancelled
+		}
+
+		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.hash {
+			log.L(bl.ctx).Debugf("Canonical chain matches current chain up to block %d", currentViewBlock.number)
+			lastValidBlock = currentViewBlock
+			// Trim everything after this point, as it's invalidated
+			nextElem := lastElem.Next()
+			for nextElem != nil {
+				toRemove := lastElem
+				nextElem = nextElem.Next()
+				_ = bl.canonicalChain.Remove(toRemove)
+			}
+			break
+		}
+		lastElem = lastElem.Prev()
+
+	}
+	return lastValidBlock
+}
+
 func (bl *blockListener) dispatchToConsumers(consumers []*blockUpdateConsumer, update *ffcapi.BlockHashEvent) {
 	for _, c := range consumers {
+		log.L(bl.ctx).Tracef("Notifying consumer %s of blocks %v (gap=%t)", c.id, update.BlockHashes, update.GapPotential)
 		select {
 		case c.updates <- update:
 		case <-bl.ctx.Done(): // loop, we're stopping and will exit on next loop
