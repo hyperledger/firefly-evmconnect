@@ -157,7 +157,7 @@ func TestPrepareTransactionWithEstimate(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
 			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
 			return true
@@ -183,8 +183,8 @@ func TestPrepareTransactionWithEstimateRevert(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Run(
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Run(
 		func(args mock.Arguments) {
 			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114d75707065747279206465746563746564000000000000000000000000000000")
 		},
@@ -205,8 +205,8 @@ func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
 
 	var req ffcapi.TransactionPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareTXEstimateGas), &req)

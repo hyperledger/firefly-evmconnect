@@ -3,10 +3,9 @@ module github.com/hyperledger/firefly-evmconnect
 go 1.17
 
 require (
-	github.com/go-resty/resty/v2 v2.7.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/firefly-common v0.1.20
-	github.com/hyperledger/firefly-signer v0.9.13
+	github.com/hyperledger/firefly-signer v0.9.16
 	github.com/hyperledger/firefly-transaction-manager v0.9.7
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
@@ -26,6 +25,7 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
+	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect

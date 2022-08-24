@@ -75,7 +75,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section)
 func (bl *blockListener) establishBlockHeightWithRetry() error {
 	return bl.c.retry.Do(bl.ctx, "get initial block height", func(attempt int) (retry bool, err error) {
 		var hexBlockHeight ethtypes.HexInteger
-		err = bl.c.backend.Invoke(bl.ctx, &hexBlockHeight, "eth_blockNumber")
+		err = bl.c.backend.CallRPC(bl.ctx, &hexBlockHeight, "eth_blockNumber")
 		if err != nil {
 			log.L(bl.ctx).Warnf("Block height could not be obtained: %s", err)
 			return true, err
@@ -116,7 +116,7 @@ func (bl *blockListener) listenLoop() {
 		}
 
 		if filter == "" {
-			err := bl.c.backend.Invoke(bl.ctx, &filter, "eth_newBlockFilter")
+			err := bl.c.backend.CallRPC(bl.ctx, &filter, "eth_newBlockFilter")
 			if err != nil {
 				log.L(bl.ctx).Errorf("Failed to establish new block filter: %s", err)
 				failCount++
@@ -125,7 +125,7 @@ func (bl *blockListener) listenLoop() {
 		}
 
 		var blockHashes []ethtypes.HexBytes0xPrefix
-		err := bl.c.backend.Invoke(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
+		err := bl.c.backend.CallRPC(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
 		if err != nil {
 			if mapError(filterRPCMethods, err) == ffcapi.ErrorReasonNotFound {
 				log.L(bl.ctx).Warnf("Block filter '%v' no longer valid. Recreating filter: %s", filter, err)

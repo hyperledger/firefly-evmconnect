@@ -71,7 +71,7 @@ func TestGetReceiptOkSuccess(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
 		mock.MatchedBy(func(txHash string) bool {
 			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
 			return true
@@ -100,7 +100,7 @@ func TestGetReceiptNotFound(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte("null"), args[1])
@@ -122,7 +122,7 @@ func TestGetReceiptError(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
 		Return(fmt.Errorf("pop"))
 
 	var req ffcapi.TransactionReceiptRequest

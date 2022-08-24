@@ -31,7 +31,7 @@ func (c *ethConnector) estimateGas(ctx context.Context, tx *ethsigner.Transactio
 
 	// Do the gas estimation
 	var gasEstimate ethtypes.HexInteger
-	err := c.backend.Invoke(ctx, &gasEstimate, "eth_estimateGas", tx)
+	err := c.backend.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx)
 	if err != nil {
 		// If it fails, fall back to an eth_call to see if we get a reverted reason
 		_, reason, errCall := c.callTransaction(ctx, tx, method)

@@ -279,7 +279,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	var filter string
 	uninstallFilter := func() {
 		var res bool
-		if err := es.c.backend.Invoke(es.ctx, &res, "eth_uninstallFilter", filter); err != nil {
+		if err := es.c.backend.CallRPC(es.ctx, &res, "eth_uninstallFilter", filter); err != nil {
 			log.L(es.ctx).Warnf("Error uninstalling filter '%v': %s", filter, err)
 		}
 		filter = ""
@@ -334,7 +334,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Create the new filter
-				err := es.c.backend.Invoke(es.ctx, &filter, "eth_newFilter", &logFilterJSONRPC{
+				err := es.c.backend.CallRPC(es.ctx, &filter, "eth_newFilter", &logFilterJSONRPC{
 					FromBlock: ethtypes.NewHexInteger64(fromBlock),
 					Topics: [][]ethtypes.HexBytes0xPrefix{
 						ag.signatureSet,
@@ -350,7 +350,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			}
 			// Get the next batch of logs
 			var ethLogs []*logJSONRPC
-			err := es.c.backend.Invoke(es.ctx, &ethLogs, filterRPC, filter)
+			err := es.c.backend.CallRPC(es.ctx, &ethLogs, filterRPC, filter)
 			// If we fail to query we just retry - setting filter to nil if not found
 			if err != nil {
 				if mapError(filterRPCMethods, err) == ffcapi.ErrorReasonNotFound {
@@ -482,7 +482,7 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedListener, fromBlock, toBlock int64) (ffcapi.ListenerEvents, error) {
 
 	var ethLogs []*logJSONRPC
-	err := es.c.backend.Invoke(ctx, &ethLogs, "eth_getLogs", &logFilterJSONRPC{
+	err := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", &logFilterJSONRPC{
 		FromBlock: ethtypes.NewHexInteger64(fromBlock),
 		ToBlock:   ethtypes.NewHexInteger64(toBlock),
 		Topics: [][]ethtypes.HexBytes0xPrefix{

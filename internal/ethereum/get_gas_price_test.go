@@ -41,7 +41,7 @@ func TestGetGasPriceOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_gasPrice").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			(args[1].(*ethtypes.HexInteger)).BigInt().SetString("12345", 10)
@@ -63,7 +63,7 @@ func TestGetGasPriceFail(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_gasPrice").
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_gasPrice").
 		Return(fmt.Errorf("pop"))
 
 	var req ffcapi.GasPriceEstimateRequest

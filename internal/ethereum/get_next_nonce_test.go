@@ -41,7 +41,7 @@ func TestGetNextNonceOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
@@ -63,7 +63,7 @@ func TestGetNextNonceFail(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
 		Return(fmt.Errorf("pop"))
 
 	var req ffcapi.NextNonceForSignerRequest

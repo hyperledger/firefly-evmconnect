@@ -30,14 +30,14 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-common/pkg/retry"
-	"github.com/hyperledger/firefly-evmconnect/internal/jsonrpc"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 type ethConnector struct {
-	backend                    jsonrpc.Client
+	backend                    rpcbackend.Backend
 	serializer                 *abi.Serializer
 	gasEstimationFactor        *big.Float
 	catchupPageSize            int64
@@ -81,7 +81,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	}
 	c.gasEstimationFactor = big.NewFloat(conf.GetFloat64(ConfigGasEstimationFactor))
 
-	c.backend = jsonrpc.NewRPCClient(ffresty.New(ctx, conf))
+	c.backend = rpcbackend.NewRPCClient(ffresty.New(ctx, conf))
 
 	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {
