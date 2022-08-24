@@ -75,7 +75,7 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber",
 		mock.MatchedBy(
 			func(blockNumber *ethtypes.HexInteger) bool {
 				return blockNumber.BigInt().String() == "12345"
@@ -114,7 +114,7 @@ func TestGetBlockInfoByNumberBlockNotFoundError(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
 		Return(fmt.Errorf("cannot query unfinalized data"))
 
 	var req ffcapi.BlockInfoByNumberRequest
@@ -131,7 +131,7 @@ func TestGetBlockInfoByNumberNotFound(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte("null"), args[1])
@@ -153,7 +153,7 @@ func TestGetBlockInfoByNumberFail(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
 		Return(fmt.Errorf("pop"))
 
 	var req ffcapi.BlockInfoByNumberRequest
@@ -171,7 +171,7 @@ func TestGetBlockInfoByHashOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", false).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleBlockJSONRPC), args[1])
@@ -202,7 +202,7 @@ func TestGetBlockInfoByHashNotFound(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte("null"), args[1])
@@ -224,7 +224,7 @@ func TestGetBlockInfoByHashFail(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
 		Return(fmt.Errorf("pop"))
 
 	var req ffcapi.BlockInfoByHashRequest

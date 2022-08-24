@@ -74,7 +74,7 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 
 	// Do the raw call
 	var outputData ethtypes.HexBytes0xPrefix
-	err := c.backend.Invoke(ctx, &outputData, "eth_call", tx, "latest")
+	err := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
 	if err != nil {
 		return nil, mapError(callRPCMethods, err), err
 	}

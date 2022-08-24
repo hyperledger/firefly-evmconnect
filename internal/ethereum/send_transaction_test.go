@@ -109,7 +109,7 @@ func TestSendTransactionBadHash(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
 			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
 			return true
@@ -135,7 +135,7 @@ func TestSendTransactionOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
 			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
 			return true
@@ -163,7 +163,7 @@ func TestSendTransactionFail(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
 			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
 			return true
@@ -256,7 +256,7 @@ func TestSendTransactionGasPriceEIP1559(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
 			assert.Equal(t, int64(65535), tx.MaxFeePerGas.BigInt().Int64())
 			assert.Equal(t, int64(12345), tx.MaxPriorityFeePerGas.BigInt().Int64())
@@ -282,7 +282,7 @@ func TestSendTransactionGasPriceLegacyNested(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("Invoke", mock.Anything, mock.Anything, "eth_sendTransaction",
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendTransaction",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
 			assert.Equal(t, int64(65535), tx.GasPrice.BigInt().Int64())
 			return true

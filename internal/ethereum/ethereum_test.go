@@ -22,7 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
-	"github.com/hyperledger/firefly-evmconnect/mocks/jsonrpcmocks"
+	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -30,9 +30,9 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-func newTestConnector(t *testing.T) (context.Context, *ethConnector, *jsonrpcmocks.Client, func()) {
+func newTestConnector(t *testing.T) (context.Context, *ethConnector, *rpcbackendmocks.Backend, func()) {
 
-	mRPC := &jsonrpcmocks.Client{}
+	mRPC := &rpcbackendmocks.Backend{}
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
 	InitConfig(conf)
