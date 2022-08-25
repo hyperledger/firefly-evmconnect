@@ -15,6 +15,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
+replace github.com/hyperledger/firefly-signer v0.9.16 => github.com/kaleido-io/firefly-signer v0.0.0-20220825032737-865a728c3d08
+
 require (
 	github.com/aidarkhanov/nanoid v1.0.8 // indirect
 	github.com/btcsuite/btcd v0.22.1 // indirect
