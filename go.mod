@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/firefly-common v0.1.20
-	github.com/hyperledger/firefly-signer v0.9.16
+	github.com/hyperledger/firefly-signer v0.9.17
 	github.com/hyperledger/firefly-transaction-manager v0.9.8
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
@@ -14,8 +14,6 @@ require (
 	golang.org/x/text v0.3.7
 	gopkg.in/yaml.v2 v2.4.0
 )
-
-replace github.com/hyperledger/firefly-signer v0.9.16 => github.com/kaleido-io/firefly-signer v0.0.0-20220825032737-865a728c3d08
 
 require (
 	github.com/aidarkhanov/nanoid v1.0.8 // indirect
