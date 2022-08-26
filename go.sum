@@ -291,10 +291,10 @@ github.com/hyperledger/firefly-common v0.1.13/go.mod h1:2NqPi5Ud9H6rSlZXkLbotxW7
 github.com/hyperledger/firefly-common v0.1.17-0.20220808193503-961a6b241a1a/go.mod h1:MNbaI2spBsdZYOub6Duj9xueE7Qyu9itOmJ4vE8tjYw=
 github.com/hyperledger/firefly-common v0.1.20 h1:0dShkjlIShyBxkXRmu3vLmpEK6xrqmfc8GhF6k0Vgbg=
 github.com/hyperledger/firefly-common v0.1.20/go.mod h1:gMlv4Iy5JjnzXmSEdb+tWVDIc/2GhL9MRcgNX+VmI4M=
-github.com/hyperledger/firefly-signer v0.9.16 h1:qItr8SbEgvnc7yxseD/XE5fPDLQhTb90I+lklc78pLM=
-github.com/hyperledger/firefly-signer v0.9.16/go.mod h1:GPQRUZOFOAjkLmg8GDjZUjEdUD0gcar+CSVhwltIwyw=
-github.com/hyperledger/firefly-transaction-manager v0.9.8 h1:mwWkiyerCe+HSFQWKEtoJaN2b26fnI7J3jNToGSQ1ac=
-github.com/hyperledger/firefly-transaction-manager v0.9.8/go.mod h1:GuwXVVXI6p3tNk99jbYi4PopMzipVBwy3uu5wSKXJEc=
+github.com/hyperledger/firefly-signer v0.9.17 h1:aNLCyRd9qPxV3E4LHuSYPMml3nHBXDYZVrmJ7q3VTGE=
+github.com/hyperledger/firefly-signer v0.9.17/go.mod h1:GPQRUZOFOAjkLmg8GDjZUjEdUD0gcar+CSVhwltIwyw=
+github.com/hyperledger/firefly-transaction-manager v0.9.9 h1:lr2rUKuk+XQ2OWKDafpwgk2HizYINfu/JBTNcaGVhdg=
+github.com/hyperledger/firefly-transaction-manager v0.9.9/go.mod h1:GuwXVVXI6p3tNk99jbYi4PopMzipVBwy3uu5wSKXJEc=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
