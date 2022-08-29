@@ -94,7 +94,7 @@ func newTestListener(t *testing.T, withMethods bool) (*listener, *rpcbackendmock
 		FromBlock: strconv.Itoa(testHighBlock),
 	}
 	if withMethods {
-		options.Options = fftypes.JSONAnyPtr(`{"methods":[` + abiTransferFn + `]}`)
+		options.Options = fftypes.JSONAnyPtr(`{"methods":[` + abiTransferFn + `],"signer":true}`)
 	}
 	l1req := &ffcapi.EventListenerAddRequest{
 		ListenerID:           lID,

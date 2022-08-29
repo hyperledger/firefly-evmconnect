@@ -36,6 +36,7 @@ import (
 // listenerCheckpoint is our Ethereum specific custom options that can be specified when creating a listener
 type listenerOptions struct {
 	Methods []*abi.Entry `json:"methods,omitempty"` // An optional array of ABI methods. If specified and the input data for a transaction matches, the decoded inputs will be included in the event
+	Signer  bool         `json:"signer,omitempty"`  // An optional boolean for whether to extract the signer of the transaction that emitted the event
 }
 
 // listenerCheckpoint is our Ethereum specific checkpoint structure
@@ -307,13 +308,17 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 		}
 	}
 
-	if len(l.config.options.Methods) > 0 {
+	if len(l.config.options.Methods) > 0 || l.config.options.Signer {
 		txInfo, err := l.c.getTransactionInfo(ctx, ethLog.TransactionHash)
 		if txInfo == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
 		} else {
-			info.InputSigner = txInfo.From
-			l.matchMethod(ctx, l.config.options.Methods, txInfo, &info)
+			if l.config.options.Signer {
+				info.InputSigner = txInfo.From
+			}
+			if len(l.config.options.Methods) > 0 {
+				l.matchMethod(ctx, l.config.options.Methods, txInfo, &info)
+			}
 		}
 	}
 
