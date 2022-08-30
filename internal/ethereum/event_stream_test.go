@@ -520,12 +520,49 @@ func TestStreamLoopNewFilterFail(t *testing.T) {
 			close(retried)
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
 
 	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
 
 	<-retried
+
+}
+
+func TestStreamCleanupFilterOK(t *testing.T) {
+
+	mRPC := &rpcbackendmocks.Backend{}
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil)
+
+	es := &eventStream{
+		ctx: context.Background(),
+		c: &ethConnector{
+			backend: mRPC,
+		},
+	}
+
+	filterID := "filter1"
+	es.uninstallFilter(&filterID)
+
+	assert.Empty(t, filterID)
+
+}
+
+func TestStreamCleanupFilterFailLog(t *testing.T) {
+
+	mRPC := &rpcbackendmocks.Backend{}
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(fmt.Errorf("pop"))
+
+	es := &eventStream{
+		ctx: context.Background(),
+		c: &ethConnector{
+			backend: mRPC,
+		},
+	}
+
+	filterID := "filter1"
+	es.uninstallFilter(&filterID)
+
+	assert.Empty(t, filterID)
 
 }
 
