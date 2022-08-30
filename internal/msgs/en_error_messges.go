@@ -47,7 +47,6 @@ var (
 	MsgUnsupportedVersion        = ffe("FF23027", "Unsupported FFCAPI Version '%s'")
 	MsgUnsupportedRequestType    = ffe("FF23028", "Unsupported FFCAPI request type '%s'")
 	MsgMissingRequestID          = ffe("FF23029", "Missing FFCAPI request id")
-	MsgRPCRequestFailed          = ffe("FF23030", "Backend RPC request failed")
 	MsgUnknownConnector          = ffe("FF23031", "Unknown connector type: '%s'")
 	MsgBadDataFormat             = ffe("FF23032", "Unknown data format option '%s' supported: %s")
 	MsgInvalidListenerOptions    = ffe("FF23033", "Invalid listener options supplied: %v")
