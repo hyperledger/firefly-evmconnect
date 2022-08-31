@@ -485,15 +485,20 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 }
 
 func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedListener, fromBlock, toBlock int64) (ffcapi.ListenerEvents, error) {
-
 	var ethLogs []*logJSONRPC
-	err := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", &logFilterJSONRPC{
+	logFilterJSONRPCReq := &logFilterJSONRPC{
 		FromBlock: ethtypes.NewHexInteger64(fromBlock),
 		ToBlock:   ethtypes.NewHexInteger64(toBlock),
 		Topics: [][]ethtypes.HexBytes0xPrefix{
 			ag.signatureSet,
 		},
-	})
+	}
+
+	if len(ag.listeners) == 1 && len(ag.listeners[0].config.filters) == 1 {
+		logFilterJSONRPCReq.Address = ag.listeners[0].config.filters[0].Address
+	}
+
+	err := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", logFilterJSONRPCReq)
 	if err != nil {
 		return nil, err
 	}
