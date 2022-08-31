@@ -53,7 +53,7 @@ func (c *ethConnector) addToBlockCache(blockInfo *blockInfoJSONRPC) {
 	c.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
 
-func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, error) {
+func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
 	var blockInfo *blockInfoJSONRPC
 	if allowCache {
 		cached, ok := c.blockCache.Get(strconv.FormatInt(blockNumber, 10))
@@ -71,24 +71,24 @@ func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int
 		if err != nil {
 			if mapError(blockRPCMethods, err) == ffcapi.ErrorReasonNotFound {
 				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", err)
-				return nil, nil
+				return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 			}
-			return nil, err
+			return nil, ffcapi.ErrorReason(""), err
 		}
 		if blockInfo == nil {
-			return nil, err
+			return nil, ffcapi.ErrorReason(""), err
 		}
 		c.addToBlockCache(blockInfo)
 	}
 
-	return blockInfo, nil
+	return blockInfo, "", nil
 }
 
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), true, req.ExpectedParentHash)
+	blockInfo, reason, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), true, req.ExpectedParentHash)
 	if err != nil {
-		return nil, ffcapi.ErrorReason(""), err
+		return nil, reason, err
 	}
 	if blockInfo == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)

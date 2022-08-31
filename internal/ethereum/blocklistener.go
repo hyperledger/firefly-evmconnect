@@ -292,12 +292,15 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	var notifyPos *list.Element
 	for {
 		var bi *blockInfoJSONRPC
+		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
-			bi, err = bl.c.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
-			return true, err
+			bi, reason, err = bl.c.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
+			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
-			return nil // Context must have been cancelled
+			if reason != ffcapi.ErrorReasonNotFound {
+				return nil // Context must have been cancelled
+			}
 		}
 		if bi == nil {
 			log.L(bl.ctx).Debugf("Block listener canonical chain view rebuilt to head at block %d", nextBlockNumber-1)
@@ -343,12 +346,15 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 		// Query the block that is no at this blockNumber
 		currentViewBlock := lastElem.Value.(*minimalBlockInfo)
 		var freshBlockInfo *blockInfoJSONRPC
+		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
-			freshBlockInfo, err = bl.c.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
-			return true, err
+			freshBlockInfo, reason, err = bl.c.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
+			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
-			return nil // Context must have been cancelled
+			if reason != ffcapi.ErrorReasonNotFound {
+				return nil // Context must have been cancelled
+			}
 		}
 
 		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.hash {
