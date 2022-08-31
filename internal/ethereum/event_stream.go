@@ -275,16 +275,21 @@ func (es *eventStream) leadGroupCatchup() bool {
 
 }
 
-func (es *eventStream) leadGroupSteadyState() bool {
-	var filter string
-	uninstallFilter := func() {
+func (es *eventStream) uninstallFilter(filter *string) {
+	if *filter != "" {
 		var res bool
 		if err := es.c.backend.CallRPC(es.ctx, &res, "eth_uninstallFilter", filter); err != nil {
 			log.L(es.ctx).Warnf("Error uninstalling filter '%v': %s", filter, err)
+		} else {
+			log.L(es.ctx).Debugf("Uninstalled filter '%v': %t", filter, res)
 		}
-		filter = ""
+		*filter = ""
 	}
-	defer uninstallFilter()
+}
+
+func (es *eventStream) leadGroupSteadyState() bool {
+	var filter string
+	defer es.uninstallFilter(&filter)
 
 	// Then we move into the head mode, where we establish a long-lived filter, and keep polling for changes on it.
 	var ag *aggregatedListener
@@ -314,7 +319,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			if filter == "" || listenerChanged {
 				// Uninstall any existing filter
 				if filter != "" {
-					uninstallFilter()
+					es.uninstallFilter(&filter)
 				}
 				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new filter ID
 				// Determine the earliest block we need to poll from
