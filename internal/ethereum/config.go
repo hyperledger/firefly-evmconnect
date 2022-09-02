@@ -41,8 +41,8 @@ const (
 	DefaultListenerPort        = 5102
 	DefaultGasEstimationFactor = 1.5
 
-	DefaultCatchupPageSize          = 2500
-	DefaultEventsCatchupThreshold   = 2500
+	DefaultCatchupPageSize          = 500
+	DefaultEventsCatchupThreshold   = 500
 	DefaultEventsCheckpointBlockGap = 50
 
 	DefaultRetryInitDelay   = "100ms"
