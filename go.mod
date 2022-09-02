@@ -15,6 +15,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
+replace github.com/hyperledger/firefly-transaction-manager v0.9.10 => github.com/kaleido-io/firefly-transaction-manager v0.0.0-20220902203522-fcba476c9ec5
+
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect

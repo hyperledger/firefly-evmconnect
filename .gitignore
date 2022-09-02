@@ -6,3 +6,5 @@ coverage.txt
 __debug*
 .leveldb
 .vscode/*.log
+*.iml
+.idea/
