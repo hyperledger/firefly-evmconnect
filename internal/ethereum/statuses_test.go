@@ -49,7 +49,7 @@ func TestIsReady(t *testing.T) {
 	assert.NotNil(t, status.DownstreamDetails)
 
 	details := status.DownstreamDetails.JSONObject()
-	assert.Equal(t, details.GetString("chainId"), "80001")
+	assert.Equal(t, details.GetString("chainID"), "80001")
 }
 
 func TestIsReadyError(t *testing.T) {
