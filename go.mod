@@ -4,9 +4,9 @@ go 1.17
 
 require (
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hyperledger/firefly-common v0.1.20
+	github.com/hyperledger/firefly-common v1.1.2
 	github.com/hyperledger/firefly-signer v0.9.19
-	github.com/hyperledger/firefly-transaction-manager v0.9.10
+	github.com/hyperledger/firefly-transaction-manager v0.9.11
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.8.0
@@ -14,8 +14,6 @@ require (
 	golang.org/x/text v0.3.7
 	gopkg.in/yaml.v2 v2.4.0
 )
-
-replace github.com/hyperledger/firefly-transaction-manager v0.9.10 => github.com/kaleido-io/firefly-transaction-manager v0.0.0-20220902203522-fcba476c9ec5
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
