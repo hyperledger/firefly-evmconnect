@@ -29,6 +29,7 @@ const (
 	sendRPCMethods
 	callRPCMethods
 	blockRPCMethods
+	netVersionRPCMethods
 )
 
 // mapErrorToReason provides a common place for mapping Ethereum client
@@ -62,6 +63,10 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 	case blockRPCMethods:
 		// https://docs.avax.network/quickstart/integrate-exchange-with-avalanche#determining-finality
 		if strings.Contains(errString, "cannot query unfinalized data") {
+			return ffcapi.ErrorReasonNotFound
+		}
+	case netVersionRPCMethods:
+		if strings.Contains(errString, "the method net_version does not exist/is not available") {
 			return ffcapi.ErrorReasonNotFound
 		}
 	}

@@ -31,7 +31,7 @@ func configCommand() *cobra.Command {
 		Long:  "",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			initConfig()
-			b, err := config.GenerateConfigMarkdown(context.Background(), config.GetKnownKeys())
+			b, err := config.GenerateConfigMarkdown(context.Background(), "", config.GetKnownKeys())
 			fmt.Println(string(b))
 			return err
 		},
