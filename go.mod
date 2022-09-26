@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/firefly-common v1.1.2
-	github.com/hyperledger/firefly-signer v0.9.19
+	github.com/hyperledger/firefly-signer v0.9.21
 	github.com/hyperledger/firefly-transaction-manager v1.1.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
@@ -20,8 +20,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/aidarkhanov/nanoid v1.0.8 // indirect
-	github.com/btcsuite/btcd v0.22.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.1.3 // indirect
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/getkin/kin-openapi v0.96.0 // indirect
