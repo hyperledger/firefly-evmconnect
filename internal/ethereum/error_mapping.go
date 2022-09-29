@@ -59,6 +59,8 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 			return ffcapi.ErrorReasonTransactionUnderpriced
 		case strings.Contains(errString, "known transaction"):
 			return ffcapi.ErrorKnownTransaction
+		case strings.Contains(errString, "already known"):
+			return ffcapi.ErrorKnownTransaction
 		}
 	case blockRPCMethods:
 		// https://docs.avax.network/quickstart/integrate-exchange-with-avalanche#determining-finality
