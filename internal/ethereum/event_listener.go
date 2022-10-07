@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -323,9 +322,6 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	}
 
 	signature := f.Signature
-	if ethLog.Address != nil {
-		signature = fmt.Sprintf("%s:%s", ethLog.Address, signature)
-	}
 	return &ffcapi.ListenerEvent{
 		Checkpoint: &listenerCheckpoint{
 			Block:            blockNumber,
