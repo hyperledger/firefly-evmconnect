@@ -91,7 +91,7 @@
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
-|factor|The retry backoff factor|`boolean`|`2`
+|factor|The retry backoff factor|`float32`|`2`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |initialDelay|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
 |maxDelay|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
@@ -104,10 +104,10 @@
 |credentials|CORS setting to control whether a browser allows credentials to be sent to this API|`boolean`|`true`
 |debug|Whether debug is enabled for the CORS implementation|`boolean`|`false`
 |enabled|Whether CORS is enabled|`boolean`|`true`
-|headers|CORS setting to control the allowed headers|`string`|`[*]`
+|headers|CORS setting to control the allowed headers|`[]string`|`[*]`
 |maxAge|The maximum age a browser should rely on CORS checks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`600`
-|methods| CORS setting to control the allowed methods|`string`|`[GET POST PUT PATCH DELETE]`
-|origins|CORS setting to control the allowed origins|`string`|`[*]`
+|methods| CORS setting to control the allowed methods|`[]string`|`[GET POST PUT PATCH DELETE]`
+|origins|CORS setting to control the allowed origins|`[]string`|`[*]`
 
 ## debug
 
@@ -137,7 +137,7 @@
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|factor|Factor to increase the delay by, between each retry|`boolean`|`2`
+|factor|Factor to increase the delay by, between each retry|`float32`|`2`
 |initialDelay|Initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxDelay|Maximum delay between retries|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
@@ -210,7 +210,7 @@
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
 |method|The HTTP Method to use when invoking the Gas Oracle REST API|`string`|`GET`
-|mode|The gas oracle mode|connector | restapi | disabled|`connector`
+|mode|The gas oracle mode|'connector', 'restapi', 'fixed', or 'disabled'|`connector`
 |queryInterval|The minimum interval between queries to the Gas Oracle|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |template|REST API Gas Oracle: A go template to execute against the result from the Gas Oracle, to create a JSON block that will be passed as the gas price to the connector|[Go Template](https://pkg.go.dev/text/template) `string`|`<nil>`
@@ -249,7 +249,7 @@
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|factor|The retry backoff factor|`boolean`|`2`
+|factor|The retry backoff factor|`float32`|`2`
 |initialDelay|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxDelay|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
