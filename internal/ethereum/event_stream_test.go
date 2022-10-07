@@ -218,6 +218,7 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		},
 	}
 
+	closed := false
 	listenerCaughtUp := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		ethLogs := make([]*logJSONRPC, 0)
@@ -238,7 +239,10 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			})
 		case es.c.catchupPageSize + 1000:
-			close(listenerCaughtUp)
+			if !closed {
+				close(listenerCaughtUp)
+				closed = true
+			}
 		default:
 			<-listenerCaughtUp // hold the main group back until we've done the listener catchup
 		}
@@ -274,6 +278,11 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	started := time.Now()
 	for {
 		t.Logf("Catchup=%t HeadBlock=%d", l.catchup, es.headBlock)
+		select {
+		case <-events:
+			t.Logf("Noting duplicate event detection of unconfirmed event after listener rejoined head group")
+		default:
+		}
 		if time.Since(started) > 1*time.Second {
 			assert.Fail(t, "Never exited catchup")
 		}

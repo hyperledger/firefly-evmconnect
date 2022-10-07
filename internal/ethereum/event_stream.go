@@ -427,6 +427,7 @@ func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ff
 		}
 	} else {
 		for _, event := range events {
+			log.L(es.ctx).Debugf("Detected event %s", event.Event)
 			select {
 			case es.events <- event:
 			case <-es.ctx.Done():
