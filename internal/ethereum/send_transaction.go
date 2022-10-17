@@ -32,29 +32,33 @@ import (
 )
 
 func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.TransactionSendRequest) (*ffcapi.TransactionSendResponse, ffcapi.ErrorReason, error) {
-
-	txData, err := hex.DecodeString(strings.TrimPrefix(req.TransactionData, "0x"))
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgInvalidTXData, req.TransactionData, err)
-	}
-
-	tx, err := c.buildTx(ctx, txTypePrePrepared, req.From, req.To, req.Nonce, req.Gas, req.Value, txData)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
-
-	err = c.mapGasPrice(ctx, req.GasPrice, tx)
-	if err != nil {
-		return nil, ffcapi.ErrorReasonInvalidInputs, err
-	}
-
+	var rpcError error
 	var txHash ethtypes.HexBytes0xPrefix
-	err = c.backend.CallRPC(ctx, &txHash, "eth_sendTransaction", tx)
-	if err == nil && len(txHash) != 32 {
-		err = i18n.NewError(ctx, msgs.MsgInvalidTXHashReturned, len(txHash))
+	if req.PreSigned {
+		rpcError = c.backend.CallRPC(ctx, &txHash, "eth_sendRawTransaction", req.TransactionData)
+	} else {
+		txData, err := hex.DecodeString(strings.TrimPrefix(req.TransactionData, "0x"))
+		if err != nil {
+			return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgInvalidTXData, req.TransactionData, err)
+		}
+
+		tx, err := c.buildTx(ctx, txTypePrePrepared, req.From, req.To, req.Nonce, req.Gas, req.Value, txData)
+		if err != nil {
+			return nil, ffcapi.ErrorReasonInvalidInputs, err
+		}
+
+		err = c.mapGasPrice(ctx, req.GasPrice, tx)
+		if err != nil {
+			return nil, ffcapi.ErrorReasonInvalidInputs, err
+		}
+		rpcError = c.backend.CallRPC(ctx, &txHash, "eth_sendTransaction", tx)
 	}
-	if err != nil {
-		return nil, mapError(sendRPCMethods, err), err
+
+	if rpcError == nil && len(txHash) != 32 {
+		rpcError = i18n.NewError(ctx, msgs.MsgInvalidTXHashReturned, len(txHash))
+	}
+	if rpcError != nil {
+		return nil, mapError(sendRPCMethods, rpcError), rpcError
 	}
 	return &ffcapi.TransactionSendResponse{
 		TransactionHash: txHash.String(),

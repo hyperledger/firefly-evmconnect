@@ -288,17 +288,12 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/huandu/xstrings v1.3.1 h1:4jgBlKK6tLKFvO8u5pmYjG91cqytmDCDvGh7ECVFfFs=
 github.com/huandu/xstrings v1.3.1/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/hyperledger/firefly-common v0.1.13/go.mod h1:2NqPi5Ud9H6rSlZXkLbotxW7z4EAD89p3/8oNOpm9Gs=
-github.com/hyperledger/firefly-common v0.1.17-0.20220808193503-961a6b241a1a/go.mod h1:MNbaI2spBsdZYOub6Duj9xueE7Qyu9itOmJ4vE8tjYw=
-github.com/hyperledger/firefly-common v1.1.2 h1:tSsptTxlgOlbbsyU6Ae83rOWA6tx1o0oNdqI8PAgzsk=
-github.com/hyperledger/firefly-common v1.1.2/go.mod h1:gMlv4Iy5JjnzXmSEdb+tWVDIc/2GhL9MRcgNX+VmI4M=
 github.com/hyperledger/firefly-common v1.1.3 h1:srCodaJSLl8/qaq+Cse6HfHZbzYFzguerX370YGxnXU=
 github.com/hyperledger/firefly-common v1.1.3/go.mod h1:gMlv4Iy5JjnzXmSEdb+tWVDIc/2GhL9MRcgNX+VmI4M=
 github.com/hyperledger/firefly-signer v0.9.21 h1:xgR5/rH1KLSU8HFoXVXrDm4sTJAI7qS1MCnPucpORFE=
 github.com/hyperledger/firefly-signer v0.9.21/go.mod h1:Ng3UzN1He1zrNBYMVQOeRs69aHobfVPMKXKyettjZk0=
-github.com/hyperledger/firefly-transaction-manager v1.1.0 h1:XEAYuAN+uqnMHsyUplc7OxuvCYsb7WwbknWmluZw4Vs=
-github.com/hyperledger/firefly-transaction-manager v1.1.0/go.mod h1:wB5YXPIL4sXXWLXO2pwjdAj9q4+iJsYt4NVaWtuttRI=
-github.com/hyperledger/firefly-transaction-manager v1.1.1 h1:KlMs2Uhi5IoIJjCa6yCwr0TnxGvHFZpbKtedHlnMI2E=
-github.com/hyperledger/firefly-transaction-manager v1.1.1/go.mod h1:jr9d7t1fEE45SuWs6+0GonZI/E0O69cGFecX2fmsGKU=
+github.com/hyperledger/firefly-transaction-manager v1.1.2 h1:CQUVtuKT32gkoXd7LXz2i0kRc68Czo6bLVXlDL3Kkhc=
+github.com/hyperledger/firefly-transaction-manager v1.1.2/go.mod h1:jr9d7t1fEE45SuWs6+0GonZI/E0O69cGFecX2fmsGKU=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/imdario/mergo v0.3.11 h1:3tnifQM4i+fbajXKBHXWEH+KvNHqojZ778UH75j3bGA=
@@ -471,7 +466,6 @@ github.com/spf13/viper v1.12.1-0.20220712161005-5247643f0235 h1:azjn5/lAGpcMny6s
 github.com/spf13/viper v1.12.1-0.20220712161005-5247643f0235/go.mod h1:f40df4ovE8V1ot0NXmYP1zUDS+X1D5AXGviq9fCJqZU=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
-github.com/stretchr/objx v0.2.0/go.mod h1:qt09Ya8vawLte6SNmTgCsAVtYtaKzEcn8ATUoHMkEqE=
 github.com/stretchr/objx v0.4.0 h1:M2gUjqZET1qApGOWNSnZ49BAIMX4F/1plDv3+l31EJ4=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
