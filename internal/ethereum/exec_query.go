@@ -19,6 +19,8 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -52,6 +54,14 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
+	errors := make([]*abi.Entry, len(req.Errors))
+	for i, e := range req.Errors {
+		err := json.Unmarshal(e.Bytes(), &errors[i])
+		if err != nil {
+			return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
+		}
+	}
+
 	// Build the base transaction object
 	tx, err := c.buildTx(ctx, txTypeQuery, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
 	if err != nil {
@@ -59,7 +69,7 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 	}
 
 	// Do the call, with processing of revert reasons
-	outputs, reason, err := c.callTransaction(ctx, tx, method)
+	outputs, reason, err := c.callTransaction(ctx, tx, method, errors)
 	if err != nil {
 		return nil, reason, err
 	}
@@ -70,7 +80,7 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 
 }
 
-func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
+func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors ...[]*abi.Entry) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
 
 	// Do the raw call
 	var outputData ethtypes.HexBytes0xPrefix
@@ -89,7 +99,8 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
 	// signature
 	if len(outputData)%32 == 4 {
-		if bytes.Equal(outputData[0:4], defaultErrorID) {
+		signature := outputData[0:4]
+		if bytes.Equal(signature, defaultErrorID) {
 			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
 			if err == nil && len(errorInfo.Children) == 1 {
 				if strError, ok := errorInfo.Children[0].Value.(string); ok {
@@ -97,11 +108,32 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 				}
 			}
 			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+		} else {
+			// check if the signature matches any of the declared custom error definitions
+			if len(errors) > 0 {
+				for _, e := range errors[0] {
+					idBytes := e.FunctionSelectorBytes()
+					if bytes.Equal(signature, idBytes) {
+						errorInfo, err := e.DecodeCallDataCtx(ctx, outputData)
+						if err == nil {
+							strError := fmt.Sprintf("%s(", e.Name)
+							for i, child := range errorInfo.Children {
+								value, err := child.JSON()
+								if err == nil {
+									strError += string(value)
+									if i < len(errorInfo.Children)-1 {
+										strError += ", "
+									}
+								}
+							}
+							strError += ")"
+							return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, strError)
+						}
+						log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+					}
+				}
+			}
 		}
-		// Note: We do not support custom errors (with custom IDs/signatures).
-		//       This would require the FFCAPI to be enhanced to allow an array
-		//       "error" ABI definition entries to be passed alongside the
-		//       "method" ABI definition entry.
 		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, outputData)
 	}
 

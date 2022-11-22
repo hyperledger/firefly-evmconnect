@@ -65,4 +65,5 @@ var (
 	MsgTimedOutQueryingChainHead = ffe("FF23046", "Timed out waiting for chain head block number")
 	MsgDecodeBytecodeFailed      = ffe("FF23047", "Failed to decode 'bytecode' as hex or Base64")
 	MsgInvalidTXHashReturned     = ffe("FF23048", "Received invalid transaction hash from node len=%d")
+	MsgUnmarshalErrorFail        = ffe("FF23049", "Failed to parse error %d: %s")
 )

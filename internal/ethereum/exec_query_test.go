@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -59,6 +61,35 @@ const sampleExecQuery = `{
 		"stateMutability":"nonpayable",
 		"type":"function"
 	},
+	"errors": [
+		{
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "x",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "y",
+          "type": "uint256"
+        }
+      ],
+      "name": "GreaterThanTen",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "x",
+          "type": "uint256"
+        }
+      ],
+      "name": "LessThanOne",
+      "type": "error"
+    }
+	],
 	"params": [ 4276993775 ]
 }`
 
@@ -112,6 +143,27 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 	assert.JSONEq(t, "null", res.Outputs.String())
+
+}
+
+func TestExecQueryCustomErrorRevertData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x391ad4e000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000014")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgRevertedWithMessage, `GreaterThanTen("20", "20")`)
+	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
 
