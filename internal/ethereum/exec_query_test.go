@@ -81,9 +81,9 @@ const sampleExecQuery = `{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "x",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "LessThanOne",
@@ -163,6 +163,27 @@ func TestExecQueryCustomErrorRevertData(t *testing.T) {
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
 	expectedError := i18n.NewError(ctx, msgs.MsgRevertedWithMessage, `GreaterThanTen("20", "20")`)
+	assert.Equal(t, expectedError.Error(), err.Error())
+
+}
+
+func TestExecQueryCustomErrorRevertDataBadOutput(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x053b20290000000000000000000000000000000000000000000000000000000000000020")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, `0x053b20290000000000000000000000000000000000000000000000000000000000000020`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }

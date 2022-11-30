@@ -114,22 +114,12 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 				for _, e := range errors[0] {
 					idBytes := e.FunctionSelectorBytes()
 					if bytes.Equal(signature, idBytes) {
-						errorInfo, err := e.DecodeCallDataCtx(ctx, outputData)
+						err := formatCustomError(ctx, e, outputData)
 						if err == nil {
-							strError := fmt.Sprintf("%s(", e.Name)
-							for i, child := range errorInfo.Children {
-								value, err := child.JSON()
-								if err == nil {
-									strError += string(value)
-									if i < len(errorInfo.Children)-1 {
-										strError += ", "
-									}
-								}
-							}
-							strError += ")"
-							return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, strError)
+							log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+							break
 						}
-						log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+						return nil, ffcapi.ErrorReasonTransactionReverted, err
 					}
 				}
 			}
@@ -150,4 +140,26 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 	}
 	return fftypes.JSONAnyPtrBytes(jsonData), "", nil
 
+}
+
+func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) error {
+	errorInfo, err := e.DecodeCallDataCtx(ctx, outputData)
+	if err == nil {
+		strError := fmt.Sprintf("%s(", e.Name)
+		for i, child := range errorInfo.Children {
+			value, err := child.JSON()
+			if err == nil {
+				strError += string(value)
+			} else {
+				// if this part of the error structure failed to parse, simply append "?"
+				strError += "?"
+			}
+			if i < len(errorInfo.Children)-1 {
+				strError += ", "
+			}
+		}
+		strError += ")"
+		return i18n.NewError(ctx, msgs.MsgRevertedWithMessage, strError)
+	}
+	return nil
 }
