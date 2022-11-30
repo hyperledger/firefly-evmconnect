@@ -31,38 +31,38 @@ import (
 )
 
 const sampleExecQuery = `{
-	"ffcapi": {
-		"version": "v1.0.0",
-		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
-		"type": "exec_query"
-	},
-	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
-	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
-	"nonce": "222",
-	"method": {
-		"inputs": [
-			{
-				"internalType":" uint256",
-				"name": "x",
-				"type": "uint256"
-			}
-		],
-		"name":"set",
-		"outputs":[
-			{
-				"internalType":"uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"type": "string"
-			}
-		],
-		"stateMutability":"nonpayable",
-		"type":"function"
-	},
-	"errors": [
-		{
+  "ffcapi": {
+    "version": "v1.0.0",
+    "id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+    "type": "exec_query"
+  },
+  "from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+  "to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+  "nonce": "222",
+  "method": {
+    "inputs": [
+      {
+        "internalType":" uint256",
+        "name": "x",
+        "type": "uint256"
+      }
+    ],
+    "name":"set",
+    "outputs":[
+      {
+        "internalType":"uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "type": "string"
+      }
+    ],
+    "stateMutability":"nonpayable",
+    "type":"function"
+  },
+  "errors": [
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -89,8 +89,8 @@ const sampleExecQuery = `{
       "name": "LessThanOne",
       "type": "error"
     }
-	],
-	"params": [ 4276993775 ]
+  ],
+  "params": [ 4276993775 ]
 }`
 
 func TestExecQueryOKResponse(t *testing.T) {
