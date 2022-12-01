@@ -31,7 +31,13 @@ func (c *ethConnector) estimateGas(ctx context.Context, tx *ethsigner.Transactio
 
 	// Do the gas estimation
 	var gasEstimate ethtypes.HexInteger
-	err := c.backend.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx)
+	// Some Ethereum client implementations (go-ethereum 1.9 and earlier, Hyperledger besu)
+	// return HTTP code 200 with a response payload that contains error messages.
+	// Other implementations (go-ethereum 1.10) return an error HTTP code along with the
+	// error payload. we need to accommodate both situations by always checking if the
+	// returned payload contains an error or not
+	rpcRes, err := c.backend.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx)
+
 	if err != nil {
 		// If it fails, fall back to an eth_call to see if we get a reverted reason
 		_, reason, errCall := c.callTransaction(ctx, tx, method)

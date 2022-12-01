@@ -84,7 +84,7 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 
 	// Do the raw call
 	var outputData ethtypes.HexBytes0xPrefix
-	err := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
+	rpcRes, err := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
 	if err != nil {
 		return nil, mapError(callRPCMethods, err), err
 	}
@@ -94,37 +94,11 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 		return nil, "", nil
 	}
 
-	// Check for a revert - we can determine it is calldata (with an error signature)
-	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
-	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
-	// signature
-	if len(outputData)%32 == 4 {
-		signature := outputData[0:4]
-		if bytes.Equal(signature, defaultErrorID) {
-			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
-			if err == nil && len(errorInfo.Children) == 1 {
-				if strError, ok := errorInfo.Children[0].Value.(string); ok {
-					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, strError)
-				}
-			}
-			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-		} else {
-			// check if the signature matches any of the declared custom error definitions
-			if len(errors) > 0 {
-				for _, e := range errors[0] {
-					idBytes := e.FunctionSelectorBytes()
-					if bytes.Equal(signature, idBytes) {
-						err := formatCustomError(ctx, e, outputData)
-						if err == nil {
-							log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-							break
-						}
-						return nil, ffcapi.ErrorReasonTransactionReverted, err
-					}
-				}
-			}
-		}
-		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, outputData)
+	// some Ethereum implementations return 200 with error data,
+	// check the output to see if there are error data and return proper errors
+	revertReason := processRevertReason(ctx, outputData, errors...)
+	if revertReason != "" {
+		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
 	}
 
 	// Parse the data against the outputs
@@ -142,7 +116,43 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 
 }
 
-func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) error {
+func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errors ...[]*abi.Entry) string {
+	// Check for a revert - we can determine it is calldata (with an error signature)
+	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
+	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
+	// signature
+	if len(outputData)%32 == 4 {
+		signature := outputData[0:4]
+		if bytes.Equal(signature, defaultErrorID) {
+			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
+			if err == nil && len(errorInfo.Children) == 1 {
+				if strError, ok := errorInfo.Children[0].Value.(string); ok {
+					return strError
+				}
+			}
+			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+		} else {
+			// check if the signature matches any of the declared custom error definitions
+			if len(errors) > 0 {
+				for _, e := range errors[0] {
+					idBytes := e.FunctionSelectorBytes()
+					if bytes.Equal(signature, idBytes) {
+						err := formatCustomError(ctx, e, outputData)
+						if err == "" {
+							log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+							break
+						}
+						return err
+					}
+				}
+			}
+		}
+		return outputData.String()
+	}
+	return ""
+}
+
+func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) string {
 	errorInfo, err := e.DecodeCallDataCtx(ctx, outputData)
 	if err == nil {
 		strError := fmt.Sprintf("%s(", e.Name)
@@ -159,7 +169,7 @@ func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.He
 			}
 		}
 		strError += ")"
-		return i18n.NewError(ctx, msgs.MsgRevertedWithMessage, strError)
+		return strError
 	}
-	return nil
+	return ""
 }
