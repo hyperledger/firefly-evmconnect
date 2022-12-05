@@ -28,11 +28,12 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.TransactionSendRequest) (*ffcapi.TransactionSendResponse, ffcapi.ErrorReason, error) {
-	var rpcError error
+	var rpcError *rpcbackend.RPCError
 	var txHash ethtypes.HexBytes0xPrefix
 	if req.PreSigned {
 		rpcError = c.backend.CallRPC(ctx, &txHash, "eth_sendRawTransaction", req.TransactionData)
@@ -55,10 +56,12 @@ func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.Transact
 	}
 
 	if rpcError == nil && len(txHash) != 32 {
-		rpcError = i18n.NewError(ctx, msgs.MsgInvalidTXHashReturned, len(txHash))
+		rpcError = &rpcbackend.RPCError{Message: i18n.NewError(ctx, msgs.MsgInvalidTXHashReturned, len(txHash)).Error()}
 	}
 	if rpcError != nil {
-		return nil, mapError(sendRPCMethods, rpcError), rpcError
+		// send transaction responses never returns error details, only the error message
+		// so no need to parse the error data
+		return nil, mapError(sendRPCMethods, rpcError.Error()), rpcError.Error()
 	}
 	return &ffcapi.TransactionSendResponse{
 		TransactionHash: txHash.String(),
@@ -67,11 +70,13 @@ func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.Transact
 }
 
 // mapGasPrice handles a variety of inputs from the Transaction Manager policy engine
-//   sending the FFCAPI request. Specifically:
-//   - {"maxFeePerGas": "12345", "maxPriorityFeePerGas": "2345"} - EIP-1559 gas price
-//   - {"gasPrice": "12345"} - legacy gas price
-//   - "12345" - same as  {"gasPrice": "12345"}
-//   - nil - same as {"gasPrice": "0"}
+//
+//	sending the FFCAPI request. Specifically:
+//	- {"maxFeePerGas": "12345", "maxPriorityFeePerGas": "2345"} - EIP-1559 gas price
+//	- {"gasPrice": "12345"} - legacy gas price
+//	- "12345" - same as  {"gasPrice": "12345"}
+//	- nil - same as {"gasPrice": "0"}
+//
 // Anything else will return an error
 func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, tx *ethsigner.Transaction) error {
 	if input == nil {

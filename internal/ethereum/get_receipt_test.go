@@ -18,9 +18,9 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -123,7 +123,7 @@ func TestGetReceiptError(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).
-		Return(fmt.Errorf("pop"))
+		Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.TransactionReceiptRequest
 	err := json.Unmarshal([]byte(sampleGetReceipt), &req)

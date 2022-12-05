@@ -74,7 +74,11 @@ type txInfoJSONRPC struct {
 
 func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*txInfoJSONRPC, error) {
 	var txInfo *txInfoJSONRPC
-	err := c.backend.CallRPC(ctx, &txInfo, "eth_getTransactionByHash", hash)
+	rpcErr := c.backend.CallRPC(ctx, &txInfo, "eth_getTransactionByHash", hash)
+	var err error
+	if rpcErr != nil {
+		err = rpcErr.Error()
+	}
 	return txInfo, err
 }
 
@@ -82,9 +86,9 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 
 	// Get the receipt in the back-end JSON/RPC format
 	var ethReceipt *txReceiptJSONRPC
-	err := c.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
-	if err != nil {
-		return nil, "", err
+	rpcErr := c.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
+	if rpcErr != nil {
+		return nil, "", rpcErr.Error()
 	}
 	if ethReceipt == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgReceiptNotAvailable, req.TransactionHash)

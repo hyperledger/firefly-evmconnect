@@ -18,10 +18,10 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -64,7 +64,7 @@ func TestGetNextNonceFail(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionCount", "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3", "pending").
-		Return(fmt.Errorf("pop"))
+		Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.NextNonceForSignerRequest
 	err := json.Unmarshal([]byte(sampleGetNextNonce), &req)

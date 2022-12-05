@@ -54,12 +54,10 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
-	errors := make([]*abi.Entry, len(req.Errors))
-	for i, e := range req.Errors {
-		err := json.Unmarshal(e.Bytes(), &errors[i])
-		if err != nil {
-			return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
-		}
+	// Parse the optional errors JSON spec, if available
+	errors, err := buildErrorsABI(ctx, req.TransactionInput.Errors)
+	if err != nil {
+		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
 	// Build the base transaction object
@@ -80,13 +78,27 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 
 }
 
-func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors ...[]*abi.Entry) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
+func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
 
 	// Do the raw call
 	var outputData ethtypes.HexBytes0xPrefix
-	rpcRes, err := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
-	if err != nil {
-		return nil, mapError(callRPCMethods, err), err
+	rpcErr := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
+	if rpcErr != nil {
+		// some Ethereum implementations (eg. geth 1.10) returns the revert data inside
+		// the "error" object rather than the "result" object in the response
+		if rpcErr.Data != "" {
+			var revertData ethtypes.HexBytes0xPrefix
+			e1 := json.Unmarshal(rpcErr.Data.Bytes(), &revertData)
+			if e1 != nil {
+				return nil, mapError(callRPCMethods, e1), e1
+			}
+			revertReason, err := processRevertReason(ctx, revertData, errors)
+			if err != nil {
+				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+			}
+			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+		}
+		return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
 	}
 
 	// If we get back nil, then send back nil
@@ -94,10 +106,13 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 		return nil, "", nil
 	}
 
-	// some Ethereum implementations return 200 with error data,
+	// some Ethereum implementations return revert reason data in the response's result object,
 	// check the output to see if there are error data and return proper errors
-	revertReason := processRevertReason(ctx, outputData, errors...)
+	revertReason, err := processRevertReason(ctx, outputData, errors)
 	if revertReason != "" {
+		if err != nil {
+			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+		}
 		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
 	}
 
@@ -116,7 +131,11 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 
 }
 
-func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errors ...[]*abi.Entry) string {
+// processRevertReason returns under 3 different circumstances:
+// 1. non-empty string with nil error: valid reason has been successfully parsed
+// 2. non-empty string with non-nil error: error detail was present but failed to parse, string was raw data
+// 3. empty string with nil error: outputData is NOT an error detail data
+func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errors []*abi.Entry) (string, error) {
 	// Check for a revert - we can determine it is calldata (with an error signature)
 	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
 	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
@@ -127,29 +146,27 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
 			if err == nil && len(errorInfo.Children) == 1 {
 				if strError, ok := errorInfo.Children[0].Value.(string); ok {
-					return strError
+					return strError, nil
 				}
 			}
 			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-		} else {
+		} else if len(errors) > 0 {
 			// check if the signature matches any of the declared custom error definitions
-			if len(errors) > 0 {
-				for _, e := range errors[0] {
-					idBytes := e.FunctionSelectorBytes()
-					if bytes.Equal(signature, idBytes) {
-						err := formatCustomError(ctx, e, outputData)
-						if err == "" {
-							log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-							break
-						}
-						return err
+			for _, e := range errors {
+				idBytes := e.FunctionSelectorBytes()
+				if bytes.Equal(signature, idBytes) {
+					err := formatCustomError(ctx, e, outputData)
+					if err == "" {
+						log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+						break
 					}
+					return err, nil
 				}
 			}
 		}
-		return outputData.String()
+		return outputData.String(), fmt.Errorf("raw data returned")
 	}
-	return ""
+	return "", nil
 }
 
 func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) string {

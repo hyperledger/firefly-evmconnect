@@ -17,11 +17,12 @@
 package ethereum
 
 import (
-	"fmt"
+	"testing"
+
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 func TestIsLive(t *testing.T) {
@@ -57,7 +58,7 @@ func TestIsReadyError(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version").
-		Return(fmt.Errorf("the method net_version does not exist/is not available"))
+		Return(&rpcbackend.RPCError{Message: "the method net_version does not exist/is not available"})
 
 	status, reason, err := c.IsReady(ctx)
 	assert.Error(t, err)

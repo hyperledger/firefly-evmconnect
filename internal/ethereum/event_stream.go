@@ -279,7 +279,7 @@ func (es *eventStream) uninstallFilter(filter *string) {
 	if *filter != "" {
 		var res bool
 		if err := es.c.backend.CallRPC(es.ctx, &res, "eth_uninstallFilter", filter); err != nil {
-			log.L(es.ctx).Warnf("Error uninstalling filter '%v': %s", filter, err)
+			log.L(es.ctx).Warnf("Error uninstalling filter '%v': %s", filter, err.Message)
 		} else {
 			log.L(es.ctx).Debugf("Uninstalled filter '%v': %t", filter, res)
 		}
@@ -347,7 +347,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				})
 				// If we fail to create the filter, we need to keep retrying
 				if err != nil {
-					log.L(es.ctx).Errorf("Failed to establish filter: %s", err)
+					log.L(es.ctx).Errorf("Failed to establish filter: %s", err.Message)
 					failCount++
 					continue
 				}
@@ -355,14 +355,14 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			}
 			// Get the next batch of logs
 			var ethLogs []*logJSONRPC
-			err := es.c.backend.CallRPC(es.ctx, &ethLogs, filterRPC, filter)
+			rpcErr := es.c.backend.CallRPC(es.ctx, &ethLogs, filterRPC, filter)
 			// If we fail to query we just retry - setting filter to nil if not found
-			if err != nil {
-				if mapError(filterRPCMethods, err) == ffcapi.ErrorReasonNotFound {
-					log.L(es.ctx).Infof("Filter '%v' reset: %s", filter, err)
+			if rpcErr != nil {
+				if mapError(filterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
+					log.L(es.ctx).Infof("Filter '%v' reset: %s", filter, rpcErr.Message)
 					filter = ""
 				}
-				log.L(es.ctx).Errorf("Failed to query filter (%s): %s", filterRPC, err)
+				log.L(es.ctx).Errorf("Failed to query filter (%s): %s", filterRPC, rpcErr.Message)
 				failCount++
 				continue
 			}
@@ -499,9 +499,9 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 		logFilterJSONRPCReq.Address = ag.listeners[0].config.filters[0].Address
 	}
 
-	err := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", logFilterJSONRPCReq)
-	if err != nil {
-		return nil, err
+	rpcErr := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", logFilterJSONRPCReq)
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
 	}
 	return es.filterEnrichSort(ctx, ag, ethLogs), nil
 }

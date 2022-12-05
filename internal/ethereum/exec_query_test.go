@@ -18,13 +18,13 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -251,7 +251,7 @@ func TestExecQueryFailCall(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(sampleExecQuery), &req)

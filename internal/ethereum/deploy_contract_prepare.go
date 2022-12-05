@@ -45,7 +45,13 @@ func (c *ethConnector) DeployContractPrepare(ctx context.Context, req *ffcapi.Co
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
-	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, constructor, req.Gas); err != nil {
+	// Parse the optional errors JSON spec, if available
+	errors, err := buildErrorsABI(ctx, req.Errors)
+	if err != nil {
+		return nil, ffcapi.ErrorReasonInvalidInputs, err
+	}
+
+	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, constructor, errors, req.Gas); err != nil {
 		return nil, reason, err
 	}
 	log.L(ctx).Infof("Prepared deploy transaction dataLen=%d gas=%s", len(callData), req.Gas.Int())
