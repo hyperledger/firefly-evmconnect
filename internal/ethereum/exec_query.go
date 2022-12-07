@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -90,7 +91,8 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 			var revertData ethtypes.HexBytes0xPrefix
 			e1 := json.Unmarshal(rpcErr.Data.Bytes(), &revertData)
 			if e1 != nil {
-				return nil, mapError(callRPCMethods, e1), e1
+				log.L(ctx).Errorf("Failed to parse revert reason from error data: %s. Error: %+v", e1, rpcErr)
+				return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
 			}
 			revertReason, err := processRevertReason(ctx, revertData, errors)
 			if err != nil {
@@ -135,7 +137,7 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 // 1. non-empty string with nil error: valid reason has been successfully parsed
 // 2. non-empty string with non-nil error: error detail was present but failed to parse, string was raw data
 // 3. empty string with nil error: outputData is NOT an error detail data
-func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errors []*abi.Entry) (string, error) {
+func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errorAbis []*abi.Entry) (string, error) {
 	// Check for a revert - we can determine it is calldata (with an error signature)
 	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
 	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
@@ -150,9 +152,9 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 				}
 			}
 			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-		} else if len(errors) > 0 {
+		} else if len(errorAbis) > 0 {
 			// check if the signature matches any of the declared custom error definitions
-			for _, e := range errors {
+			for _, e := range errorAbis {
 				idBytes := e.FunctionSelectorBytes()
 				if bytes.Equal(signature, idBytes) {
 					err := formatCustomError(ctx, e, outputData)
@@ -164,7 +166,9 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 				}
 			}
 		}
-		return outputData.String(), fmt.Errorf("raw data returned")
+		// we call this "transient error" because it signals to the caller of the case
+		// that the raw revert data is returned, then it gets thrown away. so no need to translate
+		return outputData.String(), errors.New("transient error")
 	}
 	return "", nil
 }
