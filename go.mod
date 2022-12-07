@@ -5,8 +5,8 @@ go 1.17
 require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/firefly-common v1.1.4
-	github.com/hyperledger/firefly-signer v1.1.3
-	github.com/hyperledger/firefly-transaction-manager v1.1.3
+	github.com/hyperledger/firefly-signer v1.1.4
+	github.com/hyperledger/firefly-transaction-manager v1.1.4
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.8.1
