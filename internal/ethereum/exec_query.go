@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -94,11 +93,13 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 				log.L(ctx).Errorf("Failed to parse revert reason from error data: %s. Error: %+v", e1, rpcErr)
 				return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
 			}
-			revertReason, err := processRevertReason(ctx, revertData, errors)
-			if err != nil {
+			revertReason, ok := processRevertReason(ctx, revertData, errors)
+			if revertReason != "" {
+				if ok {
+					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+				}
 				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
 			}
-			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
 		}
 		return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
 	}
@@ -110,12 +111,12 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 
 	// some Ethereum implementations return revert reason data in the response's result object,
 	// check the output to see if there are error data and return proper errors
-	revertReason, err := processRevertReason(ctx, outputData, errors)
+	revertReason, ok := processRevertReason(ctx, outputData, errors)
 	if revertReason != "" {
-		if err != nil {
-			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+		if ok {
+			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
 		}
-		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
 	}
 
 	// Parse the data against the outputs
@@ -134,10 +135,10 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 }
 
 // processRevertReason returns under 3 different circumstances:
-// 1. non-empty string with nil error: valid reason has been successfully parsed
-// 2. non-empty string with non-nil error: error detail was present but failed to parse, string was raw data
-// 3. empty string with nil error: outputData is NOT an error detail data
-func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errorAbis []*abi.Entry) (string, error) {
+// 1. non-empty string, true: valid reason has been successfully parsed
+// 2. non-empty string, false: error detail was present but failed to parse, string was raw data
+// 3. empty string, true: outputData is NOT an error detail data
+func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errorAbis []*abi.Entry) (string, bool) {
 	// Check for a revert - we can determine it is calldata (with an error signature)
 	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
 	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
@@ -148,7 +149,7 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
 			if err == nil && len(errorInfo.Children) == 1 {
 				if strError, ok := errorInfo.Children[0].Value.(string); ok {
-					return strError, nil
+					return strError, true // OK
 				}
 			}
 			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
@@ -162,15 +163,15 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 						log.L(ctx).Warnf("Invalid revert data: %s", outputData)
 						break
 					}
-					return err, nil
+					return err, true // OK
 				}
 			}
 		}
 		// we call this "transient error" because it signals to the caller of the case
 		// that the raw revert data is returned, then it gets thrown away. so no need to translate
-		return outputData.String(), errors.New("transient error")
+		return outputData.String(), false // !OK
 	}
-	return "", nil
+	return "", true
 }
 
 func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) string {

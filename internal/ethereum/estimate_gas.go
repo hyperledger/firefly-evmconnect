@@ -44,11 +44,13 @@ func (c *ethConnector) estimateGas(ctx context.Context, tx *ethsigner.Transactio
 			if e1 != nil {
 				return nil, mapError(callRPCMethods, e1), e1
 			}
-			revertReason, err := processRevertReason(ctx, revertData, errors)
-			if err != nil {
+			revertReason, ok := processRevertReason(ctx, revertData, errors)
+			if revertReason != "" {
+				if ok {
+					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+				}
 				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
 			}
-			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
 		}
 
 		// If it fails, fall back to an eth_call to see if we get a reverted reason
