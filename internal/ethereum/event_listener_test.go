@@ -18,7 +18,6 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -27,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -127,7 +127,7 @@ func TestGetInitialBlockTimeout(t *testing.T) {
 	}
 
 	blockRPC := make(chan struct{})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(fmt.Errorf("pop")).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		<-blockRPC // make it timeout
 	})
 
@@ -150,7 +150,7 @@ func TestGetHWMNotInit(t *testing.T) {
 	}
 
 	blockRPC := make(chan struct{})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(fmt.Errorf("pop")).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		<-blockRPC // make it timeout
 	})
 
@@ -175,7 +175,7 @@ func TestListenerCatchupErrorsThenDeliveryExit(t *testing.T) {
 			Number: ethtypes.NewHexInteger64(1001),
 		}
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop")).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
@@ -193,7 +193,7 @@ func TestListenerCatchupErrorThenExit(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop")).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		cancelCtx()
 	})
 
@@ -314,10 +314,10 @@ func TestFilterEnrichEthLogTXInfoFail(t *testing.T) {
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
-	}), false).Return(fmt.Errorf("pop1"))
+	}), false).Return(&rpcbackend.RPCError{Message: "pop1"})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
-	})).Return(fmt.Errorf("pop2"))
+	})).Return(&rpcbackend.RPCError{Message: "pop2"})
 
 	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)

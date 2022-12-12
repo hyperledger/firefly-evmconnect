@@ -18,12 +18,12 @@ package ethereum
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -35,7 +35,7 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 	bl := c.blockListener
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").
-		Return(fmt.Errorf("pop")).Once()
+		Return(&rpcbackend.RPCError{Message: "pop"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(12345)
@@ -57,7 +57,7 @@ func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 	bl := c.blockListener
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").
-		Return(fmt.Errorf("pop")).Maybe()
+		Return(&rpcbackend.RPCError{Message: "pop"}).Maybe()
 
 	assert.Equal(t, int64(-1), bl.getHighestBlock(bl.ctx))
 
@@ -847,7 +847,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == block1003Hash.String()
-	}), false).Return(fmt.Errorf("pop"))
+	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	bl.checkStartedLocked()
 
@@ -875,7 +875,7 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 		hbh := args[1].(*string)
 		*hbh = "filter_id2"
 	}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(fmt.Errorf("filter not found")).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(&rpcbackend.RPCError{Message: "filter not found"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		go done() // Close after we've processed the log
 	})
@@ -898,7 +898,7 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(fmt.Errorf("pop")).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		go done()
 	})
 
@@ -943,7 +943,7 @@ func TestBlockListenerRebuildCanonicalFailTerminate(t *testing.T) {
 	})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
-		Return(fmt.Errorf("pop")).
+		Return(&rpcbackend.RPCError{Message: "pop"}).
 		Run(func(args mock.Arguments) {
 			done()
 		})

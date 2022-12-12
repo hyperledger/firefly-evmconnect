@@ -18,48 +18,79 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 const sampleExecQuery = `{
-	"ffcapi": {
-		"version": "v1.0.0",
-		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
-		"type": "exec_query"
-	},
-	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
-	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
-	"nonce": "222",
-	"method": {
-		"inputs": [
-			{
-				"internalType":" uint256",
-				"name": "x",
-				"type": "uint256"
-			}
-		],
-		"name":"set",
-		"outputs":[
-			{
-				"internalType":"uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"type": "string"
-			}
-		],
-		"stateMutability":"nonpayable",
-		"type":"function"
-	},
-	"params": [ 4276993775 ]
+  "ffcapi": {
+    "version": "v1.0.0",
+    "id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+    "type": "exec_query"
+  },
+  "from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+  "to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+  "nonce": "222",
+  "method": {
+    "inputs": [
+      {
+        "internalType":" uint256",
+        "name": "x",
+        "type": "uint256"
+      }
+    ],
+    "name":"set",
+    "outputs":[
+      {
+        "internalType":"uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "type": "string"
+      }
+    ],
+    "stateMutability":"nonpayable",
+    "type":"function"
+  },
+  "errors": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "x",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "y",
+          "type": "uint256"
+        }
+      ],
+      "name": "GreaterThanTen",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "x",
+          "type": "string"
+        }
+      ],
+      "name": "LessThanOne",
+      "type": "error"
+    }
+  ],
+  "params": [ 4276993775 ]
 }`
 
 func TestExecQueryOKResponse(t *testing.T) {
@@ -112,6 +143,48 @@ func TestExecQueryOKNilResponse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 	assert.JSONEq(t, "null", res.Outputs.String())
+
+}
+
+func TestExecQueryCustomErrorRevertData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x391ad4e000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000014")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgRevertedWithMessage, `GreaterThanTen("20", "20")`)
+	assert.Equal(t, expectedError.Error(), err.Error())
+
+}
+
+func TestExecQueryCustomErrorRevertDataBadOutput(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x053b20290000000000000000000000000000000000000000000000000000000000000020")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, `0x053b20290000000000000000000000000000000000000000000000000000000000000020`)
+	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
 
@@ -178,7 +251,7 @@ func TestExecQueryFailCall(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(sampleExecQuery), &req)

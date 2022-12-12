@@ -35,7 +35,7 @@ func (c *ethConnector) IsReady(ctx context.Context) (*ffcapi.ReadyResponse, ffca
 	if err != nil {
 		return &ffcapi.ReadyResponse{
 			Ready: false,
-		}, mapError(netVersionRPCMethods, err), err
+		}, mapError(netVersionRPCMethods, err.Error()), err.Error()
 	}
 
 	details := &fftypes.JSONObject{

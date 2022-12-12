@@ -19,6 +19,8 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -52,6 +54,12 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
+	// Parse the optional errors JSON spec, if available
+	errors, err := buildErrorsABI(ctx, req.TransactionInput.Errors)
+	if err != nil {
+		return nil, ffcapi.ErrorReasonInvalidInputs, err
+	}
+
 	// Build the base transaction object
 	tx, err := c.buildTx(ctx, txTypeQuery, req.From, req.To, req.Nonce, req.Gas, req.Value, callData)
 	if err != nil {
@@ -59,7 +67,7 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 	}
 
 	// Do the call, with processing of revert reasons
-	outputs, reason, err := c.callTransaction(ctx, tx, method)
+	outputs, reason, err := c.callTransaction(ctx, tx, method, errors)
 	if err != nil {
 		return nil, reason, err
 	}
@@ -70,13 +78,30 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 
 }
 
-func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
+func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
 
 	// Do the raw call
 	var outputData ethtypes.HexBytes0xPrefix
-	err := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
-	if err != nil {
-		return nil, mapError(callRPCMethods, err), err
+	rpcErr := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, "latest")
+	if rpcErr != nil {
+		// some Ethereum implementations (eg. geth 1.10) returns the revert data inside
+		// the "error" object rather than the "result" object in the response
+		if rpcErr.Data != "" {
+			var revertData ethtypes.HexBytes0xPrefix
+			e1 := json.Unmarshal(rpcErr.Data.Bytes(), &revertData)
+			if e1 != nil {
+				log.L(ctx).Errorf("Failed to parse revert reason from error data: %s. Error: %+v", e1, rpcErr)
+				return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
+			}
+			revertReason, ok := processRevertReason(ctx, revertData, errors)
+			if revertReason != "" {
+				if ok {
+					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+				}
+				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+			}
+		}
+		return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
 	}
 
 	// If we get back nil, then send back nil
@@ -84,25 +109,14 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 		return nil, "", nil
 	}
 
-	// Check for a revert - we can determine it is calldata (with an error signature)
-	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
-	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
-	// signature
-	if len(outputData)%32 == 4 {
-		if bytes.Equal(outputData[0:4], defaultErrorID) {
-			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
-			if err == nil && len(errorInfo.Children) == 1 {
-				if strError, ok := errorInfo.Children[0].Value.(string); ok {
-					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, strError)
-				}
-			}
-			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+	// some Ethereum implementations return revert reason data in the response's result object,
+	// check the output to see if there are error data and return proper errors
+	revertReason, ok := processRevertReason(ctx, outputData, errors)
+	if revertReason != "" {
+		if ok {
+			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
 		}
-		// Note: We do not support custom errors (with custom IDs/signatures).
-		//       This would require the FFCAPI to be enhanced to allow an array
-		//       "error" ABI definition entries to be passed alongside the
-		//       "method" ABI definition entry.
-		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, outputData)
+		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
 	}
 
 	// Parse the data against the outputs
@@ -118,4 +132,66 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 	}
 	return fftypes.JSONAnyPtrBytes(jsonData), "", nil
 
+}
+
+// processRevertReason returns under 3 different circumstances:
+// 1. non-empty string, true: valid reason has been successfully parsed
+// 2. non-empty string, false: error detail was present but failed to parse, string was raw data
+// 3. empty string, true: outputData is NOT an error detail data
+func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPrefix, errorAbis []*abi.Entry) (string, bool) {
+	// Check for a revert - we can determine it is calldata (with an error signature)
+	// that is returned by the fact the output is not a multiple of 32 (as all ABI encodings
+	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
+	// signature
+	if len(outputData)%32 == 4 {
+		signature := outputData[0:4]
+		if bytes.Equal(signature, defaultErrorID) {
+			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
+			if err == nil && len(errorInfo.Children) == 1 {
+				if strError, ok := errorInfo.Children[0].Value.(string); ok {
+					return strError, true // OK
+				}
+			}
+			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+		} else if len(errorAbis) > 0 {
+			// check if the signature matches any of the declared custom error definitions
+			for _, e := range errorAbis {
+				idBytes := e.FunctionSelectorBytes()
+				if bytes.Equal(signature, idBytes) {
+					err := formatCustomError(ctx, e, outputData)
+					if err == "" {
+						log.L(ctx).Warnf("Invalid revert data: %s", outputData)
+						break
+					}
+					return err, true // OK
+				}
+			}
+		}
+		// we call this "transient error" because it signals to the caller of the case
+		// that the raw revert data is returned, then it gets thrown away. so no need to translate
+		return outputData.String(), false // !OK
+	}
+	return "", true
+}
+
+func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) string {
+	errorInfo, err := e.DecodeCallDataCtx(ctx, outputData)
+	if err == nil {
+		strError := fmt.Sprintf("%s(", e.Name)
+		for i, child := range errorInfo.Children {
+			value, err := child.JSON()
+			if err == nil {
+				strError += string(value)
+			} else {
+				// if this part of the error structure failed to parse, simply append "?"
+				strError += "?"
+			}
+			if i < len(errorInfo.Children)-1 {
+				strError += ", "
+			}
+		}
+		strError += ")"
+		return strError
+	}
+	return ""
 }

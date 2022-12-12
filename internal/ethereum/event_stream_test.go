@@ -18,7 +18,6 @@ package ethereum
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -26,6 +25,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -492,11 +492,11 @@ func TestLeadGroupCatchupRetry(t *testing.T) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop")).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"}).
 		Run(func(args mock.Arguments) {
 			close(retried)
 		}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
@@ -524,11 +524,11 @@ func TestStreamLoopNewFilterFail(t *testing.T) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(fmt.Errorf("pop")).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"}).
 		Run(func(args mock.Arguments) {
 			close(retried)
 		}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(fmt.Errorf("pop")).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"}).Maybe()
 
 	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
@@ -559,7 +559,7 @@ func TestStreamCleanupFilterOK(t *testing.T) {
 func TestStreamCleanupFilterFailLog(t *testing.T) {
 
 	mRPC := &rpcbackendmocks.Backend{}
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	es := &eventStream{
 		ctx: context.Background(),
@@ -662,7 +662,7 @@ func TestStreamLoopFilterReset(t *testing.T) {
 			*args[1].(*string) = "filter_id2"
 			close(reestablishedFilter)
 		})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(fmt.Errorf("filter not found")).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "filter not found"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Maybe()

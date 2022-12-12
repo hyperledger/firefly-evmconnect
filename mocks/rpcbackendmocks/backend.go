@@ -15,17 +15,19 @@ type Backend struct {
 }
 
 // CallRPC provides a mock function with given fields: ctx, result, method, params
-func (_m *Backend) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) error {
+func (_m *Backend) CallRPC(ctx context.Context, result interface{}, method string, params ...interface{}) *rpcbackend.RPCError {
 	var _ca []interface{}
 	_ca = append(_ca, ctx, result, method)
 	_ca = append(_ca, params...)
 	ret := _m.Called(_ca...)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}, string, ...interface{}) error); ok {
+	var r0 *rpcbackend.RPCError
+	if rf, ok := ret.Get(0).(func(context.Context, interface{}, string, ...interface{}) *rpcbackend.RPCError); ok {
 		r0 = rf(ctx, result, method, params...)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpcbackend.RPCError)
+		}
 	}
 
 	return r0

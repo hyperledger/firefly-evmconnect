@@ -18,11 +18,11 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -76,7 +76,7 @@ func TestDeployContractPrepareWithEstimateRevert(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(fmt.Errorf("pop"))
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").Run(
 		func(args mock.Arguments) {
 			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114d75707065747279206465746563746564000000000000000000000000000000")

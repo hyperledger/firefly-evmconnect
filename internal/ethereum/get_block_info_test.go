@@ -18,10 +18,10 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -115,7 +115,7 @@ func TestGetBlockInfoByNumberBlockNotFoundError(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
-		Return(fmt.Errorf("cannot query unfinalized data"))
+		Return(&rpcbackend.RPCError{Message: "cannot query unfinalized data"})
 
 	var req ffcapi.BlockInfoByNumberRequest
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
@@ -154,7 +154,7 @@ func TestGetBlockInfoByNumberFail(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
-		Return(fmt.Errorf("pop"))
+		Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.BlockInfoByNumberRequest
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
@@ -225,7 +225,7 @@ func TestGetBlockInfoByHashFail(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
-		Return(fmt.Errorf("pop"))
+		Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.BlockInfoByHashRequest
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByHash), &req)

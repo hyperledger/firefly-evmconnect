@@ -30,9 +30,9 @@ func (c *ethConnector) GasPriceEstimate(ctx context.Context, req *ffcapi.GasPric
 	// Note we use simple (pre London fork) gas fee approach.
 	// See https://github.com/ethereum/pm/issues/328#issuecomment-853234014 for a bit of color
 	var gasPrice ethtypes.HexInteger
-	err := c.backend.CallRPC(ctx, &gasPrice, "eth_gasPrice")
-	if err != nil {
-		return nil, "", err
+	rpcErr := c.backend.CallRPC(ctx, &gasPrice, "eth_gasPrice")
+	if rpcErr != nil {
+		return nil, "", rpcErr.Error()
 	}
 
 	return &ffcapi.GasPriceEstimateResponse{

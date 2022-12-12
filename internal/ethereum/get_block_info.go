@@ -67,15 +67,19 @@ func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int
 	}
 
 	if blockInfo == nil {
-		err := c.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexInteger64(blockNumber), false /* only the txn hashes */)
-		if err != nil {
-			if mapError(blockRPCMethods, err) == ffcapi.ErrorReasonNotFound {
-				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", err)
+		rpcErr := c.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexInteger64(blockNumber), false /* only the txn hashes */)
+		if rpcErr != nil {
+			if mapError(blockRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
+				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", rpcErr.Message)
 				return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 			}
-			return nil, ffcapi.ErrorReason(""), err
+			return nil, ffcapi.ErrorReason(""), rpcErr.Error()
 		}
 		if blockInfo == nil {
+			var err error
+			if rpcErr != nil {
+				err = rpcErr.Error()
+			}
 			return nil, ffcapi.ErrorReason(""), err
 		}
 		c.addToBlockCache(blockInfo)
@@ -107,8 +111,12 @@ func (c *ethConnector) getBlockInfoByHash(ctx context.Context, hash0xString stri
 	}
 
 	if blockInfo == nil {
-		err := c.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByHash", hash0xString, false /* only the txn hashes */)
-		if err != nil || blockInfo == nil {
+		rpcErr := c.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByHash", hash0xString, false /* only the txn hashes */)
+		if rpcErr != nil || blockInfo == nil {
+			var err error
+			if rpcErr != nil {
+				err = rpcErr.Error()
+			}
 			return nil, err
 		}
 		c.addToBlockCache(blockInfo)

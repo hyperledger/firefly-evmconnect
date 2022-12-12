@@ -54,7 +54,13 @@ func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.Trans
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}
 
-	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, method, req.Gas); err != nil {
+	// Parse the optional errors JSON spec, if available
+	errors, err := buildErrorsABI(ctx, req.TransactionInput.Errors)
+	if err != nil {
+		return nil, ffcapi.ErrorReasonInvalidInputs, err
+	}
+
+	if req.Gas, reason, err = c.ensureGasEstimate(ctx, tx, method, errors, req.Gas); err != nil {
 		return nil, reason, err
 	}
 	log.L(ctx).Infof("Prepared transaction method=%s dataLen=%d gas=%s", method.String(), len(callData), req.Gas.Int())
@@ -66,10 +72,21 @@ func (c *ethConnector) TransactionPrepare(ctx context.Context, req *ffcapi.Trans
 
 }
 
-func (c *ethConnector) ensureGasEstimate(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, gasRequest *fftypes.FFBigInt) (*fftypes.FFBigInt, ffcapi.ErrorReason, error) {
+func buildErrorsABI(ctx context.Context, errorSpecs []*fftypes.JSONAny) ([]*abi.Entry, error) {
+	errors := make([]*abi.Entry, len(errorSpecs))
+	for i, e := range errorSpecs {
+		err := json.Unmarshal(e.Bytes(), &errors[i])
+		if err != nil {
+			return nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
+		}
+	}
+	return errors, nil
+}
+
+func (c *ethConnector) ensureGasEstimate(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry, gasRequest *fftypes.FFBigInt) (*fftypes.FFBigInt, ffcapi.ErrorReason, error) {
 	if gasRequest == nil || gasRequest.Int().Sign() == 0 {
 		// If a value for gas has not been supplied, do a gas estimate
-		gas, reason, err := c.estimateGas(ctx, tx, method)
+		gas, reason, err := c.estimateGas(ctx, tx, method, errors)
 		if err != nil {
 			return nil, reason, err
 		}
