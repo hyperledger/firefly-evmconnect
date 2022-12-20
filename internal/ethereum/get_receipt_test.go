@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
@@ -133,4 +134,9 @@ func TestGetReceiptError(t *testing.T) {
 	assert.Empty(t, "", reason)
 	assert.Nil(t, res)
 
+}
+
+func TestProtocolIDForReceipt(t *testing.T) {
+	assert.Equal(t, "000000012345/000042", ProtocolIDForReceipt(fftypes.NewFFBigInt(12345), fftypes.NewFFBigInt(42)))
+	assert.Equal(t, "", ProtocolIDForReceipt(nil, nil))
 }

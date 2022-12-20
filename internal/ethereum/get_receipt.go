@@ -19,6 +19,7 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -82,6 +83,13 @@ func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.Hex
 	return txInfo, err
 }
 
+func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) string {
+	if blockNumber != nil && transactionIndex != nil {
+		return fmt.Sprintf("%.12d/%.6d", blockNumber.Int(), transactionIndex.Int())
+	}
+	return ""
+}
+
 func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
 
 	// Get the receipt in the back-end JSON/RPC format
@@ -114,6 +122,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		TransactionIndex: fftypes.NewFFBigInt(txIndex),
 		BlockHash:        ethReceipt.BlockHash.String(),
 		Success:          isSuccess,
+		ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
 		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
 	}, "", nil
 
