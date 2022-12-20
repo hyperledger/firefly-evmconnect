@@ -18,10 +18,10 @@ package ethereum
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -64,7 +64,7 @@ func TestGetAddressBalanceFail(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBalance", "0x4a8c8f1717570f9774652075e249ded38124d708", "latest").
-		Return(fmt.Errorf("pop"))
+		Return(&rpcbackend.RPCError{Message: "pop"})
 
 	var req ffcapi.AddressBalanceRequest
 	err := json.Unmarshal([]byte(sampleGetBalance), &req)
