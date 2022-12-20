@@ -33,7 +33,7 @@ func (c *ethConnector) AddressBalance(ctx context.Context, req *ffcapi.AddressBa
 	}
 	err := c.backend.CallRPC(ctx, &addressBalance, "eth_getBalance", req.Address, blockTag)
 	if err != nil {
-		return nil, "", err
+		return nil, "", err.Error()
 	}
 
 	return &ffcapi.AddressBalanceResponse{
