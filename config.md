@@ -7,6 +7,7 @@
 |address|Listener address for API|`string`|`127.0.0.1`
 |defaultRequestTimeout|Default server-side request timeout for API calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |maxRequestTimeout|Maximum server-side request timeout a caller can request with a Request-Timeout header|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10m`
+|passthroughHeaders|A list of HTTP request headers to pass through to dependency microservices|`[]string`|`[]`
 |port|Listener port for API|`int`|`5008`
 |publicURL|External address callers should access API over|`string`|`<nil>`
 |readTimeout|The maximum time to wait when reading from an HTTP connection|[`time.Duration`](https://pkg.go.dev/time#Duration)|`15s`
@@ -58,6 +59,7 @@
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
 |url|URL of JSON/RPC endpoint for the Ethereum node/gateway|string|`<nil>`
@@ -246,6 +248,7 @@
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
 |method|The HTTP Method to use when invoking the Gas Oracle REST API|`string`|`GET`
 |mode|The gas oracle mode|'connector', 'restapi', 'fixed', or 'disabled'|`connector`
+|passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |queryInterval|The minimum interval between queries to the Gas Oracle|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |template|REST API Gas Oracle: A go template to execute against the result from the Gas Oracle, to create a JSON block that will be passed as the gas price to the connector|[Go Template](https://pkg.go.dev/text/template) `string`|`<nil>`
@@ -292,7 +295,7 @@
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|errorHistoryCount|The number of historical errors to retain in the operation|`int`|`25`
+|maxHistoryCount|The number of historical status updates to retain in the operation|`int`|`50`
 |maxInFlight|The maximum number of transactions to have in-flight with the policy engine / blockchain transaction pool|`int`|`100`
 |nonceStateTimeout|How old the most recently submitted transaction record in our local state needs to be, before we make a request to the node to query the next nonce for a signing address|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1h`
 
@@ -306,6 +309,7 @@
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
 
