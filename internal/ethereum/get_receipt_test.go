@@ -39,7 +39,7 @@ const sampleGetReceipt = `{
 const sampleJSONRPCReceipt = `{
 	"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
 	"blockNumber": "0x7b9",
-	"contractAddress": null,
+	"contractAddress": "0x87ae94ab290932c4e6269648bb47c86978af4436",
 	"cumulativeGasUsed": "0x8414",
 	"effectiveGasPrice": "0x0",
 	"from": "0x2b1c769ef5ad304a4889f2a07a6617cd935849ae",
