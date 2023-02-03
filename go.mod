@@ -6,7 +6,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/firefly-common v1.2.1
 	github.com/hyperledger/firefly-signer v1.1.4
-	github.com/hyperledger/firefly-transaction-manager v1.2.3-0.20230202164538-9d49c2d147cc
+	github.com/hyperledger/firefly-transaction-manager v1.2.3
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.8.1
@@ -84,5 +84,3 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/hyperledger/firefly-transaction-manager => ../firefly-transaction-manager
