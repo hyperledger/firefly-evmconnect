@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -117,13 +117,20 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	if ethReceipt.TransactionIndex != nil {
 		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
 	}
-	return &ffcapi.TransactionReceiptResponse{
+	receiptResponse := &ffcapi.TransactionReceiptResponse{
 		BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
 		TransactionIndex: fftypes.NewFFBigInt(txIndex),
 		BlockHash:        ethReceipt.BlockHash.String(),
 		Success:          isSuccess,
 		ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
 		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
-	}, "", nil
+	}
+	if ethReceipt.ContractAddress != nil {
+		location, _ := json.Marshal(map[string]string{
+			"address": ethReceipt.ContractAddress.String(),
+		})
+		receiptResponse.ContractLocation = fftypes.JSONAnyPtrBytes(location)
+	}
+	return receiptResponse, "", nil
 
 }
