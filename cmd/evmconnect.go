@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -28,8 +28,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/ethereum"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/fftm"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/policyengines"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/policyengines/simple"
+	txhandlerfactory "github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/registry"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/simple"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +63,7 @@ func initConfig() {
 	fftm.InitConfig()
 	connectorConfig = config.RootSection("connector")
 	ethereum.InitConfig(connectorConfig)
-	policyengines.RegisterEngine(&simple.PolicyEngineFactory{})
+	txhandlerfactory.RegisterHandler(&simple.TransactionHandlerFactory{})
 }
 
 func run() error {

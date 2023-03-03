@@ -1,4 +1,4 @@
-FROM golang:1.18-buster AS builder
+FROM golang:1.19-buster AS builder
 ARG BUILD_VERSION
 ENV BUILD_VERSION=${BUILD_VERSION}
 ADD . /evmconnect
