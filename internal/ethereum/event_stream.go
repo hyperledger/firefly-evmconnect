@@ -321,8 +321,8 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				// Uninstall any existing filter
 				if filter != "" {
 					es.uninstallFilter(&filter)
-					filterResetRequired = false
 				}
+				filterResetRequired = false
 				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new filter ID
 				// Determine the earliest block we need to poll from
 				fromBlock := int64(-1)
