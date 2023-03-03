@@ -680,6 +680,66 @@ func TestStreamLoopFilterReset(t *testing.T) {
 
 }
 
+func TestStreamLoopEnrichFail(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"address":"0x171AE0BDd882F7b4C84D5b7FBFA994E39C5a3129","event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: strconv.Itoa(testHighBlock),
+		},
+	}
+	ctx, c, mRPC, done := newTestConnector(t)
+	c.eventBlockTimestamps = true
+
+	errorReturned := make(chan struct{})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			*args[1].(*string) = "filter_id1"
+		}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
+			{
+				BlockNumber:      ethtypes.NewHexInteger64(212122),
+				TransactionIndex: ethtypes.NewHexInteger64(64),
+				LogIndex:         ethtypes.NewHexInteger64(2),
+				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
+				Address:          ethtypes.MustNewAddress("0x171AE0BDd882F7b4C84D5b7FBFA994E39C5a3129"),
+				Topics: []ethtypes.HexBytes0xPrefix{
+					ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"),
+					ethtypes.MustNewHexBytes0xPrefix("0x0000000000000000000000003968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
+					ethtypes.MustNewHexBytes0xPrefix("0x000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d091"),
+				},
+				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
+			},
+		}
+	}).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).
+		Run(func(args mock.Arguments) {
+			close(errorReturned)
+		}).
+		Return(&rpcbackend.RPCError{Message: "pop"}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+	}).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done()
+
+	<-errorReturned
+
+}
+
 func TestDispatchListenerDone(t *testing.T) {
 
 	doneCtx, cancel := context.WithCancel(context.Background())
