@@ -296,6 +296,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	lastUpdate := -1
 	failCount := 0
 	filterRPC := ""
+	listenerResetRequired := false
 	for {
 		if es.c.doFailureDelay(es.ctx, failCount) {
 			log.L(es.ctx).Debugf("Stream loop exiting")
@@ -303,7 +304,8 @@ func (es *eventStream) leadGroupSteadyState() bool {
 		}
 
 		// Build the aggregated listener list if it has changed
-		listenerChanged := es.buildReuseLeadGroupListener(&lastUpdate, &ag)
+		listenerChanged := es.buildReuseLeadGroupListener(&lastUpdate, &ag) || listenerResetRequired
+		listenerResetRequired = false
 
 		// No need to poll for events, if we don't have any listeners
 		if len(ag.signatureSet) > 0 {
@@ -372,6 +374,8 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			events, enrichErr := es.filterEnrichSort(es.ctx, ag, ethLogs)
 			if enrichErr != nil {
 				log.L(es.ctx).Errorf("Failed to enrich events: %s", enrichErr)
+				// We have to reset our filter, as otherwise we'll skip past these events.
+				listenerResetRequired = true
 				failCount++
 				continue
 			}
