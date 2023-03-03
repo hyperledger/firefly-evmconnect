@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inl.c.
+// Copyright © 2023 Kaleido, Inl.c.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -271,7 +271,7 @@ func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo
 	info.InputArgs = fftypes.JSONAnyPtrBytes(b)
 }
 
-func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool) {
+func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
@@ -280,7 +280,7 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
 	if blockNumber < l.hwmBlock {
 		log.L(ctx).Debugf("Listener %s already delivered event '%s' hwm=%d", l.id, protoID, l.hwmBlock)
-		return nil, false
+		return nil, false, nil
 	}
 
 	// Apply a post-filter check to the event
@@ -288,7 +288,7 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])
 	if !topicMatches || !addrMatches {
 		log.L(ctx).Debugf("Listener %s skipping event '%s' topicMatches=%t addrMatches=%t", l.id, protoID, topicMatches, addrMatches)
-		return nil, false
+		return nil, false, nil
 	}
 
 	log.L(ctx).Infof("Listener %s detected event '%s'", l.id, protoID)
@@ -303,22 +303,22 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 		bi, err := l.c.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if bi == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
-		} else {
-			timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
+			return nil, false, err // This is an error condition, rather than just something we cannot enrich
 		}
+		timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
 	}
 
 	if len(l.config.options.Methods) > 0 || l.config.options.Signer {
 		txInfo, err := l.c.getTransactionInfo(ctx, ethLog.TransactionHash)
 		if txInfo == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
-		} else {
-			if l.config.options.Signer {
-				info.InputSigner = txInfo.From
-			}
-			if len(l.config.options.Methods) > 0 {
-				l.matchMethod(ctx, l.config.options.Methods, txInfo, &info)
-			}
+			return nil, false, err // This is an error condition, rather than just something we cannot enrich
+		}
+		if l.config.options.Signer {
+			info.InputSigner = txInfo.From
+		}
+		if len(l.config.options.Methods) > 0 {
+			l.matchMethod(ctx, l.config.options.Methods, txInfo, &info)
 		}
 	}
 
@@ -343,5 +343,5 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 			Info: &info,
 			Data: data,
 		},
-	}, true
+	}, true, nil
 }

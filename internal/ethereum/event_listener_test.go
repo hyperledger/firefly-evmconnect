@@ -248,9 +248,10 @@ func TestFilterEnrichEthLogBlockBelowHWM(t *testing.T) {
 	assert.NoError(t, err)
 
 	l.hwmBlock = 2
-	_, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
 		BlockNumber: ethtypes.NewHexInteger64(1),
 	})
+	assert.NoError(t, err)
 	assert.False(t, ok)
 
 }
@@ -263,9 +264,10 @@ func TestFilterEnrichEthLogAddressMismatch(t *testing.T) {
 	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
 	assert.NoError(t, err)
 
-	_, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
 		Address: ethtypes.MustNewAddress("0x20355f3e852d4b6a9944ada8d5399ddd3409a431"),
 	})
+	assert.NoError(t, err)
 	assert.False(t, ok)
 
 }
@@ -294,8 +296,9 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 		}
 	})
 
-	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
+	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)
 	assert.NotNil(t, ei.InputArgs)
 	assert.Equal(t, `{"_to":"0xd0f2f5103fd050739a9fb567251bc460cc24d091","_value":"1000"}`, ei.InputArgs.String())
@@ -319,10 +322,34 @@ func TestFilterEnrichEthLogTXInfoFail(t *testing.T) {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(&rpcbackend.RPCError{Message: "pop2"})
 
-	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
-	assert.True(t, ok)
-	ei := ev.Event.Info.(*eventInfo)
-	assert.Nil(t, ei.InputArgs)
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	assert.False(t, ok)
+	assert.Regexp(t, "pop1", err)
+
+}
+
+func TestFilterEnrichEthLogTXTimestampFail(t *testing.T) {
+
+	l, mRPC, _ := newTestListener(t, true)
+
+	var abiEvent *abi.Entry
+	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
+	assert.NoError(t, err)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1024),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
+		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
+	})).Return(&rpcbackend.RPCError{Message: "pop2"})
+
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	assert.False(t, ok)
+	assert.Regexp(t, "pop2", err)
 
 }
 
@@ -350,8 +377,9 @@ func TestFilterEnrichEthLogMethodBadInputTooShort(t *testing.T) {
 		}
 	})
 
-	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
+	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)
 
@@ -381,8 +409,9 @@ func TestFilterEnrichEthLogMethodBadInputTooMismatchFunctionID(t *testing.T) {
 		}
 	})
 
-	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
 	assert.True(t, ok)
+	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)
 
@@ -412,7 +441,8 @@ func TestFilterEnrichEthLogMethodBadInputABIData(t *testing.T) {
 		}
 	})
 
-	ev, ok := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	assert.NoError(t, err)
 	assert.True(t, ok)
 	ei := ev.Event.Info.(*eventInfo)
 	assert.Nil(t, ei.InputArgs)

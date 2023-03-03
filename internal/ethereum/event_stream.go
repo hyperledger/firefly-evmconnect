@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -369,7 +369,12 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			filterRPC = "eth_getFilterChanges"
 
 			// Enrich the events
-			events := es.filterEnrichSort(es.ctx, ag, ethLogs)
+			events, enrichErr := es.filterEnrichSort(es.ctx, ag, ethLogs)
+			if enrichErr != nil {
+				log.L(es.ctx).Errorf("Failed to enrich events: %s", enrichErr)
+				failCount++
+				continue
+			}
 
 			// Dispatch the events
 			if es.dispatchSetHWMCheckExit(ag, events, hwmBlock) {
@@ -467,13 +472,16 @@ func getEventProtoID(blockNumber, transactionIndex, logIndex int64) string {
 	return fmt.Sprintf("%.12d/%.6d/%.6d", blockNumber, transactionIndex, logIndex)
 }
 
-func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListener, ethLogs []*logJSONRPC) ffcapi.ListenerEvents {
+func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListener, ethLogs []*logJSONRPC) (ffcapi.ListenerEvents, error) {
 	updates := make(ffcapi.ListenerEvents, 0, len(ethLogs))
 	for _, ethLog := range ethLogs {
 		listeners := ag.listenersByTopic0[ethLog.Topics[0].String()]
 		for _, l := range listeners {
 			for _, f := range l.config.filters {
-				lu, matches := l.filterEnrichEthLog(ctx, f, ethLog)
+				lu, matches, err := l.filterEnrichEthLog(ctx, f, ethLog)
+				if err != nil {
+					return nil, err
+				}
 				if matches {
 					updates = append(updates, lu)
 					break // A single listener cannot emit the event twice
@@ -482,7 +490,7 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 		}
 	}
 	sort.Sort(updates)
-	return updates
+	return updates, nil
 }
 
 func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedListener, fromBlock, toBlock int64) (ffcapi.ListenerEvents, error) {
@@ -503,7 +511,7 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 	if rpcErr != nil {
 		return nil, rpcErr.Error()
 	}
-	return es.filterEnrichSort(ctx, ag, ethLogs), nil
+	return es.filterEnrichSort(ctx, ag, ethLogs)
 }
 
 func (es *eventStream) getListenerHWM(ctx context.Context, listenerID *fftypes.UUID) (*ffcapi.EventListenerHWMResponse, ffcapi.ErrorReason, error) {
