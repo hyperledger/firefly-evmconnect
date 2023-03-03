@@ -43,7 +43,7 @@ jobs:
           file: ./Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ghcr.io/${{ github.repository }}:${{ steps.build_tag_generator.outputs.BUILD_TAG }},ghcr.io/${{ github.repository }}:head
           labels: |
             commit=${{ github.sha }}
