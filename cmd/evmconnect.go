@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/ethereum"
+	fftmcmd "github.com/hyperledger/firefly-transaction-manager/cmd"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/fftm"
 	txhandlerfactory "github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/registry"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/simple"
@@ -53,6 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "f", "", "config file")
 	rootCmd.AddCommand(versionCommand())
 	rootCmd.AddCommand(configCommand())
+	rootCmd.AddCommand(fftmcmd.ClientCommand())
 }
 
 func Execute() error {
