@@ -3,7 +3,6 @@ run:
   skip-dirs:
     - "mocks"
 linters-settings:
-  golint: {}
   gocritic:
     enabled-checks: []
     disabled-checks:
@@ -29,7 +28,7 @@ linters-settings:
       See the License for the specific language governing permissions and
       limitations under the License.
 linters:
-  disable-all: false
+  disable-all: true
   enable:
     - bodyclose
     - depguard
