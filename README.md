@@ -41,4 +41,36 @@ connectors:
     url: http://localhost:8545
 ```
 
+## Blockchain node compatibility
 
+For EVM connector to function properly, you should check the blockchain node supports the following JSON-RPC Methods over HTTP:
+### Event tracking
+- `eth_blockNumber`
+- `eth_newBlockFilter`
+- `eth_getFilterLogs`
+- `eth_getFilterChanges`
+- `eth_getBlockByHash`
+- `eth_getLogs`
+- `eth_newFilter`
+- `eth_uninstallFilter`
+- `eth_getTransactionByHash`
+- `eth_getTransactionReceipt`
+
+### Query
+- `eth_call`
+- `eth_getBalance`
+- `eth_gasPrice`[^1]
+  
+  
+
+
+### Transaction submission
+- `eth_estimateGas`
+- `eth_sendTransaction`
+- `eth_getTransactionCount`
+- `eth_sendRawTransaction`[^2]
+
+
+[^1]: also used by Transaction submission if the handler is configured to get gas price using "connector".
+
+[^2]: only required by custom transaction handlers that supports pre-signing.
