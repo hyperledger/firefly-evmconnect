@@ -4,9 +4,9 @@ go 1.19
 
 require (
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hyperledger/firefly-common v1.2.6
+	github.com/hyperledger/firefly-common v1.2.7-0.20230322140623-76adeb969897
 	github.com/hyperledger/firefly-signer v1.1.4
-	github.com/hyperledger/firefly-transaction-manager v1.2.7
+	github.com/hyperledger/firefly-transaction-manager v1.2.8-0.20230322141422-1a949d401acf
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
