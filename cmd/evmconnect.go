@@ -51,7 +51,7 @@ var cfgFile string
 var connectorConfig config.Section
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "f", "", "config file")
+	rootCmd.Flags().StringVarP(&cfgFile, "config", "f", "", "config file")
 	rootCmd.AddCommand(versionCommand())
 	rootCmd.AddCommand(configCommand())
 	rootCmd.AddCommand(fftmcmd.ClientCommand())
