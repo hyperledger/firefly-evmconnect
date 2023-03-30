@@ -8,10 +8,13 @@ persistence:
 ffcore:
   url: http://127.0.0.1:5101
   namespaces:
-  - default
+    - default
 confirmations:
   required: 0
-policyengine.simple:
-  fixedGasPrice: 0
-  gasOracle:
-    mode: fixed
+transactions:
+  handler:
+    name: simple
+    simple:
+      fixedGasPrice: 0
+      gasOracle:
+        mode: fixed
