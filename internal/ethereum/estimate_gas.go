@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -47,9 +47,9 @@ func (c *ethConnector) estimateGas(ctx context.Context, tx *ethsigner.Transactio
 			revertReason, ok := processRevertReason(ctx, revertData, errors)
 			if revertReason != "" {
 				if ok {
-					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 				}
-				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 			}
 		}
 
