@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -83,6 +83,7 @@ func (c *ethConnector) mapGasPrice(ctx context.Context, input *fftypes.JSONAny, 
 		tx.GasPrice = ethtypes.NewHexInteger64(0)
 		return nil
 	}
+	log.L(ctx).Debugf("Gas Price json to parse: %s", input)
 	gasPriceObject := input.JSONObjectNowarn()
 	maxPriorityFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxPriorityFeePerGas"))
 	maxFeePerGas := (*ethtypes.HexInteger)(gasPriceObject.GetInteger("maxFeePerGas"))
