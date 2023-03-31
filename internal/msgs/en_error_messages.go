@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -38,8 +38,7 @@ var (
 	MsgInvalidTXData             = ffe("FF23018", "Failed to parse transaction data as hex '%s': %s")
 	MsgInvalidFromAddress        = ffe("FF23019", "Invalid 'from' address '%s': %s")
 	MsgInvalidToAddress          = ffe("FF23020", "Invalid 'to' address '%s': %s")
-	MsgRevertedWithMessage       = ffe("FF23021", "EVM reverted: %s")
-	MsgRevertedRawRevertData     = ffe("FF23022", "EVM reverted: %s")
+	MsgReverted                  = ffe("FF23021", "EVM reverted: %s")
 	MsgReturnDataInvalid         = ffe("FF23023", "EVM return data invalid: %s")
 	MsgNotInitialized            = ffe("FF23024", "Not initialized")
 	MsgMissingBackendURL         = ffe("FF23025", "URL must be set for the backend JSON/RPC endpoint")

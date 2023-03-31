@@ -162,7 +162,7 @@ func TestExecQueryCustomErrorRevertData(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	expectedError := i18n.NewError(ctx, msgs.MsgRevertedWithMessage, `GreaterThanTen("20", "20")`)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `GreaterThanTen("20", "20")`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
@@ -183,7 +183,7 @@ func TestExecQueryCustomErrorRevertDataBadOutput(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	expectedError := i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, `0x053b20290000000000000000000000000000000000000000000000000000000000000020`)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `0x053b20290000000000000000000000000000000000000000000000000000000000000020`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
@@ -204,7 +204,7 @@ func TestExecQueryBadRevertData(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	assert.Regexp(t, "FF23022.*0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d", err)
+	assert.Regexp(t, "FF23021.*0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d", err)
 
 }
 

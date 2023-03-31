@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -59,6 +59,10 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 			return ffcapi.ErrorReasonTransactionUnderpriced
 		case strings.Contains(errString, "known transaction"):
 			return ffcapi.ErrorKnownTransaction
+		}
+	case callRPCMethods:
+		if strings.Contains(errString, "execution reverted") {
+			return ffcapi.ErrorReasonTransactionReverted
 		}
 	case blockRPCMethods:
 		// https://docs.avax.network/quickstart/integrate-exchange-with-avalanche#determining-finality
