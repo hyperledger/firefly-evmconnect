@@ -64,6 +64,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           platforms: linux/amd64
+          provenance: false
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }},ghcr.io/${{ github.repository }}:head,${{ env.DOCKER_TAGS }}
           labels: |
             commit=${{ github.sha }}
