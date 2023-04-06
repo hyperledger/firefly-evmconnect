@@ -50,7 +50,6 @@
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
 |blockCacheSize|Maximum of blocks to hold in the block info cache|`int`|`250`
-|blockCacheTTL|Time to live for the block info cache|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
 |blockPollingInterval|Interval for polling to check for new blocks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
 |connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |dataFormat|Configure the JSON data format for query output and events|map,flat_array,self_describing|`map`
@@ -62,6 +61,7 @@
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|txCacheSize|Maximum of transactions to hold in the transaction info cache|`int`|`250`
 |url|URL of JSON/RPC endpoint for the Ethereum node/gateway|string|`<nil>`
 
 ## connector.auth

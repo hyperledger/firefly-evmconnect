@@ -75,10 +75,17 @@ type txInfoJSONRPC struct {
 
 func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*txInfoJSONRPC, error) {
 	var txInfo *txInfoJSONRPC
+	cached, ok := c.txCache.Get(hash.String())
+	if ok {
+		return cached.(*txInfoJSONRPC), nil
+	}
+
 	rpcErr := c.backend.CallRPC(ctx, &txInfo, "eth_getTransactionByHash", hash)
 	var err error
 	if rpcErr != nil {
 		err = rpcErr.Error()
+	} else {
+		c.txCache.Add(hash.String(), txInfo)
 	}
 	return txInfo, err
 }
