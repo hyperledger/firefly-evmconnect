@@ -55,7 +55,7 @@ var (
 	MsgMissingEventInFilter      = ffe("FF23037", "Each filter must have an 'event' child containing the ABI definition of the event")
 	MsgListenerAlreadyStarted    = ffe("FF23038", "Listener already started: %s")
 	MsgInvalidCheckpoint         = ffe("FF23039", "Invalid checkpoint: %s")
-	MsgCacheInitFail             = ffe("FF23040", "Failed to initialize cache")
+	MsgCacheInitFail             = ffe("FF23040", "Failed to initialize %s cache")
 	MsgStreamNotStarted          = ffe("FF23041", "Event stream %s not started")
 	MsgStreamAlreadyStarted      = ffe("FF23042", "Event stream %s already started")
 	MsgListenerNotStarted        = ffe("FF23043", "Event listener %s not started in event stream %s")
