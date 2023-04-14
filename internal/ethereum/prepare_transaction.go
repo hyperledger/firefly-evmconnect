@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -138,11 +138,13 @@ func (c *ethConnector) buildTx(ctx context.Context, txType txType, fromString, t
 	}
 
 	// Parse the from address
-	if txType != txTypeQuery {
-		from, err := ethtypes.NewAddress(fromString)
-		if err != nil {
+	from, err := ethtypes.NewAddress(fromString)
+	if err != nil {
+		if txType != txTypeQuery {
+			// ignore the error if query, from is optional for query
 			return nil, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, fromString, err)
 		}
+	} else {
 		tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 	}
 
