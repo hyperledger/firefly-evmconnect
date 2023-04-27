@@ -67,6 +67,95 @@ const sampleJSONRPCReceipt = `{
 	"type": "0x0"
 }`
 
+const sampleJSONRPCReceiptFailed = `{
+	"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+	"blockNumber": "0x7b9",
+	"contractAddress": "0x87ae94ab290932c4e6269648bb47c86978af4436",
+	"cumulativeGasUsed": "0x8414",
+	"effectiveGasPrice": "0x0",
+	"from": "0x2b1c769ef5ad304a4889f2a07a6617cd935849ae",
+	"gasUsed": "0x8414",
+	"logs": [],
+	"logsBloom": "0x00000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000100000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000",
+	"status": "0",
+	"to": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
+	"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+	"transactionIndex": "0x1e",
+	"type": "0x0"
+}`
+
+const sampleTransactionTraceGeth = `{
+	"gas": 23512,
+	"failed": true,
+	"returnValue": "08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114e6f7420656e6f75676820746f6b656e73000000000000000000000000000000",
+	"structLogs": []
+}
+`
+
+const sampleTransactionTraceBesu = `{
+	"gas": 23512,
+	"failed": true,
+	"returnValue": "",
+	"structLogs": [
+		{
+			"pc": 0,
+			"op": "PUSH1",
+			"gas": 78404,
+			"gasCost": 3,
+			"depth": 1,
+			"stack": [],
+			"memory": [],
+			"storage": {},
+			"reason": null
+		},
+		{
+			"pc": 4,
+			"op": "MSTORE",
+			"gas": 78398,
+			"gasCost": 12,
+			"depth": 1,
+			"stack": [
+				"0000000000000000000000000000000000000000000000000000000000000080",
+				"0000000000000000000000000000000000000000000000000000000000000040"
+			],
+			"memory": [
+				"0000000000000000000000000000000000000000000000000000000000000000",
+				"0000000000000000000000000000000000000000000000000000000000000000",
+				"0000000000000000000000000000000000000000000000000000000000000080"
+			],
+			"storage": {},
+			"reason": null
+		},
+		{
+			"pc": 829,
+			"op": "REVERT",
+			"gas": 76488,
+			"gasCost": 0,
+			"depth": 1,
+			"stack": [
+				"00000000000000000000000000000000000000000000000000000000a9059cbb",
+				"0000000000000000000000000000000000000000000000000000000000000129",
+				"000000000000000000000000b5855faa164db05e70fd3476e3540fc8c4053a01",
+				"00000000000000000000000000000000000000000000000000000000000f4241",
+				"0000000000000000000000000000000000000000000000000000000000000064",
+				"0000000000000000000000000000000000000000000000000000000000000080"
+			],
+			"memory": [
+				"00000000000000000000000046ec33d9fd840ae95f36c3449cf46041ff6fb886",
+				"0000000000000000000000000000000000000000000000000000000000000004",
+				"0000000000000000000000000000000000000000000000000000000000000080",
+				"0000000000000000000000000000000000000000000000000000000000000000",
+				"08c379a000000000000000000000000000000000000000000000000000000000",
+				"0000002000000000000000000000000000000000000000000000000000000000",
+				"000000114e6f7420656e6f75676820746f6b656e730000000000000000000000",
+				"0000000000000000000000000000000000000000000000000000000000000000"
+			],
+			"storage": {},
+			"reason": "0x8c379a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114e6f7420656e6f75676820746f6b656e73000000000000000000000000000000"
+		}
+	]
+}`
+
 func TestGetReceiptOkSuccess(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
@@ -133,6 +222,117 @@ func TestGetReceiptError(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 	assert.Empty(t, "", reason)
 	assert.Nil(t, res)
+
+}
+
+func TestGetReceiptErrorReasonGeth(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionTraceGeth), args[1])
+			assert.NoError(t, err)
+		})
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.False(t, res.Success)
+	assert.Contains(t, res.ExtraInfo.String(), "Not enough tokens")
+
+}
+
+func TestGetReceiptErrorReasonBesu(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionTraceBesu), args[1])
+			assert.NoError(t, err)
+		})
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.False(t, res.Success)
+	assert.Contains(t, res.ExtraInfo.String(), "Not enough tokens")
+
+}
+
+func TestGetReceiptErrorReasonError(t *testing.T) {
+	// if we get an error tracing the transaction, we ignore it.  Not all nodes support the debug_traceTransaction RPC call
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "unsupported"}).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionTraceGeth), args[1])
+			assert.NoError(t, err)
+		})
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.False(t, res.Success)
 
 }
 

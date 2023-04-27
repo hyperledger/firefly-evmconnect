@@ -18,11 +18,15 @@ package ethereum
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -54,6 +58,7 @@ type receiptExtraInfo struct {
 	To                *ethtypes.Address0xHex `json:"to"`
 	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
 	Status            *fftypes.FFBigInt      `json:"status"`
+	ReturnValue       *string                `json:"returnValue"`
 }
 
 // txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
@@ -71,6 +76,23 @@ type txInfoJSONRPC struct {
 	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
 	V                *ethtypes.HexInteger      `json:"v"`
 	Value            *ethtypes.HexInteger      `json:"value"`
+}
+
+type StructLog struct {
+	PC      *fftypes.FFBigInt `json:"pc"`
+	Op      *string           `json:"op"`
+	Gas     *fftypes.FFBigInt `json:"gas"`
+	GasCost *fftypes.FFBigInt `json:"gasCost"`
+	Depth   *fftypes.FFBigInt `json:"depth"`
+	Stack   []*string         `json:"stack"`
+	Memory  []*string         `json:"memory"`
+	Reason  *string           `json:"reason"`
+}
+type txDebugTrace struct {
+	Gas         *fftypes.FFBigInt `json:"gas"`
+	Failed      bool              `json:"failed"`
+	ReturnValue string            `json:"returnValue"`
+	StructLogs  []StructLog       `json:"structLogs"`
 }
 
 func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*txInfoJSONRPC, error) {
@@ -110,6 +132,44 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	}
 	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
 
+	var transactionReturnValue *string
+
+	if !isSuccess {
+		var debugTrace *txDebugTrace
+
+		traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", req.TransactionHash)
+		if traceErr != nil {
+			log.L(ctx).Debugf("Ignoring error from debug_traceTransaction: %s ", traceErr.Message)
+			transactionReturnValue = nil
+		} else {
+			returnValue := debugTrace.ReturnValue
+			if returnValue == "" {
+				// some clients (e.g. Besu) include the error reason on the final struct log
+				if len(debugTrace.StructLogs) > 0 {
+					finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
+					if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
+						returnValue = *finalStructLog.Reason
+					}
+				}
+			}
+			if returnValue != "" {
+				returnValue = strings.TrimPrefix(returnValue, "0x")
+				returnValueASCII, decodeErr := hex.DecodeString(returnValue)
+				if decodeErr != nil {
+					log.L(ctx).Debugf("Ignoring error decoding result from debug_traceTransaction: %s ", decodeErr)
+
+				}
+				printableString := strings.Map(func(r rune) rune {
+					if unicode.IsPrint(r) {
+						return r
+					}
+					return -1
+				}, string(returnValueASCII))
+				transactionReturnValue = &printableString
+			}
+		}
+	}
+
 	ethReceipt.Logs = nil
 	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
 		ContractAddress:   ethReceipt.ContractAddress,
@@ -118,6 +178,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		To:                ethReceipt.To,
 		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
 		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		ReturnValue:       transactionReturnValue,
 	})
 
 	var txIndex int64
