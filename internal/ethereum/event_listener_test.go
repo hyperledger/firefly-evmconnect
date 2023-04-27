@@ -294,9 +294,13 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
 			Input: ethtypes.MustNewHexBytes0xPrefix("0xa9059cbb000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d09100000000000000000000000000000000000000000000000000000000000003e8"),
 		}
-	})
+	}).Once() // 1 cache miss and hit
 
-	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog()) // cache miss
+	assert.True(t, ok)
+	assert.NoError(t, err)
+
+	ev, ok, err = l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog()) // cache hit
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)

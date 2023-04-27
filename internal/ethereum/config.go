@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -26,7 +26,6 @@ const (
 	ConfigDataFormat            = "dataFormat"
 	BlockPollingInterval        = "blockPollingInterval"
 	BlockCacheSize              = "blockCacheSize"
-	BlockCacheTTL               = "blockCacheTTL"
 	EventsCatchupPageSize       = "events.catchupPageSize"
 	EventsCatchupThreshold      = "events.catchupThreshold"
 	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
@@ -35,6 +34,7 @@ const (
 	RetryInitDelay              = "retry.initialDelay"
 	RetryMaxDelay               = "retry.maxDelay"
 	RetryFactor                 = "retry.factor"
+	TxCacheSize                 = "txCacheSize"
 )
 
 const (
@@ -53,7 +53,6 @@ const (
 func InitConfig(conf config.Section) {
 	ffresty.InitConfig(conf)
 	conf.AddKnownKey(BlockCacheSize, 250)
-	conf.AddKnownKey(BlockCacheTTL, "5m")
 	conf.AddKnownKey(BlockPollingInterval, "1s")
 	conf.AddKnownKey(ConfigDataFormat, "map")
 	conf.AddKnownKey(ConfigGasEstimationFactor, DefaultGasEstimationFactor)
@@ -65,4 +64,5 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryFactor, DefaultRetryDelayFactor)
 	conf.AddKnownKey(RetryInitDelay, DefaultRetryInitDelay)
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
+	conf.AddKnownKey(TxCacheSize, 250)
 }

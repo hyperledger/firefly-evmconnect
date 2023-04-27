@@ -373,7 +373,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			// Enrich the events
 			events, enrichErr := es.filterEnrichSort(es.ctx, ag, ethLogs)
 			if enrichErr != nil {
-				log.L(es.ctx).Errorf("Failed to enrich events: %s", enrichErr)
+				log.L(es.ctx).Errorf("Failed to enrich events: %v", enrichErr)
 				// We have to reset our filter, as otherwise we'll skip past these events.
 				filterResetRequired = true
 				failCount++

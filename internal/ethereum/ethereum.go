@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -51,6 +51,7 @@ type ethConnector struct {
 	mux          sync.Mutex
 	eventStreams map[fftypes.UUID]*eventStream
 	blockCache   *lru.Cache
+	txCache      *lru.Cache
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
@@ -73,7 +74,12 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	}
 	c.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail)
+		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
+	}
+
+	c.txCache, err = lru.New(conf.GetInt(TxCacheSize))
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "transaction")
 	}
 
 	if conf.GetString(ffresty.HTTPConfigURL) == "" {
@@ -81,7 +87,11 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	}
 	c.gasEstimationFactor = big.NewFloat(conf.GetFloat64(ConfigGasEstimationFactor))
 
-	c.backend = rpcbackend.NewRPCClient(ffresty.New(ctx, conf))
+	httpClient, err := ffresty.New(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+	c.backend = rpcbackend.NewRPCClient(httpClient)
 
 	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {

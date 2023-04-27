@@ -36,7 +36,7 @@ $(eval $(call makemock, $$(FF_SIGNER_PATH),   Backend,   rpcbackendmocks))
 $(eval $(call makemock, $$(FFTM_PATH),        Manager,   fftmmocks))
 
 firefly-evmconnect: ${GOFILES}
-		$(VGO) build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v ./evmconnect 
+		$(VGO) build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v ./evmconnect
 go-mod-tidy: .ALWAYS
 		$(VGO) mod tidy
 build: firefly-evmconnect

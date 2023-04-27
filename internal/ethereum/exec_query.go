@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -96,12 +96,18 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 			revertReason, ok := processRevertReason(ctx, revertData, errors)
 			if revertReason != "" {
 				if ok {
-					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 				}
-				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 			}
 		}
-		return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
+
+		reason := mapError(callRPCMethods, rpcErr.Error())
+		err := rpcErr.Error()
+		if reason == ffcapi.ErrorReasonTransactionReverted {
+			err = i18n.NewError(ctx, msgs.MsgReverted, rpcErr.Error())
+		}
+		return nil, reason, err
 	}
 
 	// If we get back nil, then send back nil
@@ -114,9 +120,9 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 	revertReason, ok := processRevertReason(ctx, outputData, errors)
 	if revertReason != "" {
 		if ok {
-			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedWithMessage, revertReason)
+			return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 		}
-		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgRevertedRawRevertData, revertReason)
+		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 	}
 
 	// Parse the data against the outputs

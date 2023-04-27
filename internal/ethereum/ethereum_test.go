@@ -22,6 +22,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"github.com/hyperledger/firefly-common/pkg/fftls"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/sirupsen/logrus"
@@ -97,12 +98,24 @@ func TestConnectorInit(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(t, `[{"name":"x","type":"uint256","value":"12345"},{"name":"y","type":"uint256","value":"23456"}]`, string(jv))
 
+	tlsConf := conf.SubSection("tls")
+	tlsConf.Set(fftls.HTTPConfTLSEnabled, true)
+	tlsConf.Set(fftls.HTTPConfTLSCAFile, "!!!badness")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF00153", err)
+	tlsConf.Set(fftls.HTTPConfTLSEnabled, false)
+
 	conf.Set(ConfigDataFormat, "wrong")
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23032.*wrong", err)
 
 	conf.Set(ConfigDataFormat, "map")
 	conf.Set(BlockCacheSize, "-1")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23040", err)
+
+	conf.Set(BlockCacheSize, "1")
+	conf.Set(TxCacheSize, "-1")
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23040", err)
 

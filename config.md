@@ -50,7 +50,6 @@
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
 |blockCacheSize|Maximum of blocks to hold in the block info cache|`int`|`250`
-|blockCacheTTL|Time to live for the block info cache|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
 |blockPollingInterval|Interval for polling to check for new blocks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
 |connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |dataFormat|Configure the JSON data format for query output and events|map,flat_array,self_describing|`map`
@@ -62,6 +61,7 @@
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|txCacheSize|Maximum of transactions to hold in the transaction info cache|`int`|`250`
 |url|URL of JSON/RPC endpoint for the Ethereum node/gateway|string|`<nil>`
 
 ## connector.auth
@@ -98,6 +98,16 @@
 |initialDelay|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
 |maxDelay|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
+## connector.tls
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|caFile|The path to the CA file for TLS on this API|`string`|`<nil>`
+|certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
+|clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
+|enabled|Enables or disables TLS on this API|`boolean`|`false`
+|keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 
 ## cors
 
@@ -228,7 +238,64 @@
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|name|Deprecated: Please use 'transactions.handler.name' instead|`string`|`<nil>`
+|name|Deprecated: Please use 'transactions.handler.name' instead|`string`|`simple`
+
+## policyengine.simple
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|fixedGasPrice|Deprecated: Please use 'transactions.handler.simple.fixedGasPrice' instead|Raw JSON|`<nil>`
+|resubmitInterval|Deprecated: Please use 'transactions.handler.simple.resubmitInterval' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
+
+## policyengine.simple.gasOracle
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
+|headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
+|idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
+|maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|method|Deprecated: Please use 'transactions.handler.simple.gasOracle.method' instead|`string`|`GET`
+|mode|Deprecated: Please use 'transactions.handler.simple.gasOracle.mode' instead|'connector', 'restapi', 'fixed', or 'disabled'|`connector`
+|passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
+|queryInterval|Deprecated: Please use 'transactions.handler.simple.gasOracle.queryInterval' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
+|requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|template|Deprecated: Please use 'transactions.handler.simple.gasOracle.template' instead|[Go Template](https://pkg.go.dev/text/template) `string`|`<nil>`
+|tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|url|Deprecated: Please use 'transactions.handler.simple.gasOracle.url' instead|`string`|`<nil>`
+
+## policyengine.simple.gasOracle.auth
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|password|Password|`string`|`<nil>`
+|username|Username|`string`|`<nil>`
+
+## policyengine.simple.gasOracle.proxy
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|url|Deprecated: Please use 'transactions.handler.simple.gasOracle.proxy.url' instead|`string`|`<nil>`
+
+## policyengine.simple.gasOracle.retry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|count|The maximum number of times to retry|`int`|`5`
+|enabled|Enables retries|`boolean`|`false`
+|initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
+|maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
+## policyengine.simple.gasOracle.tls
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|caFile|The path to the CA file for TLS on this API|`string`|`<nil>`
+|certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
+|clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
+|enabled|Enables or disables TLS on this API|`boolean`|`false`
+|keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 
 ## policyloop
 
@@ -256,7 +323,7 @@
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|name|The name of the transaction handler to use|`string`|`simple`
+|name|The name of the transaction handler to use|`string`|`<nil>`
 
 ## transactions.handler.simple
 
@@ -308,6 +375,16 @@
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
+## transactions.handler.simple.gasOracle.tls
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|caFile|The path to the CA file for TLS on this API|`string`|`<nil>`
+|certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
+|clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
+|enabled|Enables or disables TLS on this API|`boolean`|`false`
+|keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
+
 ## transactions.handler.simple.retry
 
 |Key|Description|Type|Default Value|
@@ -351,3 +428,13 @@
 |enabled|Enables retries|`boolean`|`false`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
+## webhooks.tls
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|caFile|The path to the CA file for TLS on this API|`string`|`<nil>`
+|certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
+|clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
+|enabled|Enables or disables TLS on this API|`boolean`|`false`
+|keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
