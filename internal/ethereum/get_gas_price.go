@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) GasPriceEstimate(ctx context.Context, req *ffcapi.GasPriceEstimateRequest) (*ffcapi.GasPriceEstimateResponse, ffcapi.ErrorReason, error) {
+func (c *ethConnector) GasPriceEstimate(ctx context.Context, _ *ffcapi.GasPriceEstimateRequest) (*ffcapi.GasPriceEstimateResponse, ffcapi.ErrorReason, error) {
 
 	// Note we use simple (pre London fork) gas fee approach.
 	// See https://github.com/ethereum/pm/issues/328#issuecomment-853234014 for a bit of color
