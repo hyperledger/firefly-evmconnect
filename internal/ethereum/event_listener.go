@@ -311,7 +311,11 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 	if len(l.config.options.Methods) > 0 || l.config.options.Signer {
 		txInfo, err := l.c.getTransactionInfo(ctx, ethLog.TransactionHash)
 		if txInfo == nil || err != nil {
-			log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
+			if txInfo == nil {
+				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': transaction hash not found", ethLog.TransactionHash)
+			} else {
+				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
+			}
 			return nil, false, err // This is an error condition, rather than just something we cannot enrich
 		}
 		if l.config.options.Signer {
