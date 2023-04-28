@@ -144,6 +144,22 @@ func TestDeployContractPrepareBadABIDefinition(t *testing.T) {
 
 }
 
+func TestDeployContractPrepareBadErrorABI(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
+	req.Errors = []*fftypes.JSONAny{fftypes.JSONAnyPtr(`[`)}
+	assert.NoError(t, err)
+	_, reason, err := c.DeployContractPrepare(ctx, &req)
+
+	assert.Regexp(t, "FF23013", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
 func TestDeployContractPrepareEstimateNoConstructor(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
