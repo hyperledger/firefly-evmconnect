@@ -5,8 +5,8 @@ go 1.19
 require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/firefly-common v1.2.9
-	github.com/hyperledger/firefly-signer v1.1.4
-	github.com/hyperledger/firefly-transaction-manager v1.2.9
+	github.com/hyperledger/firefly-signer v1.1.6
+	github.com/hyperledger/firefly-transaction-manager v1.2.10
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
@@ -75,7 +75,7 @@ require (
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
-	gitlab.com/hfuss/mux-prometheus v0.0.4 // indirect
+	gitlab.com/hfuss/mux-prometheus v0.0.5 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect

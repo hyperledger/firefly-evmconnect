@@ -51,7 +51,7 @@ var cfgFile string
 var connectorConfig config.Section
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "f", "", "config file")
+	rootCmd.Flags().StringVarP(&cfgFile, "config", "f", "", "config file")
 	rootCmd.AddCommand(versionCommand())
 	rootCmd.AddCommand(configCommand())
 	rootCmd.AddCommand(fftmcmd.ClientCommand())
@@ -61,7 +61,7 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-func initConfig() {
+func InitConfig() {
 	fftm.InitConfig()
 	connectorConfig = config.RootSection("connector")
 	ethereum.InitConfig(connectorConfig)
@@ -70,7 +70,6 @@ func initConfig() {
 
 func run() error {
 
-	initConfig()
 	err := config.ReadConfig("evmconnect", cfgFile)
 
 	// Setup logging after reading config (even if failed), to output header correctly

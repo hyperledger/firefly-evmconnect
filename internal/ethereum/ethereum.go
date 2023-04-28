@@ -87,11 +87,12 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	}
 	c.gasEstimationFactor = big.NewFloat(conf.GetFloat64(ConfigGasEstimationFactor))
 
-	restyClient, err := ffresty.New(ctx, conf)
+
+	httpClient, err := ffresty.New(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
-	c.backend = rpcbackend.NewRPCClient(restyClient)
+	c.backend = rpcbackend.NewRPCClient(httpClient)
 
 	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {

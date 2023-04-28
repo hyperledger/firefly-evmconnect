@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -32,7 +32,7 @@ import (
 
 func TestConfigDocsUpToDate(t *testing.T) {
 	// Initialize config of all plugins
-	initConfig()
+	InitConfig()
 	generatedConfig, err := config.GenerateConfigMarkdown(context.Background(), "", config.GetKnownKeys())
 	assert.NoError(t, err)
 	configOnDisk, err := os.ReadFile(filepath.Join("..", "config.md"))
