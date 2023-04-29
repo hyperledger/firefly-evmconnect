@@ -22,12 +22,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
@@ -58,7 +58,7 @@ type receiptExtraInfo struct {
 	To                *ethtypes.Address0xHex `json:"to"`
 	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
 	Status            *fftypes.FFBigInt      `json:"status"`
-	ReturnValue       *string                `json:"returnValue"`
+	ErrorMessage      *string                `json:"errorMessage"`
 }
 
 // txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
@@ -119,6 +119,75 @@ func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) strin
 	return ""
 }
 
+/*
+Accepts hex string, with or without leading 0x and also accepts short hex (leading zeros removed)
+Converts the hex string to bytes then decodes it as call data for the given abi.Entry
+*/
+func decodeCallDataHex(ctx context.Context, function *abi.Entry, callDataHex string) (*abi.ComponentValue, error) {
+	callDataHex = strings.TrimPrefix(callDataHex, "0x")
+	if len(callDataHex)%2 == 1 {
+		callDataHex = "0" + callDataHex
+	}
+
+	callDataBytes, err := hex.DecodeString(callDataHex)
+	if err != nil {
+		return nil, err
+	}
+
+	componentValue, err := function.DecodeCallDataCtx(ctx, callDataBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return componentValue, nil
+}
+
+func (c *ethConnector) getErrorMessage(ctx context.Context, transactionHash string) (*string, error) {
+
+	var debugTrace *txDebugTrace
+
+	traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
+	if traceErr != nil {
+		return nil, traceErr.Error()
+	}
+
+	returnValue := debugTrace.ReturnValue
+	if returnValue == "" {
+		// some clients (e.g. Besu) include the error reason on the final struct log
+		if len(debugTrace.StructLogs) > 0 {
+			finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
+			if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
+				returnValue = *finalStructLog.Reason
+			}
+		}
+	}
+	if returnValue == "" {
+		// not found return value in any of the expected places
+		return nil, nil
+	}
+
+	parsedABI, err := abi.ParseABI([]byte(`[
+			{
+				"name": "Error",
+				"inputs": [
+					{"name": "message", "internalType": "string", "type": "string" }
+				],
+				"type": "function"
+			}
+		]`))
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := decodeCallDataHex(ctx, parsedABI.Functions()["Error"], returnValue)
+	if err != nil {
+		return nil, err
+	}
+	errorMessage := value.Children[0].Value
+	errorMessageString := errorMessage.(string)
+	return &errorMessageString, nil
+}
+
 func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
 
 	// Get the receipt in the back-end JSON/RPC format
@@ -132,41 +201,13 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	}
 	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
 
-	var transactionReturnValue *string
+	var transactionErrorMessage *string
 
 	if !isSuccess {
-		var debugTrace *txDebugTrace
-
-		traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", req.TransactionHash)
-		if traceErr != nil {
-			log.L(ctx).Debugf("Ignoring error from debug_traceTransaction: %s ", traceErr.Message)
-			transactionReturnValue = nil
-		} else {
-			returnValue := debugTrace.ReturnValue
-			if returnValue == "" {
-				// some clients (e.g. Besu) include the error reason on the final struct log
-				if len(debugTrace.StructLogs) > 0 {
-					finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
-					if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
-						returnValue = *finalStructLog.Reason
-					}
-				}
-			}
-			if returnValue != "" {
-				returnValue = strings.TrimPrefix(returnValue, "0x")
-				returnValueASCII, decodeErr := hex.DecodeString(returnValue)
-				if decodeErr != nil {
-					log.L(ctx).Debugf("Ignoring error decoding result from debug_traceTransaction: %s ", decodeErr)
-
-				}
-				printableString := strings.Map(func(r rune) rune {
-					if unicode.IsPrint(r) {
-						return r
-					}
-					return -1
-				}, string(returnValueASCII))
-				transactionReturnValue = &printableString
-			}
+		var err error
+		transactionErrorMessage, err = c.getErrorMessage(ctx, req.TransactionHash)
+		if err != nil {
+			log.L(ctx).Debugf("Ignoring error getting error message: %s ", err)
 		}
 	}
 
@@ -178,7 +219,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		To:                ethReceipt.To,
 		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
 		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
-		ReturnValue:       transactionReturnValue,
+		ErrorMessage:      transactionErrorMessage,
 	})
 
 	var txIndex int64

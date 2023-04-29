@@ -92,6 +92,29 @@ const sampleTransactionTraceGeth = `{
 }
 `
 
+const sampleTransactionTraceNoReturnValue = `{
+	"gas": 23512,
+	"failed": true,
+	"structLogs": []
+}
+`
+
+const sampleTransactionTraceGethInvalidHex = `{
+	"gas": 23512,
+	"failed": true,
+	"returnValue": "invalid hex",
+	"structLogs": []
+}
+`
+
+const sampleTransactionTraceGethInvalidCallData = `{
+	"gas": 23512,
+	"failed": true,
+	"returnValue": "0badca11da7a",
+	"structLogs": []
+}
+`
+
 const sampleTransactionTraceBesu = `{
 	"gas": 23512,
 	"failed": true,
@@ -151,7 +174,7 @@ const sampleTransactionTraceBesu = `{
 				"0000000000000000000000000000000000000000000000000000000000000000"
 			],
 			"storage": {},
-			"reason": "0x8c379a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114e6f7420656e6f75676820746f6b656e73000000000000000000000000000000"
+			"reason": "0x8c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114e6f7420656e6f75676820746f6b656e73000000000000000000000000000000"
 		}
 	]
 }`
@@ -299,7 +322,79 @@ func TestGetReceiptErrorReasonBesu(t *testing.T) {
 
 }
 
-func TestGetReceiptErrorReasonError(t *testing.T) {
+func TestGetReceiptErrorReasonNotFound(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionTraceNoReturnValue), args[1])
+			assert.NoError(t, err)
+		})
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.False(t, res.Success)
+
+}
+
+func TestGetReceiptErrorReasonErrorFromHexDecode(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionTraceGethInvalidHex), args[1])
+			assert.NoError(t, err)
+		})
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.False(t, res.Success)
+
+}
+
+func TestGetReceiptErrorReasonErrorFromTrace(t *testing.T) {
 	// if we get an error tracing the transaction, we ignore it.  Not all nodes support the debug_traceTransaction RPC call
 
 	ctx, c, mRPC, done := newTestConnector(t)
@@ -323,6 +418,42 @@ func TestGetReceiptErrorReasonError(t *testing.T) {
 		Return(&rpcbackend.RPCError{Message: "unsupported"}).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleTransactionTraceGeth), args[1])
+			assert.NoError(t, err)
+		})
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.False(t, res.Success)
+
+}
+
+func TestGetReceiptErrorReasonErrorFromDecodeCallData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionTraceGethInvalidCallData), args[1])
 			assert.NoError(t, err)
 		})
 	var req ffcapi.TransactionReceiptRequest
