@@ -4,9 +4,9 @@ go 1.19
 
 require (
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hyperledger/firefly-common v1.2.10
-	github.com/hyperledger/firefly-signer v1.1.7
-	github.com/hyperledger/firefly-transaction-manager v1.2.11
+	github.com/hyperledger/firefly-common v1.2.11
+	github.com/hyperledger/firefly-signer v1.1.8
+	github.com/hyperledger/firefly-transaction-manager v1.2.12
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
@@ -28,7 +28,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/getkin/kin-openapi v0.107.0 // indirect
+	github.com/getkin/kin-openapi v0.116.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
@@ -57,6 +57,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
+	github.com/perimeterx/marshmallow v1.1.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.13.0 // indirect
