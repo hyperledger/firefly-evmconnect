@@ -125,19 +125,22 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 		return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
 	}
 
-	// Parse the data against the outputs
-	var jsonData []byte
-	outputValueTree, err := method.Outputs.DecodeABIDataCtx(ctx, outputData, 0)
-	if err == nil {
-		// Serialize down to JSON, and wrap in a JSONAny
-		jsonData, err = c.serializer.SerializeJSONCtx(ctx, outputValueTree)
+	if method != nil {
+		// Parse the data against the outputs
+		var jsonData []byte
+		outputValueTree, err := method.Outputs.DecodeABIDataCtx(ctx, outputData, 0)
+		if err == nil {
+			// Serialize down to JSON, and wrap in a JSONAny
+			jsonData, err = c.serializer.SerializeJSONCtx(ctx, outputValueTree)
+		}
+		if err != nil {
+			log.L(ctx).Warnf("Invalid return data: %s", outputData)
+			return nil, "", i18n.NewError(ctx, msgs.MsgReturnDataInvalid, err)
+		}
+		return fftypes.JSONAnyPtrBytes(jsonData), "", nil
 	}
-	if err != nil {
-		log.L(ctx).Warnf("Invalid return data: %s", outputData)
-		return nil, "", i18n.NewError(ctx, msgs.MsgReturnDataInvalid, err)
-	}
-	return fftypes.JSONAnyPtrBytes(jsonData), "", nil
 
+	return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
 }
 
 // processRevertReason returns under 3 different circumstances:
