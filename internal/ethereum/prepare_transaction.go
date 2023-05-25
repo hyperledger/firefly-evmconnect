@@ -86,7 +86,7 @@ func buildErrorsABI(ctx context.Context, errorSpecs []*fftypes.JSONAny) ([]*abi.
 func (c *ethConnector) ensureGasEstimate(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry, gasRequest *fftypes.FFBigInt) (*fftypes.FFBigInt, ffcapi.ErrorReason, error) {
 	if gasRequest == nil || gasRequest.Int().Sign() == 0 {
 		// If a value for gas has not been supplied, do a gas estimate
-		gas, reason, err := c.estimateGas(ctx, tx, method, errors)
+		gas, reason, err := c.gasEstimate(ctx, tx, method, errors)
 		if err != nil {
 			return nil, reason, err
 		}

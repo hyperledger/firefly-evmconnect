@@ -19,8 +19,10 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
@@ -30,7 +32,40 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) estimateGas(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry) (*ethtypes.HexInteger, ffcapi.ErrorReason, error) {
+func (c *ethConnector) GasEstimate(ctx context.Context, transaction *ffcapi.TransactionInput) (*ffcapi.GasEstimateResponse, ffcapi.ErrorReason, error) {
+
+	tx := &ethsigner.Transaction{
+		Nonce:    (*ethtypes.HexInteger)(transaction.Nonce),
+		GasLimit: (*ethtypes.HexInteger)(transaction.Gas),
+		Value:    (*ethtypes.HexInteger)(transaction.Value),
+	}
+
+	// Parse the from address
+	from, err := ethtypes.NewAddress(transaction.From)
+	if err != nil {
+		return nil, "", i18n.NewError(ctx, msgs.MsgInvalidFromAddress, transaction.From, err)
+	}
+	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
+
+	// Parse the to address - required for preparing an invoke, and must be valid if set
+	var to *ethtypes.Address0xHex
+	if transaction.To != "" {
+		to, err = ethtypes.NewAddress(transaction.To)
+		if err != nil {
+			return nil, "", i18n.NewError(ctx, msgs.MsgInvalidToAddress, transaction.To, err)
+		}
+		tx.To = to
+	}
+
+	// Do the gas estimation
+	gasEstimate, reason, err := c.gasEstimate(ctx, tx, nil, nil)
+	if err != nil {
+		return nil, reason, err
+	}
+	return &ffcapi.GasEstimateResponse{GasEstimate: (*fftypes.FFBigInt)(gasEstimate)}, "", nil
+}
+
+func (c *ethConnector) gasEstimate(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry) (*ethtypes.HexInteger, ffcapi.ErrorReason, error) {
 
 	// Do the gas estimation
 	var gasEstimate ethtypes.HexInteger

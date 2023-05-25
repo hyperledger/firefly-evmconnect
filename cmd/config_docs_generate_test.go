@@ -31,7 +31,7 @@ import (
 
 func TestGenerateConfigDocs(t *testing.T) {
 	// Initialize config of all plugins
-	initConfig()
+	InitConfig()
 	f, err := os.Create(filepath.Join("..", "config.md"))
 	assert.NoError(t, err)
 	generatedConfig, err := config.GenerateConfigMarkdown(context.Background(), "", config.GetKnownKeys())
