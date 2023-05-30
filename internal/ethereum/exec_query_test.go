@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
@@ -185,6 +186,40 @@ func TestExecQueryCustomErrorRevertDataBadOutput(t *testing.T) {
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
 	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `0x053b20290000000000000000000000000000000000000000000000000000000000000020`)
 	assert.Equal(t, expectedError.Error(), err.Error())
+
+}
+
+func TestExecQueryCustomErrorBadRevertData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Return(&rpcbackend.RPCError{Message: "pop", Data: "bad data"}).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x053b20290000000000000000000000000000000000000000000000000000000000000020")
+		})
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, _, err = c.QueryInvoke(ctx, &req)
+	assert.Error(t, err)
+	assert.Regexp(t, "pop", err)
+
+}
+
+func TestExecQueryBadErrorsABI(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	req.Errors = []*fftypes.JSONAny{fftypes.JSONAnyPtr(`[`)}
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
 
 }
 

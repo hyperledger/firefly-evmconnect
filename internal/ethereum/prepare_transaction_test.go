@@ -218,6 +218,30 @@ func TestPrepareTransactionWithEstimateFail(t *testing.T) {
 
 }
 
+func TestPrepareTransactionWithEstimateFailBadData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "pop", Data: "bad data"}).
+		Run(func(args mock.Arguments) {
+			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
+		})
+
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXEstimateGas), &req)
+	assert.NoError(t, err)
+	_, _, err = c.TransactionPrepare(ctx, &req)
+	assert.Error(t, err)
+	assert.Regexp(t, "invalid character", err)
+
+}
+
 func TestPrepareTransactionWithBadMethod(t *testing.T) {
 
 	ctx, c, _, done := newTestConnector(t)

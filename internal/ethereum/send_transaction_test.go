@@ -222,12 +222,14 @@ func TestSendTransactionFail(t *testing.T) {
 }
 
 func TestSendErrorMapping(t *testing.T) {
-
 	assert.Equal(t, ffcapi.ErrorReasonNonceTooLow, mapError(sendRPCMethods, fmt.Errorf("nonce too low")))
 	assert.Equal(t, ffcapi.ErrorReasonInsufficientFunds, mapError(sendRPCMethods, fmt.Errorf("insufficient funds")))
 	assert.Equal(t, ffcapi.ErrorReasonTransactionUnderpriced, mapError(sendRPCMethods, fmt.Errorf("transaction underpriced")))
 	assert.Equal(t, ffcapi.ErrorKnownTransaction, mapError(sendRPCMethods, fmt.Errorf("known transaction")))
+}
 
+func TestCallErrorMapping(t *testing.T) {
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, mapError(callRPCMethods, fmt.Errorf("execution reverted")))
 }
 
 func TestSendTransactionBadFrom(t *testing.T) {
