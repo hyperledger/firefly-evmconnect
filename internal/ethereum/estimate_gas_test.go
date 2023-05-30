@@ -17,9 +17,13 @@
 package ethereum
 
 import (
+	"context"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -89,4 +93,194 @@ func TestGasEstimateFail(t *testing.T) {
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
 	assert.Nil(t, res)
 
+}
+
+func TestGasEstimateBadFromAddress(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.TransactionInput
+	err := json.Unmarshal([]byte(`{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "get_address_balance"
+	},
+	"to": "0x4a8c8f1717570f9774652075e249ded38124d708",
+	"from": "bad address",
+	"value": "100000000",
+	"nonce": "0x01"
+}`), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23019", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestGasEstimateBadToAddress(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.TransactionInput
+	err := json.Unmarshal([]byte(`{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "get_address_balance"
+	},
+	"to": "bad address",
+	"from": "0x4a8c8f1717570f9774652075e249ded38124d708",
+	"value": "100000000",
+	"nonce": "0x01"
+}`), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23020", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestGasEstimateFailRevertReasonInData(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	errData, err := defaultError.EncodeCallDataValues([]string{"this reason"})
+	assert.NoError(t, err)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "reverted for reason...", Data: *fftypes.JSONAnyPtr(
+			`"0x` + hex.EncodeToString(errData) + `"`,
+		)})
+
+	var req ffcapi.TransactionInput
+	err = json.Unmarshal([]byte(sampleGasEstimate), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23021.*this reason", err)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestGasEstimateFailThenNilCallNoMethod(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		}), "latest").
+		Run(func(args mock.Arguments) {
+			hb := args[1].(*ethtypes.HexBytes0xPrefix)
+			*hb = []byte("000102030405") // ignored as there's no method to parse the outputs against
+		}).
+		Return(nil)
+
+	var req ffcapi.TransactionInput
+	err := json.Unmarshal([]byte(sampleGasEstimate), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "pop", err)
+	assert.Empty(t, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestGasEstimateFailThenRevertDataFromCall(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	errData, err := defaultError.EncodeCallDataValues([]string{"this reason"})
+	assert.NoError(t, err)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		}), "latest").
+		Return(&rpcbackend.RPCError{Message: "reverted for reason...", Data: *fftypes.JSONAnyPtr(
+			`"0x` + hex.EncodeToString(errData) + `"`,
+		)})
+
+	var req ffcapi.TransactionInput
+	err = json.Unmarshal([]byte(sampleGasEstimate), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23021.*this reason", err)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestGasEstimateFailThenRevertErrorNoExtraInfo(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		}), "latest").
+		Return(&rpcbackend.RPCError{Message: "execution reverted, without return data"})
+
+	var req ffcapi.TransactionInput
+	err := json.Unmarshal([]byte(sampleGasEstimate), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23021.*execution reverted, without return data", err)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestGasEstimateFailCustomErrorCannotParse(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	errData, err := defaultError.EncodeCallDataValues([]string{"this reason"})
+	assert.NoError(t, err)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "reverted for reason...", Data: *fftypes.JSONAnyPtr(
+			`"0x` + hex.EncodeToString(errData) + `"`,
+		)})
+
+	var req ffcapi.TransactionInput
+	err = json.Unmarshal([]byte(sampleGasEstimate), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23021.*this reason", err)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestFormatErrorComponentBadCV(t *testing.T) {
+	assert.Equal(t, "?", formatErrorComponent(context.Background(), &abi.ComponentValue{}))
 }

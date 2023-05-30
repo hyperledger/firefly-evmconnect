@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -76,11 +76,7 @@ func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int
 			return nil, ffcapi.ErrorReason(""), rpcErr.Error()
 		}
 		if blockInfo == nil {
-			var err error
-			if rpcErr != nil {
-				err = rpcErr.Error()
-			}
-			return nil, ffcapi.ErrorReason(""), err
+			return nil, ffcapi.ErrorReason(""), nil
 		}
 		c.addToBlockCache(blockInfo)
 	}

@@ -77,7 +77,7 @@ func buildErrorsABI(ctx context.Context, errorSpecs []*fftypes.JSONAny) ([]*abi.
 	for i, e := range errorSpecs {
 		err := json.Unmarshal(e.Bytes(), &errors[i])
 		if err != nil {
-			return nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
+			return nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIErrorsFail, err)
 		}
 	}
 	return errors, nil
@@ -101,7 +101,7 @@ func (c *ethConnector) prepareCallData(ctx context.Context, req *ffcapi.Transact
 	var method *abi.Entry
 	err := json.Unmarshal(req.Method.Bytes(), &method)
 	if err != nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
+		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIMethodFail, err)
 	}
 
 	// Parse the params into the standard semantics of Go JSON unmarshalling, with []interface{}
