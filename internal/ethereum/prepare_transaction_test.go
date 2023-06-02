@@ -135,6 +135,26 @@ const samplePrepareTXBadParam = `{
 	"params": [ "wrong type" ]
 }`
 
+const samplePrepareTXBadErrors = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "prepare_transaction"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+	"gas": 1000000,
+	"nonce": "111",
+	"method": {
+		"inputs": [],
+		"name":"do",
+		"outputs":[],
+		"stateMutability":"nonpayable",
+		"type":"function"
+	},
+	"errors": [false]
+}`
+
 func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
 	ctx, c, _, done := newTestConnector(t)
@@ -232,14 +252,22 @@ func TestPrepareTransactionWithEstimateFailBadData(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
 		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
+			return true
+		}), "latest").
+		Return(&rpcbackend.RPCError{Message: "pop", Data: "bad data"})
 
 	var req ffcapi.TransactionPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareTXEstimateGas), &req)
 	assert.NoError(t, err)
 	_, _, err = c.TransactionPrepare(ctx, &req)
 	assert.Error(t, err)
-	assert.Regexp(t, "invalid character", err)
+	// We fall back to an eth_call, but return the original eth_estimateGas error as we can't process the eth_call response either
+	assert.Regexp(t, "pop", err)
 
+	mRPC.AssertExpectations(t)
 }
 
 func TestPrepareTransactionWithBadMethod(t *testing.T) {
@@ -282,6 +310,21 @@ func TestPrepareTransactionWithBadTo(t *testing.T) {
 	assert.NoError(t, err)
 	res, reason, err := c.TransactionPrepare(ctx, &req)
 	assert.Regexp(t, "FF23020", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+	assert.Nil(t, res)
+
+}
+
+func TestPrepareTransactionWithBadErrors(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXBadErrors), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
+	assert.Regexp(t, "FF23050", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
 	assert.Nil(t, res)
 

@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -81,7 +81,7 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 	var a *abi.ABI
 	err = json.Unmarshal(req.Definition.Bytes(), &a)
 	if err != nil {
-		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIFail, err)
+		return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalABIMethodFail, err)
 	}
 
 	// Find the constructor in the ABI

@@ -155,7 +155,7 @@ func TestDeployContractPrepareBadErrorABI(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.DeployContractPrepare(ctx, &req)
 
-	assert.Regexp(t, "FF23013", err)
+	assert.Regexp(t, "FF23050", err)
 	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
 
 }

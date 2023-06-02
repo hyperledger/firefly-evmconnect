@@ -166,20 +166,7 @@ func (c *ethConnector) getErrorMessage(ctx context.Context, transactionHash stri
 		return nil, nil
 	}
 
-	parsedABI, err := abi.ParseABI([]byte(`[
-			{
-				"name": "Error",
-				"inputs": [
-					{"name": "message", "internalType": "string", "type": "string" }
-				],
-				"type": "function"
-			}
-		]`))
-	if err != nil {
-		return nil, err
-	}
-
-	value, err := decodeCallDataHex(ctx, parsedABI.Functions()["Error"], returnValue)
+	value, err := decodeCallDataHex(ctx, defaultError, returnValue)
 	if err != nil {
 		return nil, err
 	}

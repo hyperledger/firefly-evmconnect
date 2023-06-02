@@ -43,7 +43,7 @@ func (c *ethConnector) GasEstimate(ctx context.Context, transaction *ffcapi.Tran
 	// Parse the from address
 	from, err := ethtypes.NewAddress(transaction.From)
 	if err != nil {
-		return nil, "", i18n.NewError(ctx, msgs.MsgInvalidFromAddress, transaction.From, err)
+		return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgInvalidFromAddress, transaction.From, err)
 	}
 	tx.From = json.RawMessage(fmt.Sprintf(`"%s"`, from))
 
@@ -52,7 +52,7 @@ func (c *ethConnector) GasEstimate(ctx context.Context, transaction *ffcapi.Tran
 	if transaction.To != "" {
 		to, err = ethtypes.NewAddress(transaction.To)
 		if err != nil {
-			return nil, "", i18n.NewError(ctx, msgs.MsgInvalidToAddress, transaction.To, err)
+			return nil, ffcapi.ErrorReasonInvalidInputs, i18n.NewError(ctx, msgs.MsgInvalidToAddress, transaction.To, err)
 		}
 		tx.To = to
 	}
@@ -71,21 +71,8 @@ func (c *ethConnector) gasEstimate(ctx context.Context, tx *ethsigner.Transactio
 	var gasEstimate ethtypes.HexInteger
 	rpcErr := c.backend.CallRPC(ctx, &gasEstimate, "eth_estimateGas", tx)
 	if rpcErr != nil {
-		// some Ethereum implementations (eg. geth 1.10) returns the revert details on the estimateGas calls,
-		// so check that before making the eth_call request
-		if rpcErr.Data != "" {
-			var revertData ethtypes.HexBytes0xPrefix
-			e1 := json.Unmarshal(rpcErr.Data.Bytes(), &revertData)
-			if e1 != nil {
-				return nil, mapError(callRPCMethods, e1), e1
-			}
-			revertReason, ok := processRevertReason(ctx, revertData, errors)
-			if revertReason != "" {
-				if ok {
-					return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
-				}
-				return nil, ffcapi.ErrorReasonTransactionReverted, i18n.NewError(ctx, msgs.MsgReverted, revertReason)
-			}
+		if reason, revertErr := c.attemptProcessingRevertData(ctx, errors, rpcErr); revertErr != nil {
+			return nil, reason, revertErr
 		}
 
 		// If it fails, fall back to an eth_call to see if we get a reverted reason
