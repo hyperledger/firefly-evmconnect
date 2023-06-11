@@ -12,6 +12,7 @@
 |publicURL|External address callers should access API over|`string`|`<nil>`
 |readTimeout|The maximum time to wait when reading from an HTTP connection|[`time.Duration`](https://pkg.go.dev/time#Duration)|`15s`
 |shutdownTimeout|The maximum amount of time to wait for any open HTTP requests to finish before shutting down the HTTP server|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|simpleQuery|Force use of original limited API query syntax, even if rich query is supported in the database|`boolean`|`<nil>`
 |writeTimeout|The maximum time to wait when writing to a HTTP connection|[`time.Duration`](https://pkg.go.dev/time#Duration)|`15s`
 
 ## api.auth
@@ -236,6 +237,34 @@
 |maxHandles|The maximum number of cached file handles LevelDB should keep open|`int`|`100`
 |path|The path for the LevelDB persistence directory|`string`|`<nil>`
 |syncWrites|Whether to synchronously perform writes to the storage|`boolean`|`false`
+
+## persistence.postgres
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|maxConnIdleTime|The maximum amount of time a database connection can be idle|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1m`
+|maxConnLifetime|The maximum amount of time to keep a database connection open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|maxConns|Maximum connections to the database|`int`|`<nil>`
+|maxIdleConns|The maximum number of idle connections to the database|`int`|`<nil>`
+|url|The PostgreSQL connection string for the database|`string`|`<nil>`
+
+## persistence.postgres.migrations
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|auto|Enables automatic database migrations|`boolean`|`false`
+|directory|The directory containing the numerically ordered migration DDL files to apply to the database|`string`|`./db/migrations/postgres`
+
+## persistence.postgres.txwriter
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|batchSize|Number of persistence operations on transactions to attempt to group into a DB transaction|`int`|`100`
+|batchTimeout|Duration to hold batch open for new transaction operations before flushing to the DB|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10ms`
+|cacheSlots|Number of transactions to hold cached metadata for to avoid DB read operations to calculate history|`int`|`1000`
+|count|Number of transactions writing routines to start|`int`|`5`
+|historyCompactionInterval|Duration between cleanup activities on the DB for a transaction with a large history|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
+|historySummaryLimit|Maximum number of action entries to return embedded in the JSON response object when querying a transaction summary|`int`|`50`
 
 ## policyengine
 
