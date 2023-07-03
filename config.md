@@ -272,7 +272,7 @@
 |batchTimeout|Duration to hold batch open for new transaction operations before flushing to the DB|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10ms`
 |cacheSlots|Number of transactions to hold cached metadata for to avoid DB read operations to calculate history|`int`|`1000`
 |count|Number of transactions writing routines to start|`int`|`5`
-|historyCompactionInterval|Duration between cleanup activities on the DB for a transaction with a large history|[`time.Duration`](https://pkg.go.dev/time#Duration)|`5m`
+|historyCompactionInterval|Duration between cleanup activities on the DB for a transaction with a large history|[`time.Duration`](https://pkg.go.dev/time#Duration)|`0`
 |historySummaryLimit|Maximum number of action entries to return embedded in the JSON response object when querying a transaction summary|`int`|`50`
 
 ## policyengine
@@ -359,7 +359,7 @@
 |---|-----------|----|-------------|
 |maxHistoryCount|The number of historical status updates to retain in the operation|`int`|`50`
 |maxInFlight|Deprecated: Please use 'transactions.handler.simple.maxInFlight' instead|`int`|`100`
-|nonceStateTimeout|Deprecated: Please use 'transactions.handler.simple.nonceStateTimeout' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1h`
+|nonceStateTimeout|How old the most recently submitted transaction record in our local state needs to be, before we make a request to the node to query the next nonce for a signing address|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1h`
 
 ## transactions.handler
 
