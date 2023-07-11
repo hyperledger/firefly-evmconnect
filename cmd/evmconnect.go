@@ -57,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(fftmcmd.ClientCommand())
 	migrateCmd := fftmcmd.MigrateCommand(func() error {
 		InitConfig()
+		config.SetupLogging(context.Background())
 		return config.ReadConfig("evmconnect", cfgFile)
 	})
 	migrateCmd.PersistentFlags().StringVarP(&cfgFile, "config", "f", "", "config file")
