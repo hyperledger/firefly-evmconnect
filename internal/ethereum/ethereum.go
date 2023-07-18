@@ -91,7 +91,9 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	if err != nil {
 		return nil, err
 	}
-	c.backend = rpcbackend.NewRPCClient(httpClient)
+	c.backend = rpcbackend.NewRPCClientWithOption(httpClient, rpcbackend.RPCClientOptions{
+		MaxConcurrentRequest: conf.GetInt64(MaxConcurrentRequests),
+	})
 
 	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {
