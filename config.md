@@ -68,6 +68,7 @@
 |gasEstimationFactor|The factor to apply to the gas estimation to determine the gas limit|float|`1.5`
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
+|maxConcurrentRequests|Maximum of concurrent requests to be submitted to the blockchain|`int`|`50`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
