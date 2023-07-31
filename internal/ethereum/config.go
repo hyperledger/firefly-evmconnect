@@ -34,6 +34,7 @@ const (
 	RetryInitDelay              = "retry.initialDelay"
 	RetryMaxDelay               = "retry.maxDelay"
 	RetryFactor                 = "retry.factor"
+	MaxConcurrentRequests       = "maxConcurrentRequests"
 	TxCacheSize                 = "txCacheSize"
 )
 
@@ -64,5 +65,6 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryFactor, DefaultRetryDelayFactor)
 	conf.AddKnownKey(RetryInitDelay, DefaultRetryInitDelay)
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
+	conf.AddKnownKey(MaxConcurrentRequests, 50)
 	conf.AddKnownKey(TxCacheSize, 250)
 }

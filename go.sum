@@ -220,8 +220,8 @@ github.com/hyperledger/firefly-common v1.2.18 h1:oMxmhVsVhitoEeZXJPVIM10RxwK0Z33
 github.com/hyperledger/firefly-common v1.2.18/go.mod h1:17lOH4YufiPy82LpKm8fPa/YXJ0pUyq01zK1CmklJwM=
 github.com/hyperledger/firefly-signer v1.1.9 h1:Tx1iPTOLTpdFOLtkKFUWpjNsL/+oswnAaU4CTLMDw4Q=
 github.com/hyperledger/firefly-signer v1.1.9/go.mod h1:vNbbROziwqkOmO0b+9ky3devjcFg0JIkR2M1KG7seTQ=
-github.com/hyperledger/firefly-transaction-manager v1.3.0 h1:MxzUHz3901XdVLpk7nqexXvLf47uObwS3y/U6Y1xOho=
-github.com/hyperledger/firefly-transaction-manager v1.3.0/go.mod h1:Bbp4hDoOFbu463pTfyFY/MPDWyTq89uAFk4OcJS7UXY=
+github.com/hyperledger/firefly-transaction-manager v1.3.1 h1:ifgEK8pW8vI62wPL8v/QaKtEsfQOs2QCv7rYrW1qd9I=
+github.com/hyperledger/firefly-transaction-manager v1.3.1/go.mod h1:Bbp4hDoOFbu463pTfyFY/MPDWyTq89uAFk4OcJS7UXY=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=

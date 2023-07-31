@@ -88,3 +88,14 @@ func TestRunBadConfirmationsConfig(t *testing.T) {
 	assert.Regexp(t, "pop", err)
 
 }
+
+func TestRunMigrationsBadConfig(t *testing.T) {
+	rootCmd.SetArgs([]string{
+		"migrate", "leveldb2postgres", "-f", "../test/fail-start.evmconnect.yaml",
+	})
+	defer rootCmd.SetArgs([]string{})
+
+	err := Execute()
+	assert.Regexp(t, "FF21049", err)
+
+}
