@@ -65,6 +65,7 @@ func TestConnectorInit(t *testing.T) {
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
 	conf.Set(EventsCatchupThreshold, 1)
 	conf.Set(EventsCatchupPageSize, 500)
+	conf.Set(EventsCatchupDownscaleRegex, "Response size is larger.*error.")
 
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
