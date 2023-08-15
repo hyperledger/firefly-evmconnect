@@ -28,6 +28,7 @@ const (
 	BlockCacheSize              = "blockCacheSize"
 	EventsCatchupPageSize       = "events.catchupPageSize"
 	EventsCatchupThreshold      = "events.catchupThreshold"
+	EventsCatchupDownscaleRegex = "events.catchupDownscaleRegex"
 	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
 	EventsBlockTimestamps       = "events.blockTimestamps"
 	EventsFilterPollingInterval = "events.filterPollingInterval"
@@ -42,9 +43,10 @@ const (
 	DefaultListenerPort        = 5102
 	DefaultGasEstimationFactor = 1.5
 
-	DefaultCatchupPageSize          = 500
-	DefaultEventsCatchupThreshold   = 500
-	DefaultEventsCheckpointBlockGap = 50
+	DefaultCatchupPageSize             = 500
+	DefaultEventsCatchupThreshold      = 500
+	DefaultEventsCatchupDownscaleRegex = "Response size is larger than.*limit error."
+	DefaultEventsCheckpointBlockGap    = 50
 
 	DefaultRetryInitDelay   = "100ms"
 	DefaultRetryMaxDelay    = "30s"
@@ -61,6 +63,7 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(EventsFilterPollingInterval, "1s")
 	conf.AddKnownKey(EventsCatchupPageSize, DefaultCatchupPageSize)
 	conf.AddKnownKey(EventsCatchupThreshold, DefaultEventsCatchupThreshold)
+	conf.AddKnownKey(EventsCatchupDownscaleRegex, DefaultEventsCatchupDownscaleRegex)
 	conf.AddKnownKey(EventsCheckpointBlockGap, DefaultEventsCheckpointBlockGap)
 	conf.AddKnownKey(RetryFactor, DefaultRetryDelayFactor)
 	conf.AddKnownKey(RetryInitDelay, DefaultRetryInitDelay)

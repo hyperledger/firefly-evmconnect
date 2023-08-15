@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"regexp"
 	"sync"
 	"time"
 
@@ -42,6 +43,7 @@ type ethConnector struct {
 	gasEstimationFactor        *big.Float
 	catchupPageSize            int64
 	catchupThreshold           int64
+	catchupDownscaleRegex      *regexp.Regexp
 	checkpointBlockGap         int64
 	retry                      *retry.Retry
 	eventBlockTimestamps       bool
@@ -86,6 +88,11 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		return nil, i18n.NewError(ctx, msgs.MsgMissingBackendURL)
 	}
 	c.gasEstimationFactor = big.NewFloat(conf.GetFloat64(ConfigGasEstimationFactor))
+
+	c.catchupDownscaleRegex, err = regexp.Compile(conf.GetString(EventsCatchupDownscaleRegex))
+	if err != nil {
+		log.L(ctx).Warnf("Catchup downscale regex pattern '%s' not a valid regular expression. Catchup downscaling is disabled.", conf.GetString(EventsCatchupDownscaleRegex))
+	}
 
 	httpClient, err := ffresty.New(ctx, conf)
 	if err != nil {

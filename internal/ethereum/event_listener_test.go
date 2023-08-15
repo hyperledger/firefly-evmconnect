@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"encoding/json"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -184,6 +185,176 @@ func TestListenerCatchupErrorsThenDeliveryExit(t *testing.T) {
 
 	l.listenerCatchupLoop()
 
+}
+
+func TestListenerCatchupScalesBackOnExpectedError(t *testing.T) {
+
+	l, mRPC, cancelCtx := newTestListener(t, false)
+
+	l.catchupLoopDone = make(chan struct{})
+	l.hwmBlock = 0
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1001),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit error."}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		// Cancel the context here so we exit pushing the event
+		cancelCtx()
+	})
+
+	l.listenerCatchupLoop()
+
+	// The response size error from an JSON/RPC endpoint should cause us to scale back the catchup page size
+	assert.Equal(t, int64(250), l.c.catchupPageSize)
+}
+
+func TestListenerCatchupScalesBackNTimesOnExpectedError(t *testing.T) {
+
+	l, mRPC, cancelCtx := newTestListener(t, false)
+
+	l.catchupLoopDone = make(chan struct{})
+	l.hwmBlock = 0
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1001),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit error."}).Times(5)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		// Cancel the context here so we exit pushing the event
+		cancelCtx()
+	})
+
+	l.listenerCatchupLoop()
+
+	// The response size error from an JSON/RPC endpoint should cause us to scale back the catchup page size
+	assert.Equal(t, int64(15), l.c.catchupPageSize)
+}
+
+func TestListenerCatchupScalesBackToOne(t *testing.T) {
+
+	l, mRPC, cancelCtx := newTestListener(t, false)
+
+	l.catchupLoopDone = make(chan struct{})
+	l.hwmBlock = 0
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1001),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit error."}).Times(50)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		// Cancel the context here so we exit pushing the event
+		cancelCtx()
+	})
+
+	l.listenerCatchupLoop()
+
+	// The response size error from an JSON/RPC endpoint should cause us to scale back the catchup page size
+	assert.Equal(t, int64(1), l.c.catchupPageSize)
+}
+
+func TestListenerNoCatchupScaleBackOnErrorMismatch(t *testing.T) {
+
+	l, mRPC, cancelCtx := newTestListener(t, false)
+
+	l.catchupLoopDone = make(chan struct{})
+	l.hwmBlock = 0
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1001),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size problem"}).Times(5) // This doesn't match the default regex pattern so scaling back doesn't occur
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		// Cancel the context here so we exit pushing the event
+		cancelCtx()
+	})
+
+	l.listenerCatchupLoop()
+
+	// The response size error doesn't match what we expect, catchup page size remains 500
+	assert.Equal(t, int64(500), l.c.catchupPageSize)
+}
+
+func TestListenerCatchupScalesBackCustomRegex(t *testing.T) {
+
+	var err error
+	l, mRPC, cancelCtx := newTestListener(t, false)
+
+	l.catchupLoopDone = make(chan struct{})
+	l.hwmBlock = 0
+	l.c.catchupDownscaleRegex, err = regexp.Compile("ACME JSON/RPC.*too large")
+
+	assert.NoError(t, err)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1001),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "ACME JSON/RPC endpoint error - eth_getLogs response size is too large"}).Times(5)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		// Cancel the context here so we exit pushing the event
+		cancelCtx()
+	})
+
+	l.listenerCatchupLoop()
+
+	// The response size error from an JSON/RPC endpoint should cause us to scale back the catchup page size
+	assert.Equal(t, int64(15), l.c.catchupPageSize)
+}
+
+func TestListenerCatchupNoScaleBackEmptyRegex(t *testing.T) {
+
+	var err error
+	l, mRPC, cancelCtx := newTestListener(t, false)
+
+	l.catchupLoopDone = make(chan struct{})
+	l.hwmBlock = 0
+	l.c.catchupDownscaleRegex, err = regexp.Compile("")
+
+	assert.NoError(t, err)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number: ethtypes.NewHexInteger64(1001),
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "ACME JSON/RPC endpoint error - eth_getLogs response size is too large"}).Times(5)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		// Cancel the context here so we exit pushing the event
+		cancelCtx()
+	})
+
+	l.listenerCatchupLoop()
+
+	// The response size error from an JSON/RPC endpoint should cause us to scale back the catchup page size
+	assert.Equal(t, int64(500), l.c.catchupPageSize)
 }
 
 func TestListenerCatchupErrorThenExit(t *testing.T) {
