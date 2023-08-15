@@ -120,4 +120,8 @@ func TestConnectorInit(t *testing.T) {
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23040", err)
 
+	conf.Set(TxCacheSize, "1")
+	conf.Set(EventsCatchupDownscaleRegex, "[")
+	cc, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23051", err)
 }

@@ -66,4 +66,5 @@ var (
 	MsgInvalidTXHashReturned     = ffe("FF23048", "Received invalid transaction hash from node len=%d")
 	MsgUnmarshalErrorFail        = ffe("FF23049", "Failed to parse error %d: %s")
 	MsgUnmarshalABIErrorsFail    = ffe("FF23050", "Failed to parse errors ABI: %s")
+	MsgInvalidRegex              = ffe("FF23051", "Invalid regular expression for auto-backoff catchup error: %s")
 )
