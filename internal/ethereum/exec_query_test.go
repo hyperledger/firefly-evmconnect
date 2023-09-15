@@ -168,6 +168,69 @@ func TestExecQueryCustomErrorRevertData(t *testing.T) {
 
 }
 
+func TestExecQueryCustomErrorRevertDataExceedsBalance(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002645524332303a207472616e7366657220616d6f756e7420657863656564732062616c616e63650000000000000000000000000000000000000000000000000000")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `ERC20: transfer amount exceeds balance`)
+	assert.Equal(t, expectedError.Error(), err.Error())
+
+}
+
+func TestExecQueryCustomErrorRevertDataNotEnoughEther(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001a4e6f7420656e6f7567682045746865722070726f76696465642e000000000000")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `Not enough Ether provided.`)
+	assert.Equal(t, expectedError.Error(), err.Error())
+
+}
+
+func TestExecQueryCustomErrorRevertDataTransferFromZeroAddress(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_call", mock.Anything, "latest").
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002545524332303a207472616e736665722066726f6d20746865207a65726f2061646472657373000000000000000000000000000000000000000000000000000000")
+		}).
+		Return(nil)
+
+	var req ffcapi.QueryInvokeRequest
+	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.QueryInvoke(ctx, &req)
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `ERC20: transfer from the zero address`)
+	assert.Equal(t, expectedError.Error(), err.Error())
+
+}
+
 func TestExecQueryCustomErrorRevertDataBadOutput(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)

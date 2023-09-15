@@ -194,7 +194,119 @@ func TestSendPreSignedTransactionOK(t *testing.T) {
 	assert.Equal(t, "0x332db2d926128920c2dc1b2067de4e86d073975fd018e22ed2470449e755b508", res.TransactionHash)
 
 	mRPC.AssertExpectations(t)
+}
 
+func TestSendPreSignedTransactionBadHash(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendRawTransaction",
+		mock.MatchedBy(func(data string) bool {
+			assert.Equal(t, "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675", data)
+			return true
+		})).
+		Run(func(args mock.Arguments) {
+			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x1234")
+		}).
+		Return(nil)
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendRawTX), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "FF23048", err)
+	assert.Empty(t, reason)
+
+	mRPC.AssertExpectations(t)
+}
+
+func TestSendPreSignedTransactionNonceTooLow(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendRawTransaction",
+		mock.MatchedBy(func(data string) bool {
+			assert.Equal(t, "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675", data)
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "nonce too low"})
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendRawTX), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "nonce_too_low", reason)
+	assert.Regexp(t, "nonce too low", err.Error())
+
+	mRPC.AssertExpectations(t)
+}
+
+func TestSendPreSignedTransactionKnownTransaction(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendRawTransaction",
+		mock.MatchedBy(func(data string) bool {
+			assert.Equal(t, "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675", data)
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "known transaction"})
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendRawTX), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "known_transaction", reason)
+	assert.Regexp(t, "known transaction", err.Error())
+
+	mRPC.AssertExpectations(t)
+}
+
+func TestSendPreSignedTransactionUnderpriced(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendRawTransaction",
+		mock.MatchedBy(func(data string) bool {
+			assert.Equal(t, "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675", data)
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "transaction underpriced"})
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendRawTX), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "transaction_underpriced", reason)
+	assert.Regexp(t, "transaction underpriced", err.Error())
+
+	mRPC.AssertExpectations(t)
+}
+
+func TestSendPreSignedTransactionInsufficientFunds(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_sendRawTransaction",
+		mock.MatchedBy(func(data string) bool {
+			assert.Equal(t, "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675", data)
+			return true
+		})).
+		Return(&rpcbackend.RPCError{Message: "insufficient funds"})
+
+	var req ffcapi.TransactionSendRequest
+	err := json.Unmarshal([]byte(sampleSendRawTX), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.TransactionSend(ctx, &req)
+	assert.Regexp(t, "insufficient_funds", reason)
+	assert.Regexp(t, "insufficient funds", err.Error())
+
+	mRPC.AssertExpectations(t)
 }
 
 func TestSendTransactionFail(t *testing.T) {
