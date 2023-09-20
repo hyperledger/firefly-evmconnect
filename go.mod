@@ -1,6 +1,6 @@
 module github.com/hyperledger/firefly-evmconnect
 
-go 1.19
+go 1.20
 
 require (
 	github.com/hashicorp/golang-lru v0.5.4
