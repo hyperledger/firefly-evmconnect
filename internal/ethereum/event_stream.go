@@ -228,7 +228,11 @@ func (es *eventStream) leadGroupCatchup() bool {
 			return true
 		}
 
-		chainHeadBlock := es.c.blockListener.getHighestBlock(es.ctx)
+		chainHeadBlock, ok := es.c.blockListener.getHighestBlock(es.ctx)
+		if !ok {
+			log.L(es.ctx).Debugf("Stream catchup exiting (closed checking block height)")
+			return true
+		}
 
 		// Build the aggregated listener list (doesn't matter if it's changed, as we build the list each time)
 		_ = es.buildReuseLeadGroupListener(&lastUpdate, &ag)
@@ -311,7 +315,8 @@ func (es *eventStream) leadGroupSteadyState() bool {
 
 			// High water mark is a point safely behind the head of the chain in this case,
 			// where re-orgs are not expected.
-			hwmBlock := es.c.blockListener.getHighestBlock(es.ctx) - es.c.checkpointBlockGap
+			bh, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
+			hwmBlock := bh - es.c.checkpointBlockGap
 			if hwmBlock < 0 {
 				hwmBlock = 0
 			}
@@ -333,7 +338,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Check we're not outside of the steady state window, and need to fall back to catchup mode
-				chainHeadBlock := es.c.blockListener.getHighestBlock(es.ctx)
+				chainHeadBlock, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
 				blockGapEstimate := (chainHeadBlock - fromBlock)
 				if blockGapEstimate > es.c.catchupThreshold {
 					log.L(es.ctx).Warnf("Block gap estimate reached %d (above threshold of %d) - reverting to catchup mode", blockGapEstimate, es.c.catchupThreshold)
@@ -405,8 +410,34 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	}
 }
 
+func (es *eventStream) preStartProcessing() {
+	ctx := es.ctx
+	chainHead, ok := es.c.blockListener.getHighestBlock(ctx)
+	if !ok {
+		log.L(ctx).Warnf("Event stream closed before establishing block height")
+		return
+	}
+	for _, l := range es.listeners {
+		// During initial start we move the "head" block forwards to be the highest of all the initial streams
+		if l.hwmBlock > es.headBlock {
+			if l.hwmBlock > chainHead {
+				es.headBlock = chainHead
+			} else {
+				es.headBlock = l.hwmBlock
+			}
+		}
+	}
+
+	// Now we've done that, we can start all the listeners
+	for _, l := range es.listeners {
+		es.startEventListener(l)
+	}
+}
+
 func (es *eventStream) streamLoop() {
 	defer close(es.streamLoopDone)
+
+	es.preStartProcessing()
 
 	for {
 		// When we first start, we might find our leading pack of listeners are all way behind
