@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -44,29 +44,19 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 		streamLoopDone: make(chan struct{}),
 	}
 
-	chainHead := c.blockListener.getHighestBlock(ctx)
-	for _, lReq := range req.InitialListeners {
-		l, err := es.addEventListener(ctx, lReq)
+	// We add all the initial event listeners, checking for errors, before kicking off the streamLoop().
+	for _, il := range req.InitialListeners {
+		// Add, but do NOT start, the listener.
+		// We do pre-startup processing on this special set in streamLoop() after we've established
+		// the chain head, then start them all after that.
+		_, err := es.addEventListener(ctx, il)
 		if err != nil {
 			return nil, "", err
 		}
-		// During initial start we move the "head" block forwards to be the highest of all the initial streams
-		if l.hwmBlock > es.headBlock {
-			if l.hwmBlock > chainHead {
-				es.headBlock = chainHead
-			} else {
-				es.headBlock = l.hwmBlock
-			}
-		}
 	}
 
-	// From this point we consider ourselves started
+	// From this point we consider ourselves as in started state, but we might not actually be ready
 	c.eventStreams[*req.ID] = es
-
-	// Start all the listeners
-	for _, l := range es.listeners {
-		es.startEventListener(l)
-	}
 
 	// Start the listener head routine, which reads events for all listeners that are not in catchup mode
 	go es.streamLoop()

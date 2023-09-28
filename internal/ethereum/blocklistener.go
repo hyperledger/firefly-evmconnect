@@ -1,4 +1,4 @@
-// Copyright © 2022 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -404,7 +404,7 @@ func (bl *blockListener) addConsumer(c *blockUpdateConsumer) {
 	bl.consumers[*c.id] = c
 }
 
-func (bl *blockListener) getHighestBlock(ctx context.Context) int64 {
+func (bl *blockListener) getHighestBlock(ctx context.Context) (int64, bool) {
 	bl.mux.Lock()
 	bl.checkStartedLocked()
 	highestBlock := bl.highestBlock
@@ -414,13 +414,15 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) int64 {
 		select {
 		case <-bl.initialBlockHeightObtained:
 		case <-ctx.Done():
+			// Inform caller we timed out, or were closed
+			return -1, false
 		}
 	}
 	bl.mux.Lock()
 	highestBlock = bl.highestBlock
 	bl.mux.Unlock()
 	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
-	return highestBlock
+	return highestBlock, true
 }
 
 func (bl *blockListener) waitClosed() {

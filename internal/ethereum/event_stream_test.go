@@ -52,6 +52,9 @@ func testEventStreamExistingConnector(t *testing.T, ctx context.Context, done fu
 	es.c.eventFilterPollingInterval = 1 * time.Millisecond
 	es.c.retry.MaximumDelay = 1 * time.Microsecond
 	assert.NotNil(t, es)
+
+	es.preStartProcessing()
+
 	return es, events, mRPC, func() {
 		done()
 		_, _, err := c.EventStreamStopped(ctx, &ffcapi.EventStreamStoppedRequest{

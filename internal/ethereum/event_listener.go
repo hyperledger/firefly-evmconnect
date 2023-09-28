@@ -97,8 +97,8 @@ func (cp *listenerCheckpoint) LessThan(b ffcapi.EventListenerCheckpoint) bool {
 func (l *listener) getInitialBlock(ctx context.Context, fromBlockInstruction string) (int64, error) {
 	if fromBlockInstruction == ffcapi.FromBlockLatest || fromBlockInstruction == "" {
 		// Get the latest block number of the chain
-		chainHead := l.c.blockListener.getHighestBlock(ctx)
-		if chainHead < 0 {
+		chainHead, ok := l.c.blockListener.getHighestBlock(ctx)
+		if !ok {
 			return -1, i18n.NewError(ctx, msgs.MsgTimedOutQueryingChainHead)
 		}
 		return chainHead, nil
