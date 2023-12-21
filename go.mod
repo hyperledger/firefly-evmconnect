@@ -4,14 +4,14 @@ go 1.19
 
 require (
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hyperledger/firefly-common v1.3.0
+	github.com/hyperledger/firefly-common v1.4.1-0.20231221141603-1622fb47c8d9
 	github.com/hyperledger/firefly-signer v1.1.10-0.20230928181245-a5e84e149fdb
-	github.com/hyperledger/firefly-transaction-manager v1.3.4
+	github.com/hyperledger/firefly-transaction-manager v1.3.5-0.20231221151942-543a25094959
 	github.com/sirupsen/logrus v1.9.2
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
-	golang.org/x/net v0.10.0
-	golang.org/x/text v0.9.0
+	golang.org/x/net v0.17.0
+	golang.org/x/text v0.14.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -57,6 +57,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
@@ -87,9 +88,9 @@ require (
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
 	gitlab.com/hfuss/mux-prometheus v0.0.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
