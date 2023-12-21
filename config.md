@@ -35,6 +35,7 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
 
@@ -106,6 +107,7 @@
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
+|errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
 |factor|The retry backoff factor|`float32`|`2`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |initialDelay|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
@@ -120,6 +122,7 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
 
@@ -167,6 +170,7 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
 
@@ -261,6 +265,7 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
 
@@ -357,6 +362,7 @@
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
+|errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
@@ -368,6 +374,7 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
 
@@ -446,6 +453,7 @@
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
+|errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
@@ -457,6 +465,7 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
 
@@ -502,6 +511,7 @@
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
+|errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
@@ -513,5 +523,6 @@
 |certFile|The path to the certificate file for TLS on this API|`string`|`<nil>`
 |clientAuth|Enables or disables client auth for TLS on this API|`string`|`<nil>`
 |enabled|Enables or disables TLS on this API|`boolean`|`false`
+|insecureSkipHostVerify|When to true in unit test development environments to disable TLS verification. Use with extreme caution|`boolean`|`<nil>`
 |keyFile|The path to the private key file for TLS on this API|`string`|`<nil>`
 |requiredDNAttributes|A set of required subject DN attributes. Each entry is a regular expression, and the subject certificate must have a matching attribute of the specified type (CN, C, O, OU, ST, L, STREET, POSTALCODE, SERIALNUMBER are valid attributes)|`map[string]string`|`<nil>`
