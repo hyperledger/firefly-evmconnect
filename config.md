@@ -90,6 +90,7 @@
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
 |blockTimestamps|Whether to include the block timestamps in the event information|`boolean`|`true`
+|catchupDownscaleRegex|An error pattern to check for from JSON/RPC providers if they limit response sizes to eth_getLogs(). If an error is returned from eth_getLogs() and that error matches the configured pattern, the number of logs requested (catchupPageSize) will be reduced automatically.|string|`Response size is larger than.*limit error.`
 |catchupPageSize|Number of blocks to query per poll when catching up to the head of the blockchain|`int`|`500`
 |catchupThreshold|How many blocks behind the chain head an event stream or listener must be on startup, to enter catchup mode|`int`|`500`
 |checkpointBlockGap|The number of blocks at the head of the chain that should be considered unstable (could be dropped from the canonical chain after a re-org). Unless events with a full set of confirmations are detected, the restart checkpoint will this many blocks behind the chain head.|`int`|`50`

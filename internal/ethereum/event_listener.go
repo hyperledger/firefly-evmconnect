@@ -1,4 +1,4 @@
-// Copyright © 2023 Kaleido, Inl.c.
+// Copyright © 2024 Kaleido, Inl.c.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -206,8 +206,19 @@ func (l *listener) listenerCatchupLoop() {
 		toBlock := l.hwmBlock + l.c.catchupPageSize - 1
 		events, err := l.es.getBlockRangeEvents(ctx, al, fromBlock, toBlock)
 		if err != nil {
-			log.L(ctx).Errorf("Failed to query block range fromBlock=%d toBlock=%d: %s", fromBlock, toBlock, err)
-			failCount++
+			if l.c.catchupDownscaleRegex.String() != "" && l.c.catchupDownscaleRegex.MatchString(err.Error()) {
+				log.L(ctx).Warnf("Failed to query block range fromBlock=%d toBlock=%d. Error %s matches configured downscale regex, catchup page size will automatically be reduced", fromBlock, toBlock, err.Error())
+				if l.c.catchupPageSize > 1 {
+					l.c.catchupPageSize /= 2
+
+					if l.c.catchupPageSize < 20 {
+						log.L(ctx).Warnf("Catchup page size auto-reduced to extremely low value %d. The connector may never catch up with the head of the chain.", l.c.catchupPageSize)
+					}
+				}
+			} else {
+				log.L(ctx).Errorf("Failed to query block range fromBlock=%d toBlock=%d: %s", fromBlock, toBlock, err)
+				failCount++
+			}
 			continue
 		}
 		log.L(ctx).Infof("Listener catchup fromBlock=%d toBlock=%d events=%d", fromBlock, toBlock, len(events))
