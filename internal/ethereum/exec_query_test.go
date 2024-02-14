@@ -112,7 +112,7 @@ func TestExecQueryOKResponse(t *testing.T) {
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(sampleExecQuery), &req)
-	req.BlockNumber = fftypes.NewFFBigInt(0x12345)
+	req.BlockNumber = strPtr("0x12345")
 	assert.NoError(t, err)
 
 	res, reason, err := c.QueryInvoke(ctx, &req)

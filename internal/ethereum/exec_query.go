@@ -68,7 +68,7 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 	}
 
 	// Do the call, with processing of revert reasons
-	outputs, reason, err := c.callTransaction(ctx, tx, method, errors, (*ethtypes.HexInteger)(req.BlockNumber))
+	outputs, reason, err := c.callTransaction(ctx, tx, method, errors, req.BlockNumber)
 	if err != nil {
 		return nil, reason, err
 	}
@@ -99,13 +99,13 @@ func (c *ethConnector) attemptProcessingRevertData(ctx context.Context, errors [
 	return "", nil
 }
 
-func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry, blockNumber *ethtypes.HexInteger) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
+func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transaction, method *abi.Entry, errors []*abi.Entry, blockNumber *string) (*fftypes.JSONAny, ffcapi.ErrorReason, error) {
 
 	// Do the raw call
 	var outputData ethtypes.HexBytes0xPrefix
 	blockNumberStr := "latest"
 	if blockNumber != nil {
-		blockNumberStr = blockNumber.String()
+		blockNumberStr = *blockNumber
 	}
 	rpcErr := c.backend.CallRPC(ctx, &outputData, "eth_call", tx, blockNumberStr)
 	if rpcErr != nil {
