@@ -1,4 +1,4 @@
-// Copyright © 2023 Kaleido, Inc.
+// Copyright © 2024 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -76,7 +76,7 @@ func (c *ethConnector) gasEstimate(ctx context.Context, tx *ethsigner.Transactio
 		}
 
 		// If it fails, fall back to an eth_call to see if we get a reverted reason
-		_, reason, errCall := c.callTransaction(ctx, tx, method, errors)
+		_, reason, errCall := c.callTransaction(ctx, tx, method, errors, nil)
 		if reason == ffcapi.ErrorReasonTransactionReverted {
 			return nil, reason, errCall
 		}
