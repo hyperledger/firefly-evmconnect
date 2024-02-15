@@ -104,7 +104,7 @@ func TestExecQueryOKResponse(t *testing.T) {
 			assert.Equal(t, "0x60fe47b100000000000000000000000000000000000000000000000000000000feedbeef", tx.Data.String())
 			return true
 		}),
-		"latest").
+		"0x12345").
 		Run(func(args mock.Arguments) {
 			*(args[1].(*ethtypes.HexBytes0xPrefix)) = ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000baadf00d0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b68656c6c6f20776f726c64000000000000000000000000000000000000000000")
 		}).
@@ -112,6 +112,7 @@ func TestExecQueryOKResponse(t *testing.T) {
 
 	var req ffcapi.QueryInvokeRequest
 	err := json.Unmarshal([]byte(sampleExecQuery), &req)
+	req.BlockNumber = strPtr("0x12345")
 	assert.NoError(t, err)
 
 	res, reason, err := c.QueryInvoke(ctx, &req)
