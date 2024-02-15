@@ -5,9 +5,9 @@ go 1.21
 toolchain go1.21.6
 
 require (
-	github.com/hashicorp/golang-lru v0.5.4
+	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hyperledger/firefly-common v1.4.6-0.20240131185020-80d20a173401
-	github.com/hyperledger/firefly-signer v1.1.10-0.20230928181245-a5e84e149fdb
+	github.com/hyperledger/firefly-signer v1.1.12
 	github.com/hyperledger/firefly-transaction-manager v1.3.7
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
@@ -25,11 +25,10 @@ require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/aidarkhanov/nanoid v1.0.8 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.1.3 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/getkin/kin-openapi v0.122.0 // indirect
