@@ -1,4 +1,5 @@
-FROM golang:1.21-buster AS builder
+FROM golang:1.21-alpine3.19 AS builder
+RUN apk add make
 ARG BUILD_VERSION
 ENV BUILD_VERSION=${BUILD_VERSION}
 ADD --chown=1001:0 . /evmconnect
