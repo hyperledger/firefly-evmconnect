@@ -228,7 +228,7 @@ func TestListenerCatchupScalesBackNTimesOnExpectedError(t *testing.T) {
 			Number: ethtypes.NewHexInteger64(1001),
 		}
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit error."}).Times(5)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit"}).Times(5)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
@@ -255,7 +255,7 @@ func TestListenerCatchupScalesBackToOne(t *testing.T) {
 			Number: ethtypes.NewHexInteger64(1001),
 		}
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit error."}).Times(50)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit"}).Times(50)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
