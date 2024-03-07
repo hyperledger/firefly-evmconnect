@@ -137,6 +137,17 @@ func (bl *blockListener) listenLoop() {
 			continue
 		}
 
+		for i := 0; i < len(blockHashes); i++ {
+			truncatedHash, err := blockHashes[i].Truncate(32)
+			if err != nil {
+				log.L(bl.ctx).Errorf("Failed to truncate block hash")
+				failCount++
+				continue
+			}
+
+			blockHashes[i] = truncatedHash
+		}
+
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential}
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
