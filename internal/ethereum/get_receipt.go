@@ -17,6 +17,7 @@
 package ethereum
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -25,9 +26,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
-	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
-	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
@@ -59,6 +58,7 @@ type receiptExtraInfo struct {
 	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
 	Status            *fftypes.FFBigInt      `json:"status"`
 	ErrorMessage      *string                `json:"errorMessage"`
+	ReturnValue       *string                `json:"returnValue,omitempty"`
 }
 
 // txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
@@ -119,36 +119,14 @@ func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) strin
 	return ""
 }
 
-/*
-Accepts hex string, with or without leading 0x and also accepts short hex (leading zeros removed)
-Converts the hex string to bytes then decodes it as call data for the given abi.Entry
-*/
-func decodeCallDataHex(ctx context.Context, function *abi.Entry, callDataHex string) (*abi.ComponentValue, error) {
-	callDataHex = strings.TrimPrefix(callDataHex, "0x")
-	if len(callDataHex)%2 == 1 {
-		callDataHex = "0" + callDataHex
-	}
+func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string) (pReturnValue *string, pErrorMessage *string) {
 
-	callDataBytes, err := hex.DecodeString(callDataHex)
-	if err != nil {
-		return nil, err
-	}
-
-	componentValue, err := function.DecodeCallDataCtx(ctx, callDataBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return componentValue, nil
-}
-
-func (c *ethConnector) getErrorMessage(ctx context.Context, transactionHash string) (*string, error) {
-
+	// Attempt to get the return value of the transaction - not possible on all RPC endpoints
 	var debugTrace *txDebugTrace
-
 	traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
 	if traceErr != nil {
-		return nil, traceErr.Error()
+		msg := i18n.NewError(ctx, msgs.MsgUnableToCallDebug, traceErr).Error()
+		return nil, &msg
 	}
 
 	returnValue := debugTrace.ReturnValue
@@ -161,18 +139,26 @@ func (c *ethConnector) getErrorMessage(ctx context.Context, transactionHash stri
 			}
 		}
 	}
-	if returnValue == "" {
-		// not found return value in any of the expected places
-		return nil, nil
+
+	// See if the return value is using the default error you get from "revert"
+	var errorMessage string
+	returnDataBytes, _ := hex.DecodeString(strings.TrimPrefix(returnValue, "0x"))
+	if len(returnDataBytes) > 4 && bytes.Equal(returnDataBytes[0:4], defaultErrorID) {
+		value, err := defaultError.DecodeCallDataCtx(ctx, returnDataBytes)
+		if err == nil {
+			errorMessage = value.Children[0].Value.(string)
+		}
 	}
 
-	value, err := decodeCallDataHex(ctx, defaultError, returnValue)
-	if err != nil {
-		return nil, err
+	// Otherwise we can't decode it, so put it directly in the error
+	if errorMessage == "" {
+		if len(returnDataBytes) > 0 {
+			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotDecoded, returnValue).Error()
+		} else {
+			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotAvailable).Error()
+		}
 	}
-	errorMessage := value.Children[0].Value
-	errorMessageString := errorMessage.(string)
-	return &errorMessageString, nil
+	return &returnValue, &errorMessage
 }
 
 func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
@@ -188,14 +174,11 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	}
 	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
 
+	var returnDataString *string
 	var transactionErrorMessage *string
 
 	if !isSuccess {
-		var err error
-		transactionErrorMessage, err = c.getErrorMessage(ctx, req.TransactionHash)
-		if err != nil {
-			log.L(ctx).Debugf("Ignoring error getting error message: %s ", err)
-		}
+		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, req.TransactionHash)
 	}
 
 	ethReceipt.Logs = nil
@@ -206,6 +189,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		To:                ethReceipt.To,
 		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
 		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		ReturnValue:       returnDataString,
 		ErrorMessage:      transactionErrorMessage,
 	})
 

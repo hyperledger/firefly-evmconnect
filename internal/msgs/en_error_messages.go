@@ -67,4 +67,7 @@ var (
 	MsgUnmarshalErrorFail        = ffe("FF23049", "Failed to parse error %d: %s")
 	MsgUnmarshalABIErrorsFail    = ffe("FF23050", "Failed to parse errors ABI: %s")
 	MsgInvalidRegex              = ffe("FF23051", "Invalid regular expression for auto-backoff catchup error: %s")
+	MsgUnableToCallDebug         = ffe("FF23052", "Failed to call debug_traceTransaction to get error detail: %s")
+	MsgReturnValueNotDecoded     = ffe("FF23053", "Error return value for custom error: %s")
+	MsgReturnValueNotAvailable   = ffe("FF23054", "Error return value unavailable")
 )
