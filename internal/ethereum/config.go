@@ -45,7 +45,7 @@ const (
 
 	DefaultCatchupPageSize             = 500
 	DefaultEventsCatchupThreshold      = 500
-	DefaultEventsCatchupDownscaleRegex = "Response size is larger than.*limit error."
+	DefaultEventsCatchupDownscaleRegex = "Response size is larger than.*limit"
 	DefaultEventsCheckpointBlockGap    = 50
 
 	DefaultRetryInitDelay   = "100ms"

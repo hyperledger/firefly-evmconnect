@@ -12,10 +12,10 @@
             "program": "${workspaceFolder}/evmconnect/main.go",
             "args": [
               "-f",
-              "${workspaceFolder}/evmconnect_config.yml"
+              "/Users/samuelmay/.firefly/stacks/hedera-anglo-demo/runtime/config/evmconnect_0.yaml"
             ],
             "env": {
-              "FIREFLY_PERSISTENCE_LEVELDB_PATH": "${workspaceFolder}/.leveldb"
+              "FIREFLY_PERSISTENCE_LEVELDB_PATH": "/tmp/.leveldb3"
             }
           }
     ]
