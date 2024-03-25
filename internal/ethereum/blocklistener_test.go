@@ -861,6 +861,125 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 }
 
+func TestBlockListenerProcessNonStandardHashRejected(t *testing.T) {
+
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+	bl.allowNonStandardBlockHashLength = false
+
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93f1fae0eb6d4b24ca30aee13f29c83cc9")
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{
+			block1003Hash,
+		}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		go done() // Close after we've processed the log
+	})
+
+	bl.checkStartedLocked()
+
+	c.WaitClosed()
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestBlockListenerProcessNonStandardHashAccepted(t *testing.T) {
+
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+	bl.allowNonStandardBlockHashLength = true
+	bl.nonStandardBlockHashSizeResolutionMethod = "truncate"
+
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93f1fae0eb6d4b24ca30aee13f29c83cc9")
+	block1004Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681")
+	truncatedBlock1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93")
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{
+			block1003Hash,
+			block1004Hash,
+		}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		go done() // Close after we've processed the log
+	})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == truncatedBlock1003Hash.String()
+	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
+
+	bl.checkStartedLocked()
+
+	c.WaitClosed()
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestBlockListenerProcessNonStandardHashNoResolutionMethodSpecified(t *testing.T) {
+
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+	bl.allowNonStandardBlockHashLength = true
+	bl.nonStandardBlockHashSizeResolutionMethod = ""
+
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93f1fae0eb6d4b24ca30aee13f29c83cc9")
+	truncatedBlock1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93")
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{
+			block1003Hash,
+		}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		go done() // Close after we've processed the log
+	})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == truncatedBlock1003Hash.String()
+	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
+
+	bl.checkStartedLocked()
+
+	c.WaitClosed()
+
+	mRPC.AssertExpectations(t)
+
+}
+
 func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 
 	_, c, mRPC, done := newTestConnector(t)
