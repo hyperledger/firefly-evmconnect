@@ -39,16 +39,18 @@ type blockUpdateConsumer struct {
 // 1) To establish and keep track of what the head block height of the blockchain is, so event streams know how far from the head they are
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
-	ctx                        context.Context
-	c                          *ethConnector
-	listenLoopDone             chan struct{}
-	initialBlockHeightObtained chan struct{}
-	highestBlock               int64
-	mux                        sync.Mutex
-	consumers                  map[fftypes.UUID]*blockUpdateConsumer
-	blockPollingInterval       time.Duration
-	unstableHeadLength         int
-	canonicalChain             *list.List
+	ctx                                      context.Context
+	c                                        *ethConnector
+	listenLoopDone                           chan struct{}
+	initialBlockHeightObtained               chan struct{}
+	highestBlock                             int64
+	mux                                      sync.Mutex
+	consumers                                map[fftypes.UUID]*blockUpdateConsumer
+	blockPollingInterval                     time.Duration
+	unstableHeadLength                       int
+	canonicalChain                           *list.List
+	allowNonStandardBlockHashLength          bool
+	nonStandardBlockHashSizeResolutionMethod string
 }
 
 type minimalBlockInfo struct {
@@ -59,14 +61,16 @@ type minimalBlockInfo struct {
 
 func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) *blockListener {
 	bl := &blockListener{
-		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
-		c:                          c,
-		initialBlockHeightObtained: make(chan struct{}),
-		highestBlock:               -1,
-		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
-		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
-		canonicalChain:             list.New(),
-		unstableHeadLength:         int(c.checkpointBlockGap),
+		ctx:                                      log.WithLogField(ctx, "role", "blocklistener"),
+		c:                                        c,
+		initialBlockHeightObtained:               make(chan struct{}),
+		highestBlock:                             -1,
+		consumers:                                make(map[fftypes.UUID]*blockUpdateConsumer),
+		blockPollingInterval:                     conf.GetDuration(BlockPollingInterval),
+		canonicalChain:                           list.New(),
+		unstableHeadLength:                       int(c.checkpointBlockGap),
+		allowNonStandardBlockHashLength:          conf.GetBool(AllowNonStandardBlockHashSize),
+		nonStandardBlockHashSizeResolutionMethod: conf.GetString(NonStandardBlockHashSizeResolutionMethod),
 	}
 	return bl
 }
@@ -137,20 +141,31 @@ func (bl *blockListener) listenLoop() {
 			continue
 		}
 
-		for i := 0; i < len(blockHashes); i++ {
-			truncatedHash, err := blockHashes[i].Truncate(32)
-			if err != nil {
-				log.L(bl.ctx).Errorf("Failed to truncate block hash")
-				failCount++
-				continue
-			}
-
-			blockHashes[i] = truncatedHash
-		}
-
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential}
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
+			if len(h) != 32 {
+				if !bl.allowNonStandardBlockHashLength {
+					log.L(bl.ctx).Errorf("Tried to index a non-standard size block hash length: %s", h.String())
+					failCount++
+					continue
+				}
+
+				if bl.nonStandardBlockHashSizeResolutionMethod == "" {
+					log.L(bl.ctx).Warnf("No non-standard hash length resolution method was provided, defaulting to truncation")
+					bl.nonStandardBlockHashSizeResolutionMethod = "truncate"
+				}
+
+				if bl.nonStandardBlockHashSizeResolutionMethod == "truncate" {
+					h, err = h.Truncate(32)
+					if err != nil {
+						log.L(bl.ctx).Errorf("Input hash was shorter than the standard block hash length: %s", h.String())
+						failCount++
+						continue
+					}
+				}
+			}
+
 			// Do a lookup of the block (which will then go into our cache).
 			bi, err := bl.c.getBlockInfoByHash(bl.ctx, h.String())
 			switch {
