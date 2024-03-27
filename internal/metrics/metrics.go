@@ -2,15 +2,12 @@ package metrics
 
 import (
 	"context"
-	"net/http"
-	"sync"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/metric"
 	"github.com/hyperledger/firefly-evmconnect/internal/evmconfig"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const metricsEvmManagerComponentName = "evmconnect"
@@ -18,8 +15,6 @@ const metricsEvmManagerComponentName = "evmconnect"
 // REST api-server and transaction handler are sub-subsystem
 var metricsTransactionHandlerSubsystemName = "evm"
 var metricsRESTAPIServerSubSystemName = "api_server_rest"
-
-var mutex = &sync.Mutex{}
 
 type EvmMetricsManager struct {
 	ctx                      context.Context
@@ -58,11 +53,6 @@ func NewMetricsManager(ctx context.Context) EvmMetrics {
 
 func (mm *EvmMetricsManager) IsMetricsEnabled() bool {
 	return mm.metricsEnabled
-}
-
-func (mm *EvmMetricsManager) HTTPHandler() http.Handler {
-	httpMiddleware, _ := mm.metricsRegistry.HTTPHandler(mm.ctx, promhttp.HandlerOpts{})
-	return httpMiddleware
 }
 
 // Transaction handler metrics are defined and emitted by transaction handlers
