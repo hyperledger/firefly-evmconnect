@@ -121,6 +121,15 @@ func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) strin
 	return ""
 }
 
+func padHexData(hexString string) string {
+	hexString = strings.TrimPrefix(hexString, "0x")
+	if len(hexString)%2 == 1 {
+		hexString = "0" + hexString
+	}
+
+	return hexString
+}
+
 func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt *ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
 
 	var revertReason string
@@ -151,7 +160,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 
 	// See if the return value is using the default error you get from "revert"
 	var errorMessage string
-	returnDataBytes, _ := hex.DecodeString(strings.TrimPrefix(revertReason, "0x"))
+	returnDataBytes, _ := hex.DecodeString(padHexData(revertReason))
 	if len(returnDataBytes) > 4 && bytes.Equal(returnDataBytes[0:4], defaultErrorID) {
 		value, err := defaultError.DecodeCallDataCtx(ctx, returnDataBytes)
 		if err == nil {
