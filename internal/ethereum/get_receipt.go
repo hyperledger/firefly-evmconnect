@@ -143,7 +143,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 			return nil, &msg
 		}
 
-		revertReason := debugTrace.ReturnValue
+		revertReason = debugTrace.ReturnValue
 		if revertReason == "" {
 			// some clients (e.g. Besu) include the error reason on the final struct log
 			if len(debugTrace.StructLogs) > 0 {
