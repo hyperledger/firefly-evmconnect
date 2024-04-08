@@ -155,7 +155,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 			}
 		}
 	} else {
-		log.L(ctx).Debug("Revert reason is set in the receipt. Skipping call to debug_traceTransaction.")
+		log.L(ctx).Trace("Revert reason is set in the receipt. Skipping call to debug_traceTransaction.")
 		revertReason = revertFromReceipt.String()
 	}
 
