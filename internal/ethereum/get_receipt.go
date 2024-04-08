@@ -132,6 +132,8 @@ func padHexData(hexString string) string {
 
 func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt *ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
 
+	log.L(ctx).Debugf("Revert from receipt passed in: '%v'", revertFromReceipt)
+
 	var revertReason string
 	if revertFromReceipt == nil {
 		log.L(ctx).Debug("No revert reason for the failed transaction found in the receipt. Calling debug_traceTransaction to retrieve it.")
@@ -156,7 +158,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 		}
 	} else {
 		log.L(ctx).Debug("Revert reason is set in the receipt. Skipping call to debug_traceTransaction.")
-		revertReason = string(*revertFromReceipt)
+		revertReason = revertFromReceipt.String()
 		log.L(ctx).Debugf("Revert reason from the receipt: '%v'", revertReason)
 	}
 
