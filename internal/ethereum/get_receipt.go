@@ -134,7 +134,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 
 	var revertReason string
 	if revertFromReceipt == nil {
-		log.L(ctx).Debug("No revert reason for the failed transaction found in the receipt. Calling debug_traceTransaction to retrieve it.")
+		log.L(ctx).Trace("No revert reason for the failed transaction found in the receipt. Calling debug_traceTransaction to retrieve it.")
 		// Attempt to get the return value of the transaction - not possible on all RPC endpoints
 		var debugTrace *txDebugTrace
 		traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
