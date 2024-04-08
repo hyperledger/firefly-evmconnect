@@ -144,6 +144,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 		}
 
 		revertReason = debugTrace.ReturnValue
+		log.L(ctx).Debugf("Revert reason from debug_traceTransaction: '%v'", revertReason)
 		if revertReason == "" {
 			// some clients (e.g. Besu) include the error reason on the final struct log
 			if len(debugTrace.StructLogs) > 0 {
@@ -156,6 +157,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 	} else {
 		log.L(ctx).Debug("Revert reason is set in the receipt. Skipping call to debug_traceTransaction.")
 		revertReason = string(*revertFromReceipt)
+		log.L(ctx).Debugf("Revert reason from the receipt: '%v'", revertReason)
 	}
 
 	// See if the return value is using the default error you get from "revert"
