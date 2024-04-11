@@ -37,6 +37,7 @@ func newTestConnector(t *testing.T) (context.Context, *ethConnector, *rpcbackend
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
 	InitConfig(conf)
+	//conf.Set(TraceTXForRevertReason, true)
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
 	conf.Set(BlockPollingInterval, "1h") // Disable for tests that are not using it
 	logrus.SetLevel(logrus.DebugLevel)

@@ -37,6 +37,7 @@ const (
 	RetryFactor                 = "retry.factor"
 	MaxConcurrentRequests       = "maxConcurrentRequests"
 	TxCacheSize                 = "txCacheSize"
+	TraceTXForRevertReason      = "traceTXForRevertReason"
 )
 
 const (
@@ -70,4 +71,5 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
 	conf.AddKnownKey(MaxConcurrentRequests, 50)
 	conf.AddKnownKey(TxCacheSize, 250)
+	conf.AddKnownKey(TraceTXForRevertReason, false)
 }

@@ -269,6 +269,7 @@ func TestGetReceiptError(t *testing.T) {
 func TestGetReceiptErrorReasonGeth(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -306,6 +307,7 @@ func TestGetReceiptErrorReasonGeth(t *testing.T) {
 func TestGetReceiptErrorReasonBesu(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -343,6 +345,7 @@ func TestGetReceiptErrorReasonBesu(t *testing.T) {
 func TestGetReceiptErrorReasonNotFound(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -379,6 +382,7 @@ func TestGetReceiptErrorReasonNotFound(t *testing.T) {
 func TestGetReceiptErrorReasonErrorFromHexDecode(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -415,6 +419,7 @@ func TestGetReceiptErrorReasonErrorFromTrace(t *testing.T) {
 	// if we get an error tracing the transaction, we ignore it.  Not all nodes support the debug_traceTransaction RPC call
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -450,6 +455,7 @@ func TestGetReceiptErrorReasonErrorFromTrace(t *testing.T) {
 func TestGetReceiptErrorReasonErrorFromDecodeCallData(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -506,6 +512,32 @@ func TestGetReceiptErrorReasonErrorFromReceiptRevert(t *testing.T) {
 	assert.Empty(t, reason)
 	assert.Contains(t, res.ExtraInfo.String(), "The stored value is too small") // Check the decoded revert reason string is present in extra-info
 	assert.False(t, res.Success)
+}
+
+func TestGetReceiptNoDebugTraceIfDisabled(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.AssertNotCalled(t, "CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction")
+	var req ffcapi.TransactionReceiptRequest
+	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.False(t, res.Success)
+	mRPC.AssertExpectations(t)
 }
 
 func TestProtocolIDForReceipt(t *testing.T) {

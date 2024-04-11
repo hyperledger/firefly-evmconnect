@@ -75,6 +75,7 @@
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
+|traceTXForRevertReason|Enable the use of transaction trace functions (e.g. debug_traceTransaction) to obtain transaction revert reasons. This can place a high load on the EVM client.|`boolean`|`false`
 |txCacheSize|Maximum of transactions to hold in the transaction info cache|`int`|`250`
 |url|URL of JSON/RPC endpoint for the Ethereum node/gateway|string|`<nil>`
 

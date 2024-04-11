@@ -134,23 +134,26 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 
 	var revertReason string
 	if revertFromReceipt == nil {
-		log.L(ctx).Trace("No revert reason for the failed transaction found in the receipt. Calling debug_traceTransaction to retrieve it.")
-		// Attempt to get the return value of the transaction - not possible on all RPC endpoints
-		var debugTrace *txDebugTrace
-		traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
-		if traceErr != nil {
-			msg := i18n.NewError(ctx, msgs.MsgUnableToCallDebug, traceErr).Error()
-			return nil, &msg
-		}
+		// Tracing a transaction to get revert information is expensive so it's not enabled by default
+		if c.traceTXForRevertReason {
+			log.L(ctx).Trace("No revert reason for the failed transaction found in the receipt. Calling debug_traceTransaction to retrieve it.")
+			// Attempt to get the return value of the transaction - not possible on all RPC endpoints
+			var debugTrace *txDebugTrace
+			traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
+			if traceErr != nil {
+				msg := i18n.NewError(ctx, msgs.MsgUnableToCallDebug, traceErr).Error()
+				return nil, &msg
+			}
 
-		revertReason = debugTrace.ReturnValue
-		log.L(ctx).Debugf("Revert reason from debug_traceTransaction: '%v'", revertReason)
-		if revertReason == "" {
-			// some clients (e.g. Besu) include the error reason on the final struct log
-			if len(debugTrace.StructLogs) > 0 {
-				finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
-				if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
-					revertReason = *finalStructLog.Reason
+			revertReason = debugTrace.ReturnValue
+			log.L(ctx).Debugf("Revert reason from debug_traceTransaction: '%v'", revertReason)
+			if revertReason == "" {
+				// some clients (e.g. Besu) include the error reason on the final struct log
+				if len(debugTrace.StructLogs) > 0 {
+					finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
+					if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
+						revertReason = *finalStructLog.Reason
+					}
 				}
 			}
 		}

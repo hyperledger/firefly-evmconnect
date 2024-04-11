@@ -49,6 +49,7 @@ type ethConnector struct {
 	eventBlockTimestamps       bool
 	blockListener              *blockListener
 	eventFilterPollingInterval time.Duration
+	traceTXForRevertReason     bool
 
 	mux          sync.Mutex
 	eventStreams map[fftypes.UUID]*eventStream
@@ -64,6 +65,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		checkpointBlockGap:         conf.GetInt64(EventsCheckpointBlockGap),
 		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
 		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
+		traceTXForRevertReason:     conf.GetBool(TraceTXForRevertReason),
 		retry: &retry.Retry{
 			InitialDelay: conf.GetDuration(RetryInitDelay),
 			MaximumDelay: conf.GetDuration(RetryMaxDelay),
