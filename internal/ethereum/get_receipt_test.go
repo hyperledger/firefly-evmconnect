@@ -102,24 +102,6 @@ const sampleJSONRPCReceiptFailedWithRevertReason = `{
 	"type": "0x0"
 }`
 
-const sampleJSONRPCReceiptFailedWithCustomRevertReason = `{
-	"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
-	"blockNumber": "0x7b9",
-	"contractAddress": "0x87ae94ab290932c4e6269648bb47c86978af4436",
-	"cumulativeGasUsed": "0x8414",
-	"effectiveGasPrice": "0x0",
-	"from": "0x2b1c769ef5ad304a4889f2a07a6617cd935849ae",
-	"gasUsed": "0x8414",
-	"logs": [],
-	"logsBloom": "0x00000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000100000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000",
-	"status": "0",
-	"to": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
-	"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
-	"transactionIndex": "0x1e",
-	"revertReason": "0x1320fa6a00000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000010",
-	"type": "0x0"
-}`
-
 const sampleTransactionTraceGeth = `{
 	"gas": 23512,
 	"failed": true,
@@ -210,7 +192,7 @@ const sampleTransactionTraceBesu = `{
 				"0000000000000000000000000000000000000000000000000000000000000000"
 			],
 			"storage": {},
-			"reason": "0x1320fa6a00000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000010"
+			"reason": "8c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114e6f7420656e6f75676820746f6b656e73000000000000000000000000000000"
 		}
 	]
 }`
@@ -287,6 +269,7 @@ func TestGetReceiptError(t *testing.T) {
 func TestGetReceiptErrorReasonGeth(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -324,6 +307,7 @@ func TestGetReceiptErrorReasonGeth(t *testing.T) {
 func TestGetReceiptErrorReasonBesu(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -361,6 +345,7 @@ func TestGetReceiptErrorReasonBesu(t *testing.T) {
 func TestGetReceiptErrorReasonNotFound(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -397,6 +382,7 @@ func TestGetReceiptErrorReasonNotFound(t *testing.T) {
 func TestGetReceiptErrorReasonErrorFromHexDecode(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -433,6 +419,7 @@ func TestGetReceiptErrorReasonErrorFromTrace(t *testing.T) {
 	// if we get an error tracing the transaction, we ignore it.  Not all nodes support the debug_traceTransaction RPC call
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -468,6 +455,7 @@ func TestGetReceiptErrorReasonErrorFromTrace(t *testing.T) {
 func TestGetReceiptErrorReasonErrorFromDecodeCallData(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
+	c.traceTXForRevertReason = true
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -526,7 +514,7 @@ func TestGetReceiptErrorReasonErrorFromReceiptRevert(t *testing.T) {
 	assert.False(t, res.Success)
 }
 
-func TestGetReceiptErrorReasonCustomErrorFromReceiptRevert(t *testing.T) {
+func TestGetReceiptNoDebugTraceIfDisabled(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
@@ -538,18 +526,18 @@ func TestGetReceiptErrorReasonCustomErrorFromReceiptRevert(t *testing.T) {
 		})).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailedWithCustomRevertReason), args[1])
+			err := json.Unmarshal([]byte(sampleJSONRPCReceiptFailed), args[1])
 			assert.NoError(t, err)
 		})
-	mRPC.AssertNotCalled(t, "CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction", mock.Anything)
+	mRPC.AssertNotCalled(t, "CallRPC", mock.Anything, mock.Anything, "debug_traceTransaction")
 	var req ffcapi.TransactionReceiptRequest
 	err := json.Unmarshal([]byte(sampleGetReceipt), &req)
 	assert.NoError(t, err)
 	res, reason, err := c.TransactionReceipt(ctx, &req)
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-	assert.Contains(t, res.ExtraInfo.String(), "FF23053: Error return value for custom error: 0x1320fa6a00000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000010") // Check that a custom error which can't be decoded is at least included as a byte string
 	assert.False(t, res.Success)
+	mRPC.AssertExpectations(t)
 }
 
 func TestProtocolIDForReceipt(t *testing.T) {
