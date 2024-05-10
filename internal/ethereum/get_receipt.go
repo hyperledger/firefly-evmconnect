@@ -26,6 +26,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
+	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -33,17 +34,18 @@ import (
 
 // txReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
 type txReceiptJSONRPC struct {
-	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger      `json:"blockNumber"`
-	ContractAddress   *ethtypes.Address0xHex    `json:"contractAddress"`
-	CumulativeGasUsed *ethtypes.HexInteger      `json:"cumulativeGasUsed"`
-	From              *ethtypes.Address0xHex    `json:"from"`
-	GasUsed           *ethtypes.HexInteger      `json:"gasUsed"`
-	Logs              []*logJSONRPC             `json:"logs"`
-	Status            *ethtypes.HexInteger      `json:"status"`
-	To                *ethtypes.Address0xHex    `json:"to"`
-	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
-	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
+	BlockHash         ethtypes.HexBytes0xPrefix  `json:"blockHash"`
+	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
+	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
+	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
+	From              *ethtypes.Address0xHex     `json:"from"`
+	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
+	Logs              []*logJSONRPC              `json:"logs"`
+	Status            *ethtypes.HexInteger       `json:"status"`
+	To                *ethtypes.Address0xHex     `json:"to"`
+	TransactionHash   ethtypes.HexBytes0xPrefix  `json:"transactionHash"`
+	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
+	RevertReason      *ethtypes.HexBytes0xPrefix `json:"revertReason"`
 }
 
 // receiptExtraInfo is the version of the receipt we store under the TX.
@@ -119,30 +121,50 @@ func ProtocolIDForReceipt(blockNumber, transactionIndex *fftypes.FFBigInt) strin
 	return ""
 }
 
-func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string) (pReturnValue *string, pErrorMessage *string) {
-
-	// Attempt to get the return value of the transaction - not possible on all RPC endpoints
-	var debugTrace *txDebugTrace
-	traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
-	if traceErr != nil {
-		msg := i18n.NewError(ctx, msgs.MsgUnableToCallDebug, traceErr).Error()
-		return nil, &msg
+func padHexData(hexString string) string {
+	hexString = strings.TrimPrefix(hexString, "0x")
+	if len(hexString)%2 == 1 {
+		hexString = "0" + hexString
 	}
 
-	returnValue := debugTrace.ReturnValue
-	if returnValue == "" {
-		// some clients (e.g. Besu) include the error reason on the final struct log
-		if len(debugTrace.StructLogs) > 0 {
-			finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
-			if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
-				returnValue = *finalStructLog.Reason
+	return hexString
+}
+
+func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt *ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
+
+	var revertReason string
+	if revertFromReceipt == nil {
+		// Tracing a transaction to get revert information is expensive so it's not enabled by default
+		if c.traceTXForRevertReason {
+			log.L(ctx).Trace("No revert reason for the failed transaction found in the receipt. Calling debug_traceTransaction to retrieve it.")
+			// Attempt to get the return value of the transaction - not possible on all RPC endpoints
+			var debugTrace *txDebugTrace
+			traceErr := c.backend.CallRPC(ctx, &debugTrace, "debug_traceTransaction", transactionHash)
+			if traceErr != nil {
+				msg := i18n.NewError(ctx, msgs.MsgUnableToCallDebug, traceErr).Error()
+				return nil, &msg
+			}
+
+			revertReason = debugTrace.ReturnValue
+			log.L(ctx).Debugf("Revert reason from debug_traceTransaction: '%v'", revertReason)
+			if revertReason == "" {
+				// some clients (e.g. Besu) include the error reason on the final struct log
+				if len(debugTrace.StructLogs) > 0 {
+					finalStructLog := debugTrace.StructLogs[len(debugTrace.StructLogs)-1]
+					if *finalStructLog.Op == "REVERT" && finalStructLog.Reason != nil {
+						revertReason = *finalStructLog.Reason
+					}
+				}
 			}
 		}
+	} else {
+		log.L(ctx).Trace("Revert reason is set in the receipt. Skipping call to debug_traceTransaction.")
+		revertReason = revertFromReceipt.String()
 	}
 
 	// See if the return value is using the default error you get from "revert"
 	var errorMessage string
-	returnDataBytes, _ := hex.DecodeString(strings.TrimPrefix(returnValue, "0x"))
+	returnDataBytes, _ := hex.DecodeString(padHexData(revertReason))
 	if len(returnDataBytes) > 4 && bytes.Equal(returnDataBytes[0:4], defaultErrorID) {
 		value, err := defaultError.DecodeCallDataCtx(ctx, returnDataBytes)
 		if err == nil {
@@ -153,12 +175,12 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string)
 	// Otherwise we can't decode it, so put it directly in the error
 	if errorMessage == "" {
 		if len(returnDataBytes) > 0 {
-			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotDecoded, returnValue).Error()
+			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotDecoded, revertReason).Error()
 		} else {
 			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotAvailable).Error()
 		}
 	}
-	return &returnValue, &errorMessage
+	return &revertReason, &errorMessage
 }
 
 func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
@@ -178,7 +200,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	var transactionErrorMessage *string
 
 	if !isSuccess {
-		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, req.TransactionHash)
+		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, req.TransactionHash, ethReceipt.RevertReason)
 	}
 
 	ethReceipt.Logs = nil
