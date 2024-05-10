@@ -72,9 +72,6 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
 	conf.AddKnownKey(MaxConcurrentRequests, 50)
 	conf.AddKnownKey(TxCacheSize, 250)
-<<<<<<< HEAD
 	conf.AddKnownKey(HederaCompatibilityMode, false)
-=======
 	conf.AddKnownKey(TraceTXForRevertReason, false)
->>>>>>> 67fdd4913465665a4e21d47636a5674323bdfcf3
 }
