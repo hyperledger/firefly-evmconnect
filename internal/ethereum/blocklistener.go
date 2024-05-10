@@ -39,18 +39,17 @@ type blockUpdateConsumer struct {
 // 1) To establish and keep track of what the head block height of the blockchain is, so event streams know how far from the head they are
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
-	ctx                                      context.Context
-	c                                        *ethConnector
-	listenLoopDone                           chan struct{}
-	initialBlockHeightObtained               chan struct{}
-	highestBlock                             int64
-	mux                                      sync.Mutex
-	consumers                                map[fftypes.UUID]*blockUpdateConsumer
-	blockPollingInterval                     time.Duration
-	unstableHeadLength                       int
-	canonicalChain                           *list.List
-	allowNonStandardBlockHashLength          bool
-	nonStandardBlockHashSizeResolutionMethod string
+	ctx                        context.Context
+	c                          *ethConnector
+	listenLoopDone             chan struct{}
+	initialBlockHeightObtained chan struct{}
+	highestBlock               int64
+	mux                        sync.Mutex
+	consumers                  map[fftypes.UUID]*blockUpdateConsumer
+	blockPollingInterval       time.Duration
+	unstableHeadLength         int
+	canonicalChain             *list.List
+	hederaCompatibilityMode    bool
 }
 
 type minimalBlockInfo struct {
@@ -61,16 +60,15 @@ type minimalBlockInfo struct {
 
 func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) *blockListener {
 	bl := &blockListener{
-		ctx:                                      log.WithLogField(ctx, "role", "blocklistener"),
-		c:                                        c,
-		initialBlockHeightObtained:               make(chan struct{}),
-		highestBlock:                             -1,
-		consumers:                                make(map[fftypes.UUID]*blockUpdateConsumer),
-		blockPollingInterval:                     conf.GetDuration(BlockPollingInterval),
-		canonicalChain:                           list.New(),
-		unstableHeadLength:                       int(c.checkpointBlockGap),
-		allowNonStandardBlockHashLength:          conf.GetBool(AllowNonStandardBlockHashSize),
-		nonStandardBlockHashSizeResolutionMethod: conf.GetString(NonStandardBlockHashSizeResolutionMethod),
+		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
+		c:                          c,
+		initialBlockHeightObtained: make(chan struct{}),
+		highestBlock:               -1,
+		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
+		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
+		canonicalChain:             list.New(),
+		unstableHeadLength:         int(c.checkpointBlockGap),
+		hederaCompatibilityMode:    conf.GetBool(HederaCompatibilityMode),
 	}
 	return bl
 }
@@ -145,25 +143,13 @@ func (bl *blockListener) listenLoop() {
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
 			if len(h) != 32 {
-				if !bl.allowNonStandardBlockHashLength {
-					log.L(bl.ctx).Errorf("Tried to index a non-standard size block hash length: %s", h.String())
+				if !bl.hederaCompatibilityMode {
+					log.L(bl.ctx).Errorf("Attempted to index block header with non-standard length: %d", len(h))
 					failCount++
 					continue
 				}
 
-				if bl.nonStandardBlockHashSizeResolutionMethod == "" {
-					log.L(bl.ctx).Warnf("No non-standard hash length resolution method was provided, defaulting to truncation")
-					bl.nonStandardBlockHashSizeResolutionMethod = "truncate"
-				}
-
-				if bl.nonStandardBlockHashSizeResolutionMethod == "truncate" {
-					h, err = h.Truncate(32)
-					if err != nil {
-						log.L(bl.ctx).Errorf("Input hash was shorter than the standard block hash length: %s", h.String())
-						failCount++
-						continue
-					}
-				}
+				h = h[0:32]
 			}
 
 			// Do a lookup of the block (which will then go into our cache).

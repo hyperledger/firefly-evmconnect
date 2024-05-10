@@ -22,23 +22,22 @@ import (
 )
 
 const (
-	ConfigGasEstimationFactor                = "gasEstimationFactor"
-	ConfigDataFormat                         = "dataFormat"
-	BlockPollingInterval                     = "blockPollingInterval"
-	BlockCacheSize                           = "blockCacheSize"
-	EventsCatchupPageSize                    = "events.catchupPageSize"
-	EventsCatchupThreshold                   = "events.catchupThreshold"
-	EventsCatchupDownscaleRegex              = "events.catchupDownscaleRegex"
-	EventsCheckpointBlockGap                 = "events.checkpointBlockGap"
-	EventsBlockTimestamps                    = "events.blockTimestamps"
-	EventsFilterPollingInterval              = "events.filterPollingInterval"
-	RetryInitDelay                           = "retry.initialDelay"
-	RetryMaxDelay                            = "retry.maxDelay"
-	RetryFactor                              = "retry.factor"
-	MaxConcurrentRequests                    = "maxConcurrentRequests"
-	TxCacheSize                              = "txCacheSize"
-	AllowNonStandardBlockHashSize            = "allowNonStandardBlockHashSize"
-	NonStandardBlockHashSizeResolutionMethod = "nonStandardBlockHashSizeResolutionMethod"
+	ConfigGasEstimationFactor   = "gasEstimationFactor"
+	ConfigDataFormat            = "dataFormat"
+	BlockPollingInterval        = "blockPollingInterval"
+	BlockCacheSize              = "blockCacheSize"
+	EventsCatchupPageSize       = "events.catchupPageSize"
+	EventsCatchupThreshold      = "events.catchupThreshold"
+	EventsCatchupDownscaleRegex = "events.catchupDownscaleRegex"
+	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
+	EventsBlockTimestamps       = "events.blockTimestamps"
+	EventsFilterPollingInterval = "events.filterPollingInterval"
+	RetryInitDelay              = "retry.initialDelay"
+	RetryMaxDelay               = "retry.maxDelay"
+	RetryFactor                 = "retry.factor"
+	MaxConcurrentRequests       = "maxConcurrentRequests"
+	TxCacheSize                 = "txCacheSize"
+	HederaCompatibilityMode     = "hederaCompatibilityMode"
 )
 
 const (
@@ -53,8 +52,6 @@ const (
 	DefaultRetryInitDelay   = "100ms"
 	DefaultRetryMaxDelay    = "30s"
 	DefaultRetryDelayFactor = 2.0
-
-	DefaultAllowNonStandardBlockHashSize = false
 )
 
 func InitConfig(conf config.Section) {
@@ -74,6 +71,5 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
 	conf.AddKnownKey(MaxConcurrentRequests, 50)
 	conf.AddKnownKey(TxCacheSize, 250)
-	conf.AddKnownKey(AllowNonStandardBlockHashSize, DefaultAllowNonStandardBlockHashSize)
-	conf.AddKnownKey(NonStandardBlockHashSizeResolutionMethod, "truncate")
+	conf.AddKnownKey(HederaCompatibilityMode, false)
 }
