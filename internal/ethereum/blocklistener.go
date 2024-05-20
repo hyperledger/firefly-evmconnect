@@ -49,6 +49,7 @@ type blockListener struct {
 	blockPollingInterval       time.Duration
 	unstableHeadLength         int
 	canonicalChain             *list.List
+	hederaCompatibilityMode    bool
 }
 
 type minimalBlockInfo struct {
@@ -67,6 +68,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section)
 		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
 		canonicalChain:             list.New(),
 		unstableHeadLength:         int(c.checkpointBlockGap),
+		hederaCompatibilityMode:    conf.GetBool(HederaCompatibilityMode),
 	}
 	return bl
 }
@@ -140,6 +142,22 @@ func (bl *blockListener) listenLoop() {
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential}
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
+			if len(h) != 32 {
+				if !bl.hederaCompatibilityMode {
+					log.L(bl.ctx).Errorf("Attempted to index block header with non-standard length: %d", len(h))
+					failCount++
+					continue
+				}
+
+				if len(h) < 32 {
+					log.L(bl.ctx).Errorf("Cannot index block header hash of length: %d", len(h))
+					failCount++
+					continue
+				}
+
+				h = h[0:32]
+			}
+
 			// Do a lookup of the block (which will then go into our cache).
 			bi, err := bl.c.getBlockInfoByHash(bl.ctx, h.String())
 			switch {

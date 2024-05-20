@@ -61,9 +61,6 @@ For EVM connector to function properly, you should check the blockchain node sup
 - `eth_getBalance`
 - `eth_gasPrice`[^1]
   
-  
-
-
 ### Transaction submission
 - `eth_estimateGas`
 - `eth_sendTransaction`

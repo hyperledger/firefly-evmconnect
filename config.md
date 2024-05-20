@@ -68,6 +68,7 @@
 |expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
 |gasEstimationFactor|The factor to apply to the gas estimation to determine the gas limit|float|`1.5`
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
+|hederaCompatibilityMode|Compatibility mode for Hedera, allowing non-standard block header hashes to be processed|`boolean`|`false`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxConcurrentRequests|Maximum of concurrent requests to be submitted to the blockchain|`int`|`50`
 |maxConnsPerHost|The max number of connections, per unique hostname. Zero means no limit|`int`|`0`

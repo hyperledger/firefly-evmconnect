@@ -37,6 +37,7 @@ const (
 	RetryFactor                 = "retry.factor"
 	MaxConcurrentRequests       = "maxConcurrentRequests"
 	TxCacheSize                 = "txCacheSize"
+	HederaCompatibilityMode     = "hederaCompatibilityMode"
 	TraceTXForRevertReason      = "traceTXForRevertReason"
 )
 
@@ -71,5 +72,6 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
 	conf.AddKnownKey(MaxConcurrentRequests, 50)
 	conf.AddKnownKey(TxCacheSize, 250)
+	conf.AddKnownKey(HederaCompatibilityMode, false)
 	conf.AddKnownKey(TraceTXForRevertReason, false)
 }

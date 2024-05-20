@@ -40,5 +40,6 @@ var (
 	ConfigEventsFilterPollingInterval = ffc("config.connector.events.filterPollingInterval", "The interval between polling calls to a filter, when checking for newly arrived events", i18n.TimeDurationType)
 	ConfigTxCacheSize                 = ffc("config.connector.txCacheSize", "Maximum of transactions to hold in the transaction info cache", i18n.IntType)
 	ConfigMaxConcurrentRequests       = ffc("config.connector.maxConcurrentRequests", "Maximum of concurrent requests to be submitted to the blockchain", i18n.IntType)
+	ConfigHederaCompatibilityMode     = ffc("config.connector.hederaCompatibilityMode", "Compatibility mode for Hedera, allowing non-standard block header hashes to be processed", i18n.BooleanType)
 	ConfigTraceTXForRevertReason      = ffc("config.connector.traceTXForRevertReason", "Enable the use of transaction trace functions (e.g. debug_traceTransaction) to obtain transaction revert reasons. This can place a high load on the EVM client.", i18n.BooleanType)
 )
