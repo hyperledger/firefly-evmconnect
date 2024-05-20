@@ -149,6 +149,12 @@ func (bl *blockListener) listenLoop() {
 					continue
 				}
 
+				if len(h) < 32 {
+					log.L(bl.ctx).Errorf("Cannot index block header hash of length: %d", len(h))
+					failCount++
+					continue
+				}
+
 				h = h[0:32]
 			}
 
