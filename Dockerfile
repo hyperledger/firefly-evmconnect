@@ -27,6 +27,7 @@ RUN apt update -y \
     && mv ./migrate /usr/bin/migrate
 COPY --from=builder --chown=1001:0 /evmconnect/firefly-evmconnect /usr/bin/evmconnect
 COPY --from=builder --chown=1001:0 /evmconnect/db/ /evmconnect/db/
+RUN mkdir /evmconnect/leveldb && chown 1001:0 /evmconnect/leveldb
 USER 1001
 
 ENTRYPOINT [ "/usr/bin/evmconnect" ]
