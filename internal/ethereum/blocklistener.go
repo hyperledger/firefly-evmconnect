@@ -139,7 +139,7 @@ func (bl *blockListener) listenLoop() {
 			continue
 		}
 
-		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential}
+		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential, Created: fftypes.Now()}
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
 			if len(h) != 32 {
