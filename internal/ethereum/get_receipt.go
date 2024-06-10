@@ -239,12 +239,15 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
 	}
 	receiptResponse := &ffcapi.TransactionReceiptResponse{
-		BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
-		TransactionIndex: fftypes.NewFFBigInt(txIndex),
-		BlockHash:        ethReceipt.BlockHash.String(),
-		Success:          isSuccess,
-		ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
-		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
+		TransactionReceiptResponseBase: ffcapi.TransactionReceiptResponseBase{
+
+			BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
+			TransactionIndex: fftypes.NewFFBigInt(txIndex),
+			BlockHash:        ethReceipt.BlockHash.String(),
+			Success:          isSuccess,
+			ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
+			ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
+		},
 	}
 	if req.IncludeLogs {
 		receiptResponse.Logs = make([]fftypes.JSONAny, len(ethReceipt.Logs))
