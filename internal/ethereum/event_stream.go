@@ -88,10 +88,8 @@ func parseEventFilters(ctx context.Context, filters []fftypes.JSONAny) (string, 
 		if ethFilters[i].Event == nil {
 			return "", nil, i18n.NewError(ctx, msgs.MsgMissingEventFilter)
 		}
-		if err == nil {
-			ethFilters[i].Topic0, err = ethFilters[i].Event.SignatureHashCtx(ctx)
-			ethFilters[i].Signature = ethFilters[i].Event.String()
-		}
+		ethFilters[i].Topic0, err = ethFilters[i].Event.SignatureHashCtx(ctx)
+		ethFilters[i].Signature = ethFilters[i].Event.String()
 		if err != nil {
 			return "", nil, i18n.NewError(ctx, msgs.MsgInvalidEventFilter, err)
 		}
@@ -146,6 +144,11 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 			filters:   filters,
 			signature: signature,
 		},
+	}
+	l.ee = &eventEnricher{
+		connector:     l.c,
+		methods:       l.config.options.Methods,
+		extractSigner: l.config.options.Signer,
 	}
 	if checkpoint != nil {
 		l.hwmBlock = checkpoint.Block

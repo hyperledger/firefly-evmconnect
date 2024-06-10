@@ -88,7 +88,7 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 		}).
 		Twice() // two cache misses and a hit
 
-	var req ffcapi.BlockInfoByNumberRequest
+	req := ffcapi.BlockInfoByNumberRequest{AllowCache: true}
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
 	assert.NoError(t, err)
 	res, reason, err := c.BlockInfoByNumber(ctx, &req)

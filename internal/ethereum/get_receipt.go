@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
@@ -183,7 +184,26 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 	return &revertReason, &errorMessage
 }
 
-func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (*ffcapi.TransactionReceiptResponse, ffcapi.ErrorReason, error) {
+func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.TransactionReceiptRequest) (_ *ffcapi.TransactionReceiptResponse, _ ffcapi.ErrorReason, err error) {
+
+	var filters []*eventFilter
+	var methods []*abi.Entry
+	if len(req.EventFilters) > 0 {
+		// We need to post-process the logs and build a list of events
+		_, filters, err = parseEventFilters(ctx, req.EventFilters)
+		if err != nil {
+			return nil, ffcapi.ErrorReasonInvalidInputs, err
+		}
+	}
+	if len(req.Methods) > 0 {
+		methods = make([]*abi.Entry, len(req.Methods))
+		for i, m := range req.Methods {
+			if err := json.Unmarshal(m.Bytes(), &methods[i]); err != nil {
+				err = i18n.NewError(ctx, msgs.MsgUnmarshalABIMethodFail, err)
+				return nil, ffcapi.ErrorReasonInvalidInputs, err
+			}
+		}
+	}
 
 	// Get the receipt in the back-end JSON/RPC format
 	var ethReceipt *txReceiptJSONRPC
@@ -203,7 +223,6 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, req.TransactionHash, ethReceipt.RevertReason)
 	}
 
-	ethReceipt.Logs = nil
 	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
 		ContractAddress:   ethReceipt.ContractAddress,
 		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
@@ -226,6 +245,30 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		Success:          isSuccess,
 		ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
 		ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
+	}
+	if req.IncludeLogs {
+		receiptResponse.Logs = make([]fftypes.JSONAny, len(ethReceipt.Logs))
+		for i, l := range ethReceipt.Logs {
+			b, _ := json.Marshal(l) // no error injectable here as we unmarshalled to a struct we control
+			receiptResponse.Logs[i] = *fftypes.JSONAnyPtrBytes(b)
+		}
+	}
+	// Try to decode the events etc. if we have filters supplied
+	if len(filters) > 0 {
+		ee := &eventEnricher{
+			connector:     c,
+			methods:       methods,
+			extractSigner: req.ExtractSigner,
+		}
+		for _, ethLog := range ethReceipt.Logs {
+			for _, f := range filters {
+				event, matches, err := ee.filterEnrichEthLog(ctx, f, ethLog)
+				if matches && err == nil {
+					receiptResponse.Events = append(receiptResponse.Events, event)
+				}
+			}
+		}
+
 	}
 	if ethReceipt.ContractAddress != nil {
 		location, _ := json.Marshal(map[string]string{

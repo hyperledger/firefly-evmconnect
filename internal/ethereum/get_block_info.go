@@ -86,7 +86,7 @@ func (c *ethConnector) getBlockInfoByNumber(ctx context.Context, blockNumber int
 
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, reason, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), true, req.ExpectedParentHash)
+	blockInfo, reason, err := c.getBlockInfoByNumber(ctx, req.BlockNumber.Int64(), req.AllowCache, req.ExpectedParentHash)
 	if err != nil {
 		return nil, reason, err
 	}
