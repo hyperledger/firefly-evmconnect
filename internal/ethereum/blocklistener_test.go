@@ -18,10 +18,14 @@ package ethereum
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -49,6 +53,71 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 	<-bl.listenLoopDone
 
 	mRPC.AssertExpectations(t)
+
+}
+
+func TestBlockListenerStartGettingHighestBlockRetryWS(t *testing.T) {
+
+	failedConnectOnce := false
+	failedSubOnce := false
+	toServer, fromServer, url, wsDone := wsclient.NewTestWSServer(func(req *http.Request) {
+		if !failedConnectOnce {
+			failedConnectOnce = true
+			panic("fail once here")
+		}
+	})
+
+	ctx, c, _, done := newTestConnector(t)
+	svrDone := make(chan struct{})
+	defer func() {
+		wsDone()
+		done()
+		<-svrDone
+	}()
+	bl := c.blockListener
+	bl.wsBackend = rpcbackend.NewWSRPCClient(&wsclient.WSConfig{
+		HTTPURL: url, // ensured to fail
+	})
+
+	go func() {
+		defer close(svrDone)
+		for {
+			select {
+			case rpcStr := <-toServer:
+				var rpcReq rpcbackend.RPCRequest
+				err := json.Unmarshal([]byte(rpcStr), &rpcReq)
+				assert.NoError(t, err)
+				rpcRes := &rpcbackend.RPCResponse{
+					JSONRpc: rpcReq.JSONRpc,
+					ID:      rpcReq.ID,
+				}
+				if rpcReq.Method == "eth_blockNumber" {
+					rpcRes.Result = fftypes.JSONAnyPtr(`"0x12345"`)
+				} else {
+					assert.Equal(t, "newHeads", rpcReq.Params[0].AsString())
+					if !failedSubOnce {
+						failedSubOnce = true
+						rpcRes.Error = &rpcbackend.RPCError{
+							Code:    int64(rpcbackend.RPCCodeInternalError),
+							Message: "pop",
+						}
+					} else {
+						rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, fftypes.NewUUID()))
+					}
+				}
+				b, err := json.Marshal(rpcRes)
+				assert.NoError(t, err)
+				fromServer <- string(b)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	err := bl.establishBlockHeightWithRetry()
+	assert.NoError(t, err)
+	assert.True(t, failedConnectOnce)
+	assert.True(t, failedSubOnce)
 
 }
 

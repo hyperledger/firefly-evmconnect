@@ -18,7 +18,7 @@ package ethereum
 
 import (
 	"github.com/hyperledger/firefly-common/pkg/config"
-	"github.com/hyperledger/firefly-common/pkg/ffresty"
+	"github.com/hyperledger/firefly-common/pkg/wsclient"
 )
 
 const (
@@ -39,6 +39,7 @@ const (
 	TxCacheSize                 = "txCacheSize"
 	HederaCompatibilityMode     = "hederaCompatibilityMode"
 	TraceTXForRevertReason      = "traceTXForRevertReason"
+	WebSocketsEnabled           = "ws.enabled"
 )
 
 const (
@@ -56,7 +57,8 @@ const (
 )
 
 func InitConfig(conf config.Section) {
-	ffresty.InitConfig(conf)
+	wsclient.InitConfig(conf)
+	conf.AddKnownKey(WebSocketsEnabled, false)
 	conf.AddKnownKey(BlockCacheSize, 250)
 	conf.AddKnownKey(BlockPollingInterval, "1s")
 	conf.AddKnownKey(ConfigDataFormat, "map")

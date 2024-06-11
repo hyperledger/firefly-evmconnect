@@ -46,6 +46,7 @@ func newTestConnector(t *testing.T) (context.Context, *ethConnector, *rpcbackend
 	assert.NoError(t, err)
 	c := cc.(*ethConnector)
 	c.backend = mRPC
+	c.blockListener.backend = mRPC
 	return ctx, c, mRPC, func() {
 		done()
 		mRPC.AssertExpectations(t)
@@ -64,6 +65,7 @@ func TestConnectorInit(t *testing.T) {
 	assert.Regexp(t, "FF23025", err)
 
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
+	conf.Set(WebSocketsEnabled, true)
 	conf.Set(EventsCatchupThreshold, 1)
 	conf.Set(EventsCatchupPageSize, 500)
 	conf.Set(EventsCatchupDownscaleRegex, "Response size is larger.*error.")

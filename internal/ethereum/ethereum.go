@@ -31,6 +31,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-common/pkg/retry"
+	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -53,7 +54,6 @@ type ethConnector struct {
 
 	mux          sync.Mutex
 	eventStreams map[fftypes.UUID]*eventStream
-	blockCache   *lru.Cache
 	txCache      *lru.Cache
 }
 
@@ -76,10 +76,6 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		log.L(ctx).Warnf("Catchup threshold %d must be at least as large as the catchup page size %d (overridden to %d)", c.catchupThreshold, c.catchupPageSize, c.catchupPageSize)
 		c.catchupThreshold = c.catchupPageSize
 	}
-	c.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
-	if err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
-	}
 
 	c.txCache, err = lru.New(conf.GetInt(TxCacheSize))
 	if err != nil {
@@ -96,10 +92,20 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		return nil, i18n.WrapError(ctx, err, msgs.MsgInvalidRegex, c.catchupDownscaleRegex)
 	}
 
-	httpClient, err := ffresty.New(ctx, conf)
+	var wsConf *wsclient.WSConfig
+	var httpConf *ffresty.Config
+	if conf.GetBool(WebSocketsEnabled) {
+		// If websockets are enabled, then they are used selectively (block listening/query)
+		// not as a full replacement for HTTP.
+		wsConf, err = wsclient.GenerateConfig(ctx, conf)
+	}
+	if err == nil {
+		httpConf, err = ffresty.GenerateConfig(ctx, conf)
+	}
 	if err != nil {
 		return nil, err
 	}
+	httpClient := ffresty.NewWithConfig(ctx, *httpConf)
 	c.backend = rpcbackend.NewRPCClientWithOption(httpClient, rpcbackend.RPCClientOptions{
 		MaxConcurrentRequest: conf.GetInt64(MaxConcurrentRequests),
 	})
@@ -123,7 +129,9 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		return name
 	})
 
-	c.blockListener = newBlockListener(ctx, c, conf)
+	if c.blockListener, err = newBlockListener(ctx, c, conf, wsConf); err != nil {
+		return nil, err
+	}
 
 	return c, nil
 }
