@@ -392,8 +392,9 @@ func TestDecodeLogDataFail(t *testing.T) {
 	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
 	assert.NoError(t, err)
 
-	res := l.ee.decodeLogData(l.es.ctx, abiEvent, []ethtypes.HexBytes0xPrefix{}, nil)
+	res, decoded := l.ee.decodeLogData(l.es.ctx, abiEvent, []ethtypes.HexBytes0xPrefix{}, nil)
 	assert.Nil(t, res)
+	assert.False(t, decoded)
 
 }
 
@@ -405,8 +406,9 @@ func TestSerializeEventDataFail(t *testing.T) {
 	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
 	assert.NoError(t, err)
 
-	res := l.ee.decodeLogData(l.es.ctx, abiEvent, []ethtypes.HexBytes0xPrefix{}, nil)
+	res, decoded := l.ee.decodeLogData(l.es.ctx, abiEvent, []ethtypes.HexBytes0xPrefix{}, nil)
 	assert.Nil(t, res)
+	assert.False(t, decoded)
 
 }
 

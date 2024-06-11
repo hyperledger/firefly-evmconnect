@@ -265,9 +265,10 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 		}
 		for _, ethLog := range ethReceipt.Logs {
 			for _, f := range filters {
-				event, matches, err := ee.filterEnrichEthLog(ctx, f, ethLog)
-				if matches && err == nil {
+				event, matches, decoded, err := ee.filterEnrichEthLog(ctx, f, ethLog)
+				if matches && decoded && err == nil {
 					receiptResponse.Events = append(receiptResponse.Events, event)
+					break // don't try any more attempts to decode
 				}
 			}
 		}

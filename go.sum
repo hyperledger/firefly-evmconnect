@@ -106,6 +106,8 @@ github.com/hyperledger/firefly-signer v1.1.13 h1:eiHjc6HPRG8AzXUCUgm51qqX1I9Boki
 github.com/hyperledger/firefly-signer v1.1.13/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
 github.com/hyperledger/firefly-transaction-manager v1.3.15-0.20240610222246-001555528484 h1:HEhw5XoN0NSqfADwUTImWvJjAgkPiRwyHCJpGSgR9EM=
 github.com/hyperledger/firefly-transaction-manager v1.3.15-0.20240610222246-001555528484/go.mod h1:N3BoHh8+dWG710oQKuNiXmJNEOBBeLTsQ8GpZ41vhog=
+github.com/hyperledger/firefly-transaction-manager v1.3.15-0.20240611130821-adc7fa2f78e2 h1:mcE7cTLB9yNlQ0UmTzBZyseu8XwVjcgCD0dNMcRq7fw=
+github.com/hyperledger/firefly-transaction-manager v1.3.15-0.20240611130821-adc7fa2f78e2/go.mod h1:N3BoHh8+dWG710oQKuNiXmJNEOBBeLTsQ8GpZ41vhog=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
 github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=

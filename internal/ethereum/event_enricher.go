@@ -33,7 +33,7 @@ type eventEnricher struct {
 	extractSigner bool
 }
 
-func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.Event, bool, error) {
+func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
@@ -46,11 +46,12 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])
 	if !topicMatches || !addrMatches {
 		log.L(ctx).Debugf("skipping event '%s' topicMatches=%t addrMatches=%t", protoID, topicMatches, addrMatches)
-		return nil, false, nil
+		return nil, matched, decoded, nil
 	}
+	matched = true
 
 	log.L(ctx).Infof("detected event '%s'", protoID)
-	data := ee.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
+	data, decoded := ee.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
 
 	info := eventInfo{
 		logJSONRPC: *ethLog,
@@ -61,7 +62,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		bi, err := ee.connector.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if bi == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
-			return nil, false, err // This is an error condition, rather than just something we cannot enrich
+			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
 		}
 		timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
 	}
@@ -74,7 +75,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 			} else {
 				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
 			}
-			return nil, false, err // This is an error condition, rather than just something we cannot enrich
+			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
 		}
 		if ee.extractSigner {
 			info.InputSigner = txInfo.From
@@ -97,10 +98,10 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		},
 		Info: &info,
 		Data: data,
-	}, true, nil
+	}, matched, decoded, nil
 }
 
-func (ee *eventEnricher) decodeLogData(ctx context.Context, event *abi.Entry, topics []ethtypes.HexBytes0xPrefix, data ethtypes.HexBytes0xPrefix) *fftypes.JSONAny {
+func (ee *eventEnricher) decodeLogData(ctx context.Context, event *abi.Entry, topics []ethtypes.HexBytes0xPrefix, data ethtypes.HexBytes0xPrefix) (*fftypes.JSONAny, bool) {
 	var b []byte
 	v, err := event.DecodeEventDataCtx(ctx, topics, data)
 	if err == nil {
@@ -108,9 +109,9 @@ func (ee *eventEnricher) decodeLogData(ctx context.Context, event *abi.Entry, to
 	}
 	if err != nil {
 		log.L(ctx).Errorf("Failed to process event log: %s", err)
-		return nil
+		return nil, false
 	}
-	return fftypes.JSONAnyPtrBytes(b)
+	return fftypes.JSONAnyPtrBytes(b), true
 }
 
 func (ee *eventEnricher) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *txInfoJSONRPC, info *eventInfo) {
