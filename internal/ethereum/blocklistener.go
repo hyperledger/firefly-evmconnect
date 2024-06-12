@@ -50,6 +50,8 @@ type blockListener struct {
 	wsBackend                  rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
 	listenLoopDone             chan struct{}
 	initialBlockHeightObtained chan struct{}
+	newHeadsTap                chan struct{}
+	newHeadsSub                rpcbackend.Subscription
 	highestBlock               int64
 	mux                        sync.Mutex
 	consumers                  map[fftypes.UUID]*blockUpdateConsumer
@@ -72,6 +74,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 		c:                          c,
 		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
 		initialBlockHeightObtained: make(chan struct{}),
+		newHeadsTap:                make(chan struct{}),
 		highestBlock:               -1,
 		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
 		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
@@ -87,6 +90,17 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
 	}
 	return bl, nil
+}
+
+func (bl *blockListener) newHeadsSubListener() {
+	for range bl.newHeadsSub.Notifications() {
+		select {
+		case bl.newHeadsTap <- struct{}{}:
+			// Do nothing apart from tap the listener to wake up early
+			// when there's a notification to the change of the head.
+		default:
+		}
+	}
 }
 
 // getBlockHeightWithRetry keeps retrying attempting to get the initial block height until successful
@@ -106,9 +120,14 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 				// if we retry subscribe, we don't want to retry connect
 				wsConnected = true
 			}
-			// Once subscribed the backend will keep us subscribed over reconnect
-			if _, rpcErr := bl.wsBackend.Subscribe(bl.ctx, "newHeads"); rpcErr != nil {
-				return true, rpcErr.Error()
+			if bl.newHeadsSub == nil {
+				// Once subscribed the backend will keep us subscribed over reconnect
+				sub, rpcErr := bl.wsBackend.Subscribe(bl.ctx, "newHeads")
+				if rpcErr != nil {
+					return true, rpcErr.Error()
+				}
+				bl.newHeadsSub = sub
+				go bl.newHeadsSubListener()
 			}
 			// Ok all JSON/RPC from this point on uses our WS Backend, thus ensuring we're
 			// sticky to the same node that the WS is connected to when we're doing queries
@@ -149,9 +168,10 @@ func (bl *blockListener) listenLoop() {
 				return
 			}
 		} else {
-			// Sleep for the polling interval
+			// Sleep for the polling interval, or until we're shoulder tapped by the newHeads listener
 			select {
 			case <-time.After(bl.blockPollingInterval):
+			case <-bl.newHeadsTap:
 			case <-bl.ctx.Done():
 				log.L(bl.ctx).Debugf("Block listener loop stopping")
 				return
@@ -489,6 +509,7 @@ func (bl *blockListener) waitClosed() {
 	listenLoopDone := bl.listenLoopDone
 	bl.mux.Unlock()
 	if bl.wsBackend != nil {
+		_ = bl.wsBackend.UnsubscribeAll(bl.ctx)
 		bl.wsBackend.Close()
 	}
 	if listenLoopDone != nil {
