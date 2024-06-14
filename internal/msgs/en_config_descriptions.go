@@ -28,6 +28,7 @@ var ffc = func(key, translation string, fieldType string) i18n.ConfigMessageKey 
 //revive:disable
 var (
 	ConfigEthereumURL                 = ffc("config.connector.url", "URL of JSON/RPC endpoint for the Ethereum node/gateway", "string")
+	ConfigEthereumWSEnabled           = ffc("config.connector.ws.enabled", "When true a WebSocket is established for block listening, in addition to the HTTP RPC connections used for other functions", i18n.BooleanType)
 	ConfigEthereumDataFormat          = ffc("config.connector.dataFormat", "Configure the JSON data format for query output and events", "map,flat_array,self_describing")
 	ConfigEthereumGasEstimationFactor = ffc("config.connector.gasEstimationFactor", "The factor to apply to the gas estimation to determine the gas limit", "float")
 	ConfigBlockCacheSize              = ffc("config.connector.blockCacheSize", "Maximum of blocks to hold in the block info cache", i18n.IntType)

@@ -311,7 +311,7 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 
 	var timestamp *fftypes.FFTime
 	if l.c.eventBlockTimestamps {
-		bi, err := l.c.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
+		bi, err := l.c.blockListener.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if bi == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
 			return nil, false, err // This is an error condition, rather than just something we cannot enrich
