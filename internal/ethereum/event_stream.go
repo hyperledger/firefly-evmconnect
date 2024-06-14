@@ -147,7 +147,6 @@ func (es *eventStream) addEventListener(ctx context.Context, req *ffcapi.EventLi
 	}
 	l.ee = &eventEnricher{
 		connector:     l.c,
-		methods:       l.config.options.Methods,
 		extractSigner: l.config.options.Signer,
 	}
 	if checkpoint != nil {
@@ -516,7 +515,7 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 		listeners := ag.listenersByTopic0[ethLog.Topics[0].String()]
 		for _, l := range listeners {
 			for _, f := range l.config.filters {
-				lu, matches, err := l.filterEnrichEthLog(ctx, f, ethLog)
+				lu, matches, err := l.filterEnrichEthLog(ctx, f, l.config.options.Methods, ethLog)
 				if err != nil {
 					return nil, err
 				}

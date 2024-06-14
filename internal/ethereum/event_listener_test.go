@@ -421,7 +421,7 @@ func TestFilterEnrichEthLogBlockBelowHWM(t *testing.T) {
 	assert.NoError(t, err)
 
 	l.hwmBlock = 2
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &logJSONRPC{
 		BlockNumber: ethtypes.NewHexInteger64(1),
 	})
 	assert.NoError(t, err)
@@ -437,7 +437,7 @@ func TestFilterEnrichEthLogAddressMismatch(t *testing.T) {
 	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
 	assert.NoError(t, err)
 
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], &logJSONRPC{
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &logJSONRPC{
 		Address: ethtypes.MustNewAddress("0x20355f3e852d4b6a9944ada8d5399ddd3409a431"),
 	})
 	assert.NoError(t, err)
@@ -469,11 +469,11 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 		}
 	}).Once() // 1 cache miss and hit
 
-	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog()) // cache miss
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog()) // cache miss
 	assert.True(t, ok)
 	assert.NoError(t, err)
 
-	ev, ok, err = l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog()) // cache hit
+	ev, ok, err = l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog()) // cache hit
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)
@@ -508,7 +508,7 @@ func TestFilterEnrichEthLogMethodInputsTxInfoWithErr(t *testing.T) {
 		}
 	}).Once()
 
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog())
 	assert.False(t, ok)
 	assert.Error(t, err)
 
@@ -529,7 +529,7 @@ func TestFilterEnrichEthLogTXInfoFail(t *testing.T) {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(&rpcbackend.RPCError{Message: "pop2"})
 
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog())
 	assert.False(t, ok)
 	assert.Regexp(t, "pop1", err)
 
@@ -554,7 +554,7 @@ func TestFilterEnrichEthLogTXTimestampFail(t *testing.T) {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(&rpcbackend.RPCError{Message: "pop2"})
 
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog())
 	assert.False(t, ok)
 	assert.Regexp(t, "pop2", err)
 
@@ -584,7 +584,7 @@ func TestFilterEnrichEthLogMethodBadInputTooShort(t *testing.T) {
 		}
 	})
 
-	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog())
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)
@@ -616,7 +616,7 @@ func TestFilterEnrichEthLogMethodBadInputTooMismatchFunctionID(t *testing.T) {
 		}
 	})
 
-	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog())
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	ei := ev.Event.Info.(*eventInfo)
@@ -648,7 +648,7 @@ func TestFilterEnrichEthLogMethodBadInputABIData(t *testing.T) {
 		}
 	})
 
-	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], sampleTransferLog())
+	ev, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, sampleTransferLog())
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	ei := ev.Event.Info.(*eventInfo)

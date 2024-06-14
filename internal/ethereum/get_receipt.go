@@ -260,13 +260,12 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	if len(filters) > 0 {
 		ee := &eventEnricher{
 			connector:     c,
-			methods:       methods,
 			extractSigner: req.ExtractSigner,
 		}
 		for _, ethLog := range ethReceipt.Logs {
 			var bestMatch *ffcapi.Event
 			for _, f := range filters {
-				event, matches, decoded, err := ee.filterEnrichEthLog(ctx, f, ethLog)
+				event, matches, decoded, err := ee.filterEnrichEthLog(ctx, f, methods, ethLog)
 				// If we matched and decoded, this is our best match (overriding any earlier)
 				// If we only matched, then don't override a match+decode.
 				// Example: ERC-20 & ERC-721 ABIs - both match, but only one decodes

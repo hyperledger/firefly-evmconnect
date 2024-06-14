@@ -22,10 +22,15 @@ import (
 	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -41,8 +46,12 @@ type blockUpdateConsumer struct {
 type blockListener struct {
 	ctx                        context.Context
 	c                          *ethConnector
+	backend                    rpcbackend.RPC
+	wsBackend                  rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
 	listenLoopDone             chan struct{}
 	initialBlockHeightObtained chan struct{}
+	newHeadsTap                chan struct{}
+	newHeadsSub                rpcbackend.Subscription
 	highestBlock               int64
 	mux                        sync.Mutex
 	consumers                  map[fftypes.UUID]*blockUpdateConsumer
@@ -50,6 +59,7 @@ type blockListener struct {
 	unstableHeadLength         int
 	canonicalChain             *list.List
 	hederaCompatibilityMode    bool
+	blockCache                 *lru.Cache
 }
 
 type minimalBlockInfo struct {
@@ -58,11 +68,13 @@ type minimalBlockInfo struct {
 	parentHash string
 }
 
-func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) *blockListener {
-	bl := &blockListener{
+func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section, wsConf *wsclient.WSConfig) (bl *blockListener, err error) {
+	bl = &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		c:                          c,
+		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
 		initialBlockHeightObtained: make(chan struct{}),
+		newHeadsTap:                make(chan struct{}),
 		highestBlock:               -1,
 		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
 		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
@@ -70,14 +82,62 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section)
 		unstableHeadLength:         int(c.checkpointBlockGap),
 		hederaCompatibilityMode:    conf.GetBool(HederaCompatibilityMode),
 	}
-	return bl
+	if wsConf != nil {
+		bl.wsBackend = rpcbackend.NewWSRPCClient(wsConf)
+	}
+	bl.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
+	}
+	return bl, nil
+}
+
+func (bl *blockListener) newHeadsSubListener() {
+	for range bl.newHeadsSub.Notifications() {
+		select {
+		case bl.newHeadsTap <- struct{}{}:
+			// Do nothing apart from tap the listener to wake up early
+			// when there's a notification to the change of the head.
+		default:
+		}
+	}
 }
 
 // getBlockHeightWithRetry keeps retrying attempting to get the initial block height until successful
 func (bl *blockListener) establishBlockHeightWithRetry() error {
+	wsConnected := false
 	return bl.c.retry.Do(bl.ctx, "get initial block height", func(attempt int) (retry bool, err error) {
+
+		// If we have a WebSocket backend, then we connect it and switch over to using it
+		// (we accept an un-locked update here to backend, as the most important routine that's
+		// querying block state is the one we're called on)
+		if bl.wsBackend != nil {
+			if !wsConnected {
+				if err := bl.wsBackend.Connect(bl.ctx); err != nil {
+					log.L(bl.ctx).Warnf("WebSocket connection failed, blocking startup of block listener: %s", err)
+					return true, err
+				}
+				// if we retry subscribe, we don't want to retry connect
+				wsConnected = true
+			}
+			if bl.newHeadsSub == nil {
+				// Once subscribed the backend will keep us subscribed over reconnect
+				sub, rpcErr := bl.wsBackend.Subscribe(bl.ctx, "newHeads")
+				if rpcErr != nil {
+					return true, rpcErr.Error()
+				}
+				bl.newHeadsSub = sub
+				go bl.newHeadsSubListener()
+			}
+			// Ok all JSON/RPC from this point on uses our WS Backend, thus ensuring we're
+			// sticky to the same node that the WS is connected to when we're doing queries
+			// and building our cache.
+			bl.backend = bl.wsBackend
+		}
+
+		// Now get the block heiht
 		var hexBlockHeight ethtypes.HexInteger
-		rpcErr := bl.c.backend.CallRPC(bl.ctx, &hexBlockHeight, "eth_blockNumber")
+		rpcErr := bl.backend.CallRPC(bl.ctx, &hexBlockHeight, "eth_blockNumber")
 		if rpcErr != nil {
 			log.L(bl.ctx).Warnf("Block height could not be obtained: %s", rpcErr.Message)
 			return true, rpcErr.Error()
@@ -108,9 +168,10 @@ func (bl *blockListener) listenLoop() {
 				return
 			}
 		} else {
-			// Sleep for the polling interval
+			// Sleep for the polling interval, or until we're shoulder tapped by the newHeads listener
 			select {
 			case <-time.After(bl.blockPollingInterval):
+			case <-bl.newHeadsTap:
 			case <-bl.ctx.Done():
 				log.L(bl.ctx).Debugf("Block listener loop stopping")
 				return
@@ -118,7 +179,7 @@ func (bl *blockListener) listenLoop() {
 		}
 
 		if filter == "" {
-			err := bl.c.backend.CallRPC(bl.ctx, &filter, "eth_newBlockFilter")
+			err := bl.backend.CallRPC(bl.ctx, &filter, "eth_newBlockFilter")
 			if err != nil {
 				log.L(bl.ctx).Errorf("Failed to establish new block filter: %s", err.Message)
 				failCount++
@@ -127,7 +188,7 @@ func (bl *blockListener) listenLoop() {
 		}
 
 		var blockHashes []ethtypes.HexBytes0xPrefix
-		rpcErr := bl.c.backend.CallRPC(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
+		rpcErr := bl.backend.CallRPC(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
 		if rpcErr != nil {
 			if mapError(filterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
 				log.L(bl.ctx).Warnf("Block filter '%v' no longer valid. Recreating filter: %s", filter, rpcErr.Message)
@@ -159,7 +220,7 @@ func (bl *blockListener) listenLoop() {
 			}
 
 			// Do a lookup of the block (which will then go into our cache).
-			bi, err := bl.c.getBlockInfoByHash(bl.ctx, h.String())
+			bi, err := bl.getBlockInfoByHash(bl.ctx, h.String())
 			switch {
 			case err != nil:
 				log.L(bl.ctx).Debugf("Failed to query block '%s': %s", h, err)
@@ -312,7 +373,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 		var bi *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
-			bi, reason, err = bl.c.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
+			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -366,7 +427,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 		var freshBlockInfo *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
-			freshBlockInfo, reason, err = bl.c.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
+			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -447,6 +508,10 @@ func (bl *blockListener) waitClosed() {
 	bl.mux.Lock()
 	listenLoopDone := bl.listenLoopDone
 	bl.mux.Unlock()
+	if bl.wsBackend != nil {
+		_ = bl.wsBackend.UnsubscribeAll(bl.ctx)
+		bl.wsBackend.Close()
+	}
 	if listenLoopDone != nil {
 		<-listenLoopDone
 	}

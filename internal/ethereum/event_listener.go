@@ -239,7 +239,7 @@ func (l *listener) listenerCatchupLoop() {
 	}
 }
 
-func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
+func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
@@ -250,7 +250,7 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLo
 		return nil, false, nil
 	}
 
-	e, matched, _, err := l.ee.filterEnrichEthLog(ctx, f, ethLog)
+	e, matched, _, err := l.ee.filterEnrichEthLog(ctx, f, methods, ethLog)
 	if !matched || err != nil {
 		return nil, false, err
 	}

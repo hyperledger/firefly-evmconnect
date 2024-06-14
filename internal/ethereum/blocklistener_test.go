@@ -18,10 +18,15 @@ package ethereum
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -161,6 +166,97 @@ func TestBlockListenerOKSequential(t *testing.T) {
 
 	assert.Equal(t, bl.unstableHeadLength, bl.canonicalChain.Len())
 
+}
+
+func TestBlockListenerWSShoulderTap(t *testing.T) {
+
+	failedConnectOnce := false
+	failedSubOnce := false
+	toServer, fromServer, url, wsDone := wsclient.NewTestWSServer(func(req *http.Request) {
+		if !failedConnectOnce {
+			failedConnectOnce = true
+			panic("fail once here")
+		}
+	})
+
+	ctx, c, _, done := newTestConnector(t, func(conf config.Section) {
+		conf.Set(wsclient.WSConfigURL, url)
+		conf.Set(wsclient.WSConfigKeyInitialConnectAttempts, 0)
+		conf.Set(WebSocketsEnabled, true)
+		conf.Set(BlockPollingInterval, "100s") // so the test would just hang if no WS notifications
+	})
+	svrDone := make(chan struct{})
+	bl := c.blockListener
+
+	pingerDone := make(chan struct{})
+	complete := false
+	go func() {
+		defer close(svrDone)
+		for {
+			select {
+			case rpcStr := <-toServer:
+				var rpcReq rpcbackend.RPCRequest
+				err := json.Unmarshal([]byte(rpcStr), &rpcReq)
+				assert.NoError(t, err)
+				rpcRes := &rpcbackend.RPCResponse{
+					JSONRpc: rpcReq.JSONRpc,
+					ID:      rpcReq.ID,
+				}
+				switch rpcReq.Method {
+				case "eth_blockNumber":
+					rpcRes.Result = fftypes.JSONAnyPtr(`"0x12345"`)
+				case "eth_subscribe":
+					assert.Equal(t, "newHeads", rpcReq.Params[0].AsString())
+					if !failedSubOnce {
+						failedSubOnce = true
+						rpcRes.Error = &rpcbackend.RPCError{
+							Code:    int64(rpcbackend.RPCCodeInternalError),
+							Message: "pop",
+						}
+					} else {
+						rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, fftypes.NewUUID()))
+						// Spam with notifications
+						go func() {
+							defer close(pingerDone)
+							for !complete {
+								time.Sleep(100 * time.Microsecond)
+								if bl.newHeadsSub != nil {
+									bl.newHeadsSub.Notifications() <- &rpcbackend.RPCSubscriptionNotification{
+										CurrentSubID: bl.newHeadsSub.LocalID().String(),
+										Result:       fftypes.JSONAnyPtr(`"anything"`),
+									}
+								}
+							}
+						}()
+					}
+				case "eth_newBlockFilter":
+					rpcRes.Result = fftypes.JSONAnyPtr(fmt.Sprintf(`"%s"`, fftypes.NewUUID()))
+				case "eth_getFilterChanges":
+					// ok we can close - the shoulder tap worked
+					complete = true
+					<-pingerDone
+					go done()
+				default:
+					assert.Fail(t, "unexpected RPC call: %+v", rpcReq)
+				}
+				b, err := json.Marshal(rpcRes)
+				assert.NoError(t, err)
+				fromServer <- string(b)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	bl.checkStartedLocked()
+
+	// Wait until we close because it worked
+	<-bl.listenLoopDone
+	assert.True(t, failedConnectOnce)
+	assert.True(t, failedSubOnce)
+
+	wsDone()
+	<-svrDone
 }
 
 func TestBlockListenerOKDuplicates(t *testing.T) {

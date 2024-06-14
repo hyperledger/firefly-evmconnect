@@ -29,11 +29,10 @@ import (
 
 type eventEnricher struct {
 	connector     *ethConnector
-	methods       []*abi.Entry
 	extractSigner bool
 }
 
-func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
+func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *logJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
@@ -59,7 +58,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 
 	var timestamp *fftypes.FFTime
 	if ee.connector.eventBlockTimestamps {
-		bi, err := ee.connector.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
+		bi, err := ee.connector.blockListener.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if bi == nil || err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
 			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
@@ -67,7 +66,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
 	}
 
-	if len(ee.methods) > 0 || ee.extractSigner {
+	if len(methods) > 0 || ee.extractSigner {
 		txInfo, err := ee.connector.getTransactionInfo(ctx, ethLog.TransactionHash)
 		if txInfo == nil || err != nil {
 			if txInfo == nil {
@@ -80,8 +79,8 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		if ee.extractSigner {
 			info.InputSigner = txInfo.From
 		}
-		if len(ee.methods) > 0 {
-			ee.matchMethod(ctx, ee.methods, txInfo, &info)
+		if len(methods) > 0 {
+			ee.matchMethod(ctx, methods, txInfo, &info)
 		}
 	}
 

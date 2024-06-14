@@ -31,7 +31,7 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-func newTestConnector(t *testing.T) (context.Context, *ethConnector, *rpcbackendmocks.Backend, func()) {
+func newTestConnector(t *testing.T, confSetup ...func(conf config.Section)) (context.Context, *ethConnector, *rpcbackendmocks.Backend, func()) {
 
 	mRPC := &rpcbackendmocks.Backend{}
 	config.RootConfigReset()
@@ -41,11 +41,15 @@ func newTestConnector(t *testing.T) (context.Context, *ethConnector, *rpcbackend
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
 	conf.Set(BlockPollingInterval, "1h") // Disable for tests that are not using it
 	logrus.SetLevel(logrus.DebugLevel)
+	for _, fn := range confSetup {
+		fn(conf)
+	}
 	ctx, done := context.WithCancel(context.Background())
 	cc, err := NewEthereumConnector(ctx, conf)
 	assert.NoError(t, err)
 	c := cc.(*ethConnector)
 	c.backend = mRPC
+	c.blockListener.backend = mRPC
 	return ctx, c, mRPC, func() {
 		done()
 		mRPC.AssertExpectations(t)
@@ -64,6 +68,7 @@ func TestConnectorInit(t *testing.T) {
 	assert.Regexp(t, "FF23025", err)
 
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
+	conf.Set(WebSocketsEnabled, true)
 	conf.Set(EventsCatchupThreshold, 1)
 	conf.Set(EventsCatchupPageSize, 500)
 	conf.Set(EventsCatchupDownscaleRegex, "Response size is larger.*error.")
