@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -48,9 +49,11 @@ const sampleJSONRPCReceipt = `{
 	{
 		"address": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
 		"topics": [
-		"0x805721bc246bccc732581be0c0aa2dd8f7ec93e97ba4b307be84428c98b0a12f"
+			"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+			"0x0000000000000000000000000000000000000000000000000000000000000000",
+			"0x0000000000000000000000005dae1910885cde875de559333d12722357e69c42"
 		],
-		"data": "0x0000000000000000000000002b1c769ef5ad304a4889f2a07a6617cd935849ae00000000000000000000000000000000000000000000000000000000625829cc00000000000000000000000000000000000000000000000000000000000000e01f64cabbf2b44bff810396f2cb08186c2d460c2bd1c44058bc058267d554e724973b16c67dbcade6c509329de6aad8037bb024b7a996129f731b9f68ac5fcd9f00000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000966665f73797374656d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002e516d546a587065445154326a377063583145347445764379334665554a71744374737036464c5762535553724a4e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014a1ad4027f59715bca7fd30dc0121be0542c713f7a2470c415e8b1d9e7df372c",
+		"data": "0x000000000000000000000000000000000000000000000000016345785d8a0000",
 		"blockNumber": "0x5",
 		"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
 		"transactionIndex": "0x0",
@@ -195,6 +198,25 @@ const sampleTransactionTraceBesu = `{
 			"reason": "8c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000114e6f7420656e6f75676820746f6b656e73000000000000000000000000000000"
 		}
 	]
+}`
+
+const sampleTransactionInputJSONRPC = `{
+	"blockHash": "0xa6d9ef8afd65f187e43d1ebd378681bf79663920da0563cd8c06b49dd1db8758",
+	"blockNumber": "0x6790",
+	"chainId": "0x3dbb0ab",
+	"from": "0xa61465d0d19d842d73625cb7a2b6f318c74d304b",
+	"gas": "0xd900",
+	"gasPrice": "0x0",
+	"hash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+	"input": "0x40c10f190000000000000000000000005dae1910885cde875de559333d12722357e69c42000000000000000000000000000000000000000000000000016345785d8a0000",
+	"nonce": "0xc",
+	"to": "0xd0685a91ae2d4b0ec4701f7a9787c6633790a65e",
+	"transactionIndex": "0x0",
+	"type": "0x0",
+	"value": "0x0",
+	"v": "0x7b76179",
+	"r": "0x963a8620b31ac796dd605f37c7f386d039f40c3a31854931fae5e3c95b1faf7a",
+	"s": "0x58bb39fa958611c123adbef40eaaba44d36cddf77532064a437f0840242e5d30"
 }`
 
 func TestGetReceiptOkSuccess(t *testing.T) {
@@ -543,4 +565,137 @@ func TestGetReceiptNoDebugTraceIfDisabled(t *testing.T) {
 func TestProtocolIDForReceipt(t *testing.T) {
 	assert.Equal(t, "000000012345/000042", ProtocolIDForReceipt(fftypes.NewFFBigInt(12345), fftypes.NewFFBigInt(42)))
 	assert.Equal(t, "", ProtocolIDForReceipt(nil, nil))
+}
+
+func TestGetReceiptEventDecodeOK(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		"0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2").
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash",
+		"0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+		false).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleBlockJSONRPC), args[1])
+			assert.NoError(t, err)
+		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleTransactionInputJSONRPC), args[1])
+			assert.NoError(t, err)
+		})
+
+	req := ffcapi.TransactionReceiptRequest{
+		TransactionHash: "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+		IncludeLogs:     true,
+		Methods: []fftypes.JSONAny{`{
+			"inputs": [
+				{
+					"internalType": "address",
+					"name": "to",
+					"type": "address"
+				},
+				{
+					"internalType": "uint256",
+					"name": "amount",
+					"type": "uint256"
+				}
+			],
+			"name": "mint",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}`},
+		ExtractSigner: true,
+		EventFilters: []fftypes.JSONAny{*fftypes.JSONAnyPtr(`{
+			"event": {
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"name": "from",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"name": "value",
+						"type": "uint256"
+					}
+				],
+				"name": "Transfer",
+				"type": "event"
+			}
+		}`)},
+	}
+	res, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	assert.True(t, res.Success)
+	assert.Equal(t, int64(1977), res.BlockNumber.Int64())
+	assert.Equal(t, int64(30), res.TransactionIndex.Int64())
+
+	assert.Len(t, res.Logs, 1)
+	assert.Len(t, res.Events, 1)
+	b, err := json.Marshal(res.Events[0].Data)
+	assert.NoError(t, err)
+	fmt.Println(string(b))
+	assert.JSONEq(t, `{
+		"from": "0x0000000000000000000000000000000000000000",
+		"to": "0x5dae1910885cde875de559333d12722357e69c42",
+		"value": "100000000000000000"
+	}`, string(b))
+	b = res.Events[0].Info.(*eventInfo).InputArgs.Bytes()
+	assert.JSONEq(t, `{
+		"to": "0x5dae1910885cde875de559333d12722357e69c42",
+		"amount": "100000000000000000"
+	}`, string(b))
+	assert.Equal(t, "0xa61465d0d19d842d73625cb7a2b6f318c74d304b", res.Events[0].Info.(*eventInfo).InputSigner.String())
+
+}
+
+func TestGetReceiptEventInvalidFilters(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	req := ffcapi.TransactionReceiptRequest{
+		TransactionHash: "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+		IncludeLogs:     true,
+		EventFilters:    []fftypes.JSONAny{*fftypes.JSONAnyPtr(`!! wrong`)},
+	}
+	_, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.Regexp(t, "FF23036", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
+}
+
+func TestGetReceiptEventInvalidMethods(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	req := ffcapi.TransactionReceiptRequest{
+		TransactionHash: "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+		IncludeLogs:     true,
+		Methods:         []fftypes.JSONAny{*fftypes.JSONAnyPtr(`!! wrong`)},
+	}
+	_, reason, err := c.TransactionReceipt(ctx, &req)
+	assert.Regexp(t, "FF23013", err)
+	assert.Equal(t, ffcapi.ErrorReasonInvalidInputs, reason)
+
 }

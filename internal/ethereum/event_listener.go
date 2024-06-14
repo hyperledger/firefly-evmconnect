@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"math/big"
@@ -59,6 +58,7 @@ type listener struct {
 	id              *fftypes.UUID
 	c               *ethConnector
 	es              *eventStream
+	ee              *eventEnricher
 	hwmMux          sync.Mutex // Protects checkpoint of an individual listener. May hold ES lock when taking this, must NOT attempt to obtain ES lock while holding this
 	hwmBlock        int64
 	config          listenerConfig
@@ -239,124 +239,29 @@ func (l *listener) listenerCatchupLoop() {
 	}
 }
 
-func (l *listener) decodeLogData(ctx context.Context, event *abi.Entry, topics []ethtypes.HexBytes0xPrefix, data ethtypes.HexBytes0xPrefix) *fftypes.JSONAny {
-	var b []byte
-	v, err := event.DecodeEventDataCtx(ctx, topics, data)
-	if err == nil {
-		b, err = l.c.serializer.SerializeJSONCtx(ctx, v)
-	}
-	if err != nil {
-		log.L(ctx).Errorf("Failed to process event log: %s", err)
-		return nil
-	}
-	return fftypes.JSONAnyPtrBytes(b)
-}
-
-func (l *listener) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *txInfoJSONRPC, info *eventInfo) {
-	if len(txInfo.Input) < 4 {
-		log.L(ctx).Debugf("No function selector available for TX '%s'", txInfo.Hash)
-		return
-	}
-	functionID := txInfo.Input[0:4]
-	var method *abi.Entry
-	for _, m := range methods {
-		if bytes.Equal(m.FunctionSelectorBytes(), functionID) {
-			method = m
-			break
-		}
-	}
-	if method == nil {
-		log.L(ctx).Debugf("Function selector '%s' for TX '%s' does not match any of the supplied methods", functionID.String(), txInfo.Hash)
-		return
-	}
-	info.InputMethod = method.String()
-	v, err := method.DecodeCallDataCtx(ctx, txInfo.Input)
-	var b []byte
-	if err == nil {
-		b, err = l.c.serializer.SerializeJSONCtx(ctx, v)
-	}
-	if err != nil {
-		log.L(ctx).Warnf("Failed to decode input for TX '%s' using '%s'", txInfo.Hash, info.InputMethod)
-		return
-	}
-	info.InputArgs = fftypes.JSONAnyPtrBytes(b)
-}
-
-func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
+func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
 	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
 	logIndex := ethLog.LogIndex.BigInt().Int64()
-	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
 	if blockNumber < l.hwmBlock {
-		log.L(ctx).Debugf("Listener %s already delivered event '%s' hwm=%d", l.id, protoID, l.hwmBlock)
+		log.L(ctx).Debugf("Listener %s already delivered event '%s' hwm=%d", l.id, getEventProtoID(blockNumber, transactionIndex, logIndex), l.hwmBlock)
 		return nil, false, nil
 	}
 
-	// Apply a post-filter check to the event
-	topicMatches := len(ethLog.Topics) > 0 && bytes.Equal(ethLog.Topics[0], f.Topic0)
-	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])
-	if !topicMatches || !addrMatches {
-		log.L(ctx).Debugf("Listener %s skipping event '%s' topicMatches=%t addrMatches=%t", l.id, protoID, topicMatches, addrMatches)
-		return nil, false, nil
+	e, matched, _, err := l.ee.filterEnrichEthLog(ctx, f, methods, ethLog)
+	if !matched || err != nil {
+		return nil, false, err
 	}
 
-	log.L(ctx).Infof("Listener %s detected event '%s'", l.id, protoID)
-	data := l.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
-
-	info := eventInfo{
-		logJSONRPC: *ethLog,
-	}
-
-	var timestamp *fftypes.FFTime
-	if l.c.eventBlockTimestamps {
-		bi, err := l.c.blockListener.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
-		if bi == nil || err != nil {
-			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
-			return nil, false, err // This is an error condition, rather than just something we cannot enrich
-		}
-		timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
-	}
-
-	if len(l.config.options.Methods) > 0 || l.config.options.Signer {
-		txInfo, err := l.c.getTransactionInfo(ctx, ethLog.TransactionHash)
-		if txInfo == nil || err != nil {
-			if txInfo == nil {
-				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': transaction hash not found", ethLog.TransactionHash)
-			} else {
-				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
-			}
-			return nil, false, err // This is an error condition, rather than just something we cannot enrich
-		}
-		if l.config.options.Signer {
-			info.InputSigner = txInfo.From
-		}
-		if len(l.config.options.Methods) > 0 {
-			l.matchMethod(ctx, l.config.options.Methods, txInfo, &info)
-		}
-	}
-
-	signature := f.Signature
+	e.ID.ListenerID = l.id
 	return &ffcapi.ListenerEvent{
 		Checkpoint: &listenerCheckpoint{
 			Block:            blockNumber,
 			TransactionIndex: transactionIndex,
 			LogIndex:         logIndex,
 		},
-		Event: &ffcapi.Event{
-			ID: ffcapi.EventID{
-				ListenerID:       l.id,
-				Signature:        signature,
-				BlockHash:        ethLog.BlockHash.String(),
-				TransactionHash:  ethLog.TransactionHash.String(),
-				BlockNumber:      fftypes.FFuint64(blockNumber),
-				TransactionIndex: fftypes.FFuint64(transactionIndex),
-				LogIndex:         fftypes.FFuint64(logIndex),
-				Timestamp:        timestamp,
-			},
-			Info: &info,
-			Data: data,
-		},
+		Event: e,
 	}, true, nil
 }

@@ -992,6 +992,41 @@ func TestBlockListenerProcessNonStandardHashRejectedWhenNotInHederaCompatibility
 
 }
 
+func TestBlockListenerProcessNonStandardHashRejectedWhenWrongSizeForHedera(t *testing.T) {
+
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+	bl.hederaCompatibilityMode = true
+
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef")
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{
+			block1003Hash,
+		}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		go done() // Close after we've processed the log
+	})
+
+	bl.checkStartedLocked()
+
+	c.WaitClosed()
+
+	mRPC.AssertExpectations(t)
+
+}
+
 func TestBlockListenerProcessNonStandardHashAcceptedWhenInHederaCompatbilityMode(t *testing.T) {
 
 	_, c, mRPC, done := newTestConnector(t)
