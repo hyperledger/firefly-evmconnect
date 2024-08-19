@@ -84,6 +84,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 	}
 	if wsConf != nil {
 		bl.wsBackend = rpcbackend.NewWSRPCClient(wsConf)
+		bl.backend = bl.wsBackend
 	}
 	bl.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
 	if err != nil {
