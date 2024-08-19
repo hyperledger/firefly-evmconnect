@@ -117,6 +117,7 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 					log.L(bl.ctx).Warnf("WebSocket connection failed, blocking startup of block listener: %s", err)
 					return true, err
 				}
+				bl.backend = bl.wsBackend
 				// if we retry subscribe, we don't want to retry connect
 				wsConnected = true
 			}
