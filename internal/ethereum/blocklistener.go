@@ -84,7 +84,6 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 	}
 	if wsConf != nil {
 		bl.wsBackend = rpcbackend.NewWSRPCClient(wsConf)
-		bl.backend = bl.wsBackend
 	}
 	bl.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
 	if err != nil {
@@ -118,6 +117,7 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 					log.L(bl.ctx).Warnf("WebSocket connection failed, blocking startup of block listener: %s", err)
 					return true, err
 				}
+				bl.backend = bl.wsBackend
 				// if we retry subscribe, we don't want to retry connect
 				wsConnected = true
 			}
