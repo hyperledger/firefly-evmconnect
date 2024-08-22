@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -54,6 +55,32 @@ const samplePrepareDeployTX = `{
 	"params": [ 4276993775 ]
 }`
 
+const samplePrepareDeployTXLargeInputParams = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "DeployContract"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+	"gas": 1000000,
+	"nonce": "111",
+	"value": "12345678901234567890123456789",
+	"contract": "0xfeedbeef",
+	"definition": [{
+		"inputs": [
+			{
+				"internalType":" uint256",
+				"name": "x",
+				"type": "uint256"
+			}
+		],
+		"outputs":[],
+		"type":"constructor"
+	}],
+	"params": [ 10000000000000000000000001 ]
+}`
+
 func TestDeployContractPrepareOkNoEstimate(t *testing.T) {
 
 	ctx, c, _, done := newTestConnector(t)
@@ -63,12 +90,25 @@ func TestDeployContractPrepareOkNoEstimate(t *testing.T) {
 	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
 	assert.NoError(t, err)
 	res, reason, err := c.DeployContractPrepare(ctx, &req)
-
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-
 	assert.Equal(t, int64(1000000), res.Gas.Int64())
+	assert.True(t, strings.HasSuffix(res.TransactionData, "feedbeef"))
+}
 
+func TestDeployContractPrepareOkLargeInputParam(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTXLargeInputParams), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.DeployContractPrepare(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.Equal(t, int64(1000000), res.Gas.Int64())
+	assert.True(t, strings.HasSuffix(res.TransactionData, "84595161401484A000001"))
 }
 
 func TestDeployContractPrepareWithEstimateRevert(t *testing.T) {
