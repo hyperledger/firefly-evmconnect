@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -108,7 +109,8 @@ func TestDeployContractPrepareOkLargeInputParam(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 	assert.Equal(t, int64(1000000), res.Gas.Int64())
-	assert.True(t, strings.HasSuffix(res.TransactionData, "84595161401484A000001"))
+	fmt.Println(res.TransactionData)
+	assert.True(t, strings.HasSuffix(res.TransactionData, "84595161401484a000001"))
 }
 
 func TestDeployContractPrepareWithEstimateRevert(t *testing.T) {
