@@ -17,6 +17,7 @@
 package ethereum
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -95,7 +96,9 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 	ethParams := make([]interface{}, len(req.Params))
 	for i, p := range req.Params {
 		if p != nil {
-			err := json.Unmarshal([]byte(*p), &ethParams[i])
+			decodedParam := json.NewDecoder(bytes.NewReader([]byte(*p)))
+			decodedParam.UseNumber()
+			err := decodedParam.Decode(&ethParams[i])
 			if err != nil {
 				return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalParamFail, i, err)
 			}
