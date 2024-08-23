@@ -100,3 +100,5 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/hyperledger/firefly-signer => github.com/kaleido-io/firefly-signer v0.0.0-20240823134028-a2c5b23d5256

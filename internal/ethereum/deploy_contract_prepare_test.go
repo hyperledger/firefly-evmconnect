@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -39,12 +40,12 @@ const samplePrepareDeployTX = `{
 	"gas": 1000000,
 	"nonce": "111",
 	"value": "12345678901234567890123456789",
-	"contract": "0xfeedbeef",
+	"contract": "0xdeadbeef",
 	"definition": [{
 		"inputs": [
 			{
 				"internalType":" uint256",
-				"name": "x",
+				"name": "y",
 				"type": "uint256"
 			}
 		],
@@ -52,6 +53,68 @@ const samplePrepareDeployTX = `{
 		"type":"constructor"
 	}],
 	"params": [ 4276993775 ]
+}`
+
+const samplePrepareDeployTXLargeInputParams = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "DeployContract"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+	"gas": 1000000,
+	"nonce": "111",
+	"value": "12345678901234567890123456789",
+	"contract": "0xdeadbeef",
+	"definition": [{
+		"inputs": [
+			{
+				"internalType":" uint256",
+				"name": "x",
+				"type": "uint256"
+			},
+		    {
+			    "internalType":" string",
+			    "name": "y",
+			    "type": "string"
+		    }
+		],
+		"outputs":[],
+		"type":"constructor"
+	}],
+	"params": [ 10000000000000000000000001, "some-text" ]
+}`
+
+const samplePrepareDeployTXScientificNotation = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "DeployContract"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+	"gas": 1000000,
+	"nonce": "111",
+	"value": "12345678901234567890123456789",
+	"contract": "0xdeadbeef",
+	"definition": [{
+		"inputs": [
+			{
+				"internalType":" uint256",
+				"name": "x",
+				"type": "uint256"
+			},
+		    {
+			    "internalType":" string",
+			    "name": "y",
+			    "type": "string"
+		    }
+		],
+		"outputs":[],
+		"type":"constructor"
+	}],
+	"params": [ 1.0000000000000000000000001e+25, "some-text" ]
 }`
 
 func TestDeployContractPrepareOkNoEstimate(t *testing.T) {
@@ -63,12 +126,49 @@ func TestDeployContractPrepareOkNoEstimate(t *testing.T) {
 	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
 	assert.NoError(t, err)
 	res, reason, err := c.DeployContractPrepare(ctx, &req)
-
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
-
 	assert.Equal(t, int64(1000000), res.Gas.Int64())
 
+	// Basic check that our input param 4276993775 is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "feedbeef"))
+}
+
+func TestDeployContractPrepareOkLargeInputParam(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTXLargeInputParams), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.DeployContractPrepare(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.Equal(t, int64(1000000), res.Gas.Int64())
+	// Basic check that our input param 10000000000000000000000001 is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "84595161401484a000001"))
+	// Basic check that our input param "some-text" is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "736f6d652d74657874"))
+}
+
+func TestDeployContractPrepareOkScientificNotationParam(t *testing.T) {
+
+	ctx, c, _, done := newTestConnector(t)
+	defer done()
+
+	var req ffcapi.ContractDeployPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareDeployTXScientificNotation), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.DeployContractPrepare(ctx, &req)
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+	assert.Equal(t, int64(1000000), res.Gas.Int64())
+	// Basic check that our input param 1.0000000000000000000000001e+25 is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "84595161401484a000001"))
+	// Basic check that our input param "some-text" is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "736f6d652d74657874"))
+	assert.Error(t, err)
 }
 
 func TestDeployContractPrepareWithEstimateRevert(t *testing.T) {
