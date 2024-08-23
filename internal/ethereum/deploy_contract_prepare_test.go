@@ -168,7 +168,6 @@ func TestDeployContractPrepareOkScientificNotationParam(t *testing.T) {
 	assert.True(t, strings.Contains(res.TransactionData, "84595161401484a000001"))
 	// Basic check that our input param "some-text" is in the TX data
 	assert.True(t, strings.Contains(res.TransactionData, "736f6d652d74657874"))
-	assert.Error(t, err)
 }
 
 func TestDeployContractPrepareWithEstimateRevert(t *testing.T) {
