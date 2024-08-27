@@ -162,6 +162,7 @@ func (bl *blockListener) listenLoop() {
 	var filter string
 	failCount := 0
 	gapPotential := true
+	firstIteration := true
 	for {
 		if failCount > 0 {
 			if bl.c.doFailureDelay(bl.ctx, failCount) {
@@ -170,13 +171,16 @@ func (bl *blockListener) listenLoop() {
 			}
 		} else {
 			// Sleep for the polling interval, or until we're shoulder tapped by the newHeads listener
-			select {
-			case <-time.After(bl.blockPollingInterval):
-			case <-bl.newHeadsTap:
-			case <-bl.ctx.Done():
-				log.L(bl.ctx).Debugf("Block listener loop stopping")
-				return
+			if !firstIteration {
+				select {
+				case <-time.After(bl.blockPollingInterval):
+				case <-bl.newHeadsTap:
+				case <-bl.ctx.Done():
+					log.L(bl.ctx).Debugf("Block listener loop stopping")
+					return
+				}
 			}
+			firstIteration = false
 		}
 
 		if filter == "" {
