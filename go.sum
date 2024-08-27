@@ -100,8 +100,6 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/huandu/xstrings v1.3.3/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/huandu/xstrings v1.4.0 h1:D17IlohoQq4UcpqD7fDk80P7l+lwAmlFaBHgOipl2FU=
 github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
-github.com/hyperledger/firefly-common v1.4.8 h1:0o1Qp1c5YzQo8nbnX+gAo9SVd2tR4Z9U2t8Y4zEzyaA=
-github.com/hyperledger/firefly-common v1.4.8/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
 github.com/hyperledger/firefly-transaction-manager v1.3.15 h1:IyWIId+uytqjIRMxROk5OqOcdHMzJFGFKpQQybiISOU=
 github.com/hyperledger/firefly-transaction-manager v1.3.15/go.mod h1:N3BoHh8+dWG710oQKuNiXmJNEOBBeLTsQ8GpZ41vhog=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
@@ -115,8 +113,10 @@ github.com/jarcoal/httpmock v1.2.0 h1:gSvTxxFR/MEMfsGrvRbdfpRUMBStovlSRLw0Ep1bww
 github.com/jarcoal/httpmock v1.2.0/go.mod h1:oCoTsnAz4+UoOUIf5lJOWV2QQIW5UoeUI6aM2YnWAZk=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
-github.com/kaleido-io/firefly-signer v0.0.0-20240823134028-a2c5b23d5256 h1:uu4qVM451mnU+mOH8TUvPfynnvxEbWzaiISl1MSIDSM=
-github.com/kaleido-io/firefly-signer v0.0.0-20240823134028-a2c5b23d5256/go.mod h1:pK6kivzBFSue3zpJSQpH67VasnLLbwBJOBUNv0zHbRA=
+github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156 h1:HQpScPoAm9xsACbu9r31wVQ5sQFxLsfe9XzPGY5c4rI=
+github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
+github.com/kaleido-io/firefly-signer v0.0.0-20240827135812-3c6f71cfc108 h1:Vix70J+rkeInHxhl3evmLij4QhE33zo6GCgaB2ZLp8c=
+github.com/kaleido-io/firefly-signer v0.0.0-20240827135812-3c6f71cfc108/go.mod h1:Xj2PF6y8Ce26jX38ch0KasNnnZCSyzcwyLSv8NN+7JA=
 github.com/karlseguin/ccache v2.0.3+incompatible h1:j68C9tWOROiOLWTS/kCGg9IcJG+ACqn5+0+t8Oh83UU=
 github.com/karlseguin/ccache v2.0.3+incompatible/go.mod h1:CM9tNPzT6EdRh14+jiW8mEF9mkNZuuE51qmgGYUB93w=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=

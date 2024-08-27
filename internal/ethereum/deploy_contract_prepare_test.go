@@ -45,14 +45,24 @@ const samplePrepareDeployTX = `{
 		"inputs": [
 			{
 				"internalType":" uint256",
-				"name": "y",
+				"name": "x",
 				"type": "uint256"
-			}
+			},
+		    {
+			    "internalType":" address",
+			    "name": "y",
+			    "type": "address"
+		    },
+		    {
+			    "internalType":" string",
+			    "name": "z",
+			    "type": "string"
+		    }
 		],
 		"outputs":[],
 		"type":"constructor"
 	}],
-	"params": [ 4276993775 ]
+	"params": [ 4276993775, "0x5f906824E562B6a0F278D910D388728b833a43bB", "some-text" ]
 }`
 
 const samplePrepareDeployTXLargeInputParams = `{
@@ -132,6 +142,10 @@ func TestDeployContractPrepareOkNoEstimate(t *testing.T) {
 
 	// Basic check that our input param 4276993775 is in the TX data
 	assert.True(t, strings.Contains(res.TransactionData, "feedbeef"))
+	// Basic check that our input param "some-text" is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, strings.ToLower("736f6d652d74657874")))
+	// Basic check that our input param address is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, strings.ToLower("5f906824E562B6a0F278D910D388728b833a43bB")))
 }
 
 func TestDeployContractPrepareOkLargeInputParam(t *testing.T) {
@@ -146,6 +160,7 @@ func TestDeployContractPrepareOkLargeInputParam(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, reason)
 	assert.Equal(t, int64(1000000), res.Gas.Int64())
+
 	// Basic check that our input param 10000000000000000000000001 is in the TX data
 	assert.True(t, strings.Contains(res.TransactionData, "84595161401484a000001"))
 	// Basic check that our input param "some-text" is in the TX data

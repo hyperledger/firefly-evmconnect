@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
@@ -93,10 +92,10 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 	}
 
 	// Parse the params into the standard semantics of Go JSON unmarshalling, with []interface{}
-	ethParams := make([]fftypes.JSONAny, len(req.Params))
+	ethParams := make([]interface{}, len(req.Params))
 	for i, p := range req.Params {
 		if p != nil {
-			err := json.Unmarshal([]byte(*p), &ethParams[i])
+			err := p.Unmarshal(ctx, &ethParams[i])
 			if err != nil {
 				return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalParamFail, i, err)
 			}
