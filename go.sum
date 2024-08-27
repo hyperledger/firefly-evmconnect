@@ -115,8 +115,8 @@ github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8Hm
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156 h1:HQpScPoAm9xsACbu9r31wVQ5sQFxLsfe9XzPGY5c4rI=
 github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
-github.com/kaleido-io/firefly-signer v0.0.0-20240827135812-3c6f71cfc108 h1:Vix70J+rkeInHxhl3evmLij4QhE33zo6GCgaB2ZLp8c=
-github.com/kaleido-io/firefly-signer v0.0.0-20240827135812-3c6f71cfc108/go.mod h1:Xj2PF6y8Ce26jX38ch0KasNnnZCSyzcwyLSv8NN+7JA=
+github.com/kaleido-io/firefly-signer v0.0.0-20240827145609-70863b71eb78 h1:KVn6azO0KM9NH6+SYktI3Lh8AyQXutYdMb45lZXO+Uc=
+github.com/kaleido-io/firefly-signer v0.0.0-20240827145609-70863b71eb78/go.mod h1:Xj2PF6y8Ce26jX38ch0KasNnnZCSyzcwyLSv8NN+7JA=
 github.com/karlseguin/ccache v2.0.3+incompatible h1:j68C9tWOROiOLWTS/kCGg9IcJG+ACqn5+0+t8Oh83UU=
 github.com/karlseguin/ccache v2.0.3+incompatible/go.mod h1:CM9tNPzT6EdRh14+jiW8mEF9mkNZuuE51qmgGYUB93w=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=
