@@ -49,6 +49,7 @@ type blockListener struct {
 	backend                    rpcbackend.RPC
 	wsBackend                  rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
 	listenLoopDone             chan struct{}
+	blockFilterEstablished     chan struct{}
 	initialBlockHeightObtained chan struct{}
 	newHeadsTap                chan struct{}
 	newHeadsSub                rpcbackend.Subscription
@@ -73,6 +74,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		c:                          c,
 		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
+		blockFilterEstablished:     make(chan struct{}),
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}),
 		highestBlock:               -1,
@@ -136,16 +138,18 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 			bl.backend = bl.wsBackend
 		}
 
-		// Now get the block heiht
+		// Now get the block height
 		var hexBlockHeight ethtypes.HexInteger
 		rpcErr := bl.backend.CallRPC(bl.ctx, &hexBlockHeight, "eth_blockNumber")
 		if rpcErr != nil {
 			log.L(bl.ctx).Warnf("Block height could not be obtained: %s", rpcErr.Message)
 			return true, rpcErr.Error()
 		}
+
 		bl.mux.Lock()
 		bl.highestBlock = hexBlockHeight.BigInt().Int64()
 		bl.mux.Unlock()
+
 		return false, nil
 	})
 }
@@ -179,8 +183,9 @@ func (bl *blockListener) listenLoop() {
 					log.L(bl.ctx).Debugf("Block listener loop stopping")
 					return
 				}
+			} else {
+				firstIteration = false
 			}
-			firstIteration = false
 		}
 
 		if filter == "" {
@@ -189,6 +194,8 @@ func (bl *blockListener) listenLoop() {
 				log.L(bl.ctx).Errorf("Failed to establish new block filter: %s", err.Message)
 				failCount++
 				continue
+			} else {
+				close(bl.blockFilterEstablished)
 			}
 		}
 
@@ -479,6 +486,7 @@ func (bl *blockListener) checkStartedLocked() {
 		bl.listenLoopDone = make(chan struct{})
 		go bl.listenLoop()
 	}
+	<-bl.blockFilterEstablished
 }
 
 func (bl *blockListener) addConsumer(c *blockUpdateConsumer) {
