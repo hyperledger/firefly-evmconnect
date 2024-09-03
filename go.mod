@@ -6,9 +6,9 @@ toolchain go1.21.6
 
 require (
 	github.com/hashicorp/golang-lru v1.0.2
-	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.13
-	github.com/hyperledger/firefly-transaction-manager v1.3.15
+	github.com/hyperledger/firefly-common v1.4.9
+	github.com/hyperledger/firefly-signer v1.1.14
+	github.com/hyperledger/firefly-transaction-manager v1.3.16
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
@@ -100,7 +100,3 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/hyperledger/firefly-signer => github.com/kaleido-io/firefly-signer v0.0.0-20240827145609-70863b71eb78
-
-replace github.com/hyperledger/firefly-common => github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156

@@ -100,8 +100,12 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/huandu/xstrings v1.3.3/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/huandu/xstrings v1.4.0 h1:D17IlohoQq4UcpqD7fDk80P7l+lwAmlFaBHgOipl2FU=
 github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
-github.com/hyperledger/firefly-transaction-manager v1.3.15 h1:IyWIId+uytqjIRMxROk5OqOcdHMzJFGFKpQQybiISOU=
-github.com/hyperledger/firefly-transaction-manager v1.3.15/go.mod h1:N3BoHh8+dWG710oQKuNiXmJNEOBBeLTsQ8GpZ41vhog=
+github.com/hyperledger/firefly-common v1.4.9 h1:PfPZ73FN8WUoPl8iF8ud00B8476+jmqXHHi94w0Krbc=
+github.com/hyperledger/firefly-common v1.4.9/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
+github.com/hyperledger/firefly-signer v1.1.14 h1:gSGwdBHTLPchGlmLOKk2Y2nawfMhlH2CDm2owt0lIUE=
+github.com/hyperledger/firefly-signer v1.1.14/go.mod h1:Xj2PF6y8Ce26jX38ch0KasNnnZCSyzcwyLSv8NN+7JA=
+github.com/hyperledger/firefly-transaction-manager v1.3.16 h1:rW6rptO4LcOeUYVOMTyvsfPcOzNLBpmBTj4T6n0/vpY=
+github.com/hyperledger/firefly-transaction-manager v1.3.16/go.mod h1:UT4Cijjsz5AqiXa9H3GUiT2vm2Hq1wEgT0n/shsYZp0=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
 github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
@@ -113,10 +117,6 @@ github.com/jarcoal/httpmock v1.2.0 h1:gSvTxxFR/MEMfsGrvRbdfpRUMBStovlSRLw0Ep1bww
 github.com/jarcoal/httpmock v1.2.0/go.mod h1:oCoTsnAz4+UoOUIf5lJOWV2QQIW5UoeUI6aM2YnWAZk=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
-github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156 h1:HQpScPoAm9xsACbu9r31wVQ5sQFxLsfe9XzPGY5c4rI=
-github.com/kaleido-io/firefly-common v0.0.0-20240827134901-edb07289f156/go.mod h1:dXewcVMFNON2SvQ1UPvu64OWUt77+M3p8qy61lT1kE4=
-github.com/kaleido-io/firefly-signer v0.0.0-20240827145609-70863b71eb78 h1:KVn6azO0KM9NH6+SYktI3Lh8AyQXutYdMb45lZXO+Uc=
-github.com/kaleido-io/firefly-signer v0.0.0-20240827145609-70863b71eb78/go.mod h1:Xj2PF6y8Ce26jX38ch0KasNnnZCSyzcwyLSv8NN+7JA=
 github.com/karlseguin/ccache v2.0.3+incompatible h1:j68C9tWOROiOLWTS/kCGg9IcJG+ACqn5+0+t8Oh83UU=
 github.com/karlseguin/ccache v2.0.3+incompatible/go.mod h1:CM9tNPzT6EdRh14+jiW8mEF9mkNZuuE51qmgGYUB93w=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=
