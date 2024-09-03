@@ -19,6 +19,7 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -155,6 +156,70 @@ const samplePrepareTXBadErrors = `{
 	"errors": [false]
 }`
 
+const samplePrepareTXHugeNumberParam = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "prepare_transaction"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+	"nonce": "222",
+	"method": {
+		"inputs": [],
+		"name":"do",
+		"outputs":[],
+		"stateMutability":"nonpayable",
+		"type":"function"
+	},
+	"method": {
+		"inputs": [
+			{
+				"internalType":" uint256",
+				"name": "x",
+				"type": "uint256"
+			}
+		],
+		"name":"set",
+		"outputs":[],
+		"stateMutability":"nonpayable",
+		"type":"function"
+	},
+	"params": [ 10000000000000000000000001 ]
+}`
+
+const samplePrepareTXScientificNumberParam = `{
+	"ffcapi": {
+		"version": "v1.0.0",
+		"id": "904F177C-C790-4B01-BDF4-F2B4E52E607E",
+		"type": "prepare_transaction"
+	},
+	"from": "0xb480F96c0a3d6E9e9a263e4665a39bFa6c4d01E8",
+	"to": "0xe1a078b9e2b145d0a7387f09277c6ae1d9470771",
+	"nonce": "222",
+	"method": {
+		"inputs": [],
+		"name":"do",
+		"outputs":[],
+		"stateMutability":"nonpayable",
+		"type":"function"
+	},
+	"method": {
+		"inputs": [
+			{
+				"internalType":" uint256",
+				"name": "x",
+				"type": "uint256"
+			}
+		],
+		"name":"set",
+		"outputs":[],
+		"stateMutability":"nonpayable",
+		"type":"function"
+	},
+	"params": [ 1.0000000000000000000000002e+25 ]
+}`
+
 func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
 	ctx, c, _, done := newTestConnector(t)
@@ -170,6 +235,60 @@ func TestPrepareTransactionOkNoEstimate(t *testing.T) {
 
 	assert.Equal(t, int64(1000000), res.Gas.Int64())
 
+}
+
+func TestPrepareTransactionOkHugeNumberParam(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, "0x60fe47b1000000000000000000000000000000000000000000084595161401484a000001", tx.Data.String())
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
+		})
+
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXHugeNumberParam), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
+
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	// Basic check that our input param 10000000000000000000000001 is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "84595161401484a000001"))
+}
+
+func TestPrepareTransactionOkScientificNumberParam(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			assert.Equal(t, "0x60fe47b1000000000000000000000000000000000000000000084595161401484a000002", tx.Data.String())
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
+		})
+
+	var req ffcapi.TransactionPrepareRequest
+	err := json.Unmarshal([]byte(samplePrepareTXScientificNumberParam), &req)
+	assert.NoError(t, err)
+	res, reason, err := c.TransactionPrepare(ctx, &req)
+
+	assert.NoError(t, err)
+	assert.Empty(t, reason)
+
+	// Basic check that our input param 1.0000000000000000000000002e+25 is in the TX data
+	assert.True(t, strings.Contains(res.TransactionData, "84595161401484a000002"))
 }
 
 func TestPrepareTransactionWithEstimate(t *testing.T) {
