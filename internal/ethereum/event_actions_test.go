@@ -82,13 +82,18 @@ func mockStreamLoopEmpty(mRPC *rpcbackendmocks.Backend) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(testHighBlock)
 	}).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "block_filter_id1"
+	}).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "block_filter_id1").Return(nil).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*string) = "filter_id1"
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {

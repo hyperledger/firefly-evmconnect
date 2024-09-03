@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func strPtr(s string) *string { return &s }
@@ -56,6 +57,18 @@ func newTestConnector(t *testing.T, confSetup ...func(conf config.Section)) (con
 		c.WaitClosed()
 	}
 
+}
+
+func conditionalMockOnce(call *mock.Call, predicate func() bool, thenRun func(args mock.Arguments)) {
+	call.Run(func(args mock.Arguments) {
+		if predicate() {
+			thenRun(args)
+		} else {
+			call.Run(func(args mock.Arguments) {
+				thenRun(args)
+			}).Once()
+		}
+	}).Once()
 }
 
 func TestConnectorInit(t *testing.T) {
