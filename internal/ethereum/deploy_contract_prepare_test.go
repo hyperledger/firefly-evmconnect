@@ -323,7 +323,7 @@ func TestDeployContractPrepareBadParamType(t *testing.T) {
 
 	var req ffcapi.ContractDeployPrepareRequest
 	err := json.Unmarshal([]byte(samplePrepareDeployTX), &req)
-	req.Params = []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"!wrong"`)}
+	req.Params = []*fftypes.JSONAny{fftypes.JSONAnyPtr(`"!wrong"`), fftypes.JSONAnyPtr(`"0x90eB678C3586103805a676d21721Cc6883a6c3AE"`), fftypes.JSONAnyPtr(`"helloworld"`)}
 	assert.NoError(t, err)
 	_, reason, err := c.DeployContractPrepare(ctx, &req)
 
