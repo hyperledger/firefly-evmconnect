@@ -1177,6 +1177,62 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 
 }
 
+func TestBlockListenerWillNotCloseBlockFilterSignalChannelMoreThanOnce(t *testing.T) {
+
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		go done()
+	})
+
+	bl.checkStartedLocked(context.Background()) // start block listener loop
+	bl.setBlockFilterStatus()                   // ensure that block filter established signal channel is not closed more than once
+
+	c.WaitClosed()
+
+	mRPC.AssertExpectations(t)
+
+}
+
+func TestBlockListenerCheckStartedLockedOnlyReturnsAfterEstablishingBlockFilter(t *testing.T) {
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
+
+	assert.False(t, bl.blockFilterEstablished.isEstablished)
+	bl.checkStartedLocked(context.Background())
+	assert.True(t, bl.blockFilterEstablished.isEstablished)
+	_, ok := <-bl.blockFilterEstablished.signal
+	if ok {
+		t.Errorf("Expected new block filter established signal channel to be closed")
+	}
+
+	done()
+	c.WaitClosed()
+
+	mRPC.AssertExpectations(t)
+}
+
 func TestBlockListenerDispatchStopped(t *testing.T) {
 	_, c, _, done := newTestConnector(t)
 	done()
