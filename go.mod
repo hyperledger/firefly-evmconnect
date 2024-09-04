@@ -6,9 +6,9 @@ toolchain go1.21.6
 
 require (
 	github.com/hashicorp/golang-lru v1.0.2
-	github.com/hyperledger/firefly-common v1.4.8
-	github.com/hyperledger/firefly-signer v1.1.13
-	github.com/hyperledger/firefly-transaction-manager v1.3.15
+	github.com/hyperledger/firefly-common v1.4.9
+	github.com/hyperledger/firefly-signer v1.1.14
+	github.com/hyperledger/firefly-transaction-manager v1.3.16
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4

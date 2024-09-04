@@ -95,7 +95,7 @@ func (c *ethConnector) prepareDeployData(ctx context.Context, req *ffcapi.Contra
 	ethParams := make([]interface{}, len(req.Params))
 	for i, p := range req.Params {
 		if p != nil {
-			err := json.Unmarshal([]byte(*p), &ethParams[i])
+			err := p.Unmarshal(ctx, &ethParams[i])
 			if err != nil {
 				return nil, nil, i18n.NewError(ctx, msgs.MsgUnmarshalParamFail, i, err)
 			}
