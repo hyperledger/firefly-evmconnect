@@ -231,9 +231,8 @@ func (bl *blockListener) listenLoop() {
 				log.L(bl.ctx).Errorf("Failed to establish new block filter: %s", err.Message)
 				failCount++
 				continue
-			} else {
-				bl.setBlockFilterStatus()
 			}
+			bl.setBlockFilterStatus()
 		}
 
 		var blockHashes []ethtypes.HexBytes0xPrefix
@@ -519,9 +518,13 @@ func (bl *blockListener) dispatchToConsumers(consumers []*blockUpdateConsumer, u
 }
 
 func (bl *blockListener) checkStartedLocked(ctx context.Context) {
+	bl.mux.Lock()
 	if bl.listenLoopDone == nil {
 		bl.listenLoopDone = make(chan struct{})
+		bl.mux.Unlock()
 		go bl.listenLoop()
+	} else {
+		bl.mux.Unlock()
 	}
 
 	bl.blockTillBlockFilterEstablished(ctx)
