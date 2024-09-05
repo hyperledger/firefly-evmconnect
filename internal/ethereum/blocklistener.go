@@ -199,6 +199,7 @@ func (bl *blockListener) listenLoop() {
 			failCount++
 			continue
 		}
+		log.L(bl.ctx).Debugf("Block filter received new block hashes: %+v", blockHashes)
 
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential, Created: fftypes.Now()}
 		var notifyPos *list.Element
