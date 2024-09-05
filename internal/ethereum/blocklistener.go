@@ -230,6 +230,7 @@ func (bl *blockListener) listenLoop() {
 			failCount++
 			continue
 		}
+		log.L(bl.ctx).Debugf("Block filter received new block hashes: %+v", blockHashes)
 
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential, Created: fftypes.Now()}
 		var notifyPos *list.Element
@@ -260,7 +261,7 @@ func (bl *blockListener) listenLoop() {
 			default:
 				candidate := bl.reconcileCanonicalChain(bi)
 				// Check this is the lowest position to notify from
-				if candidate != nil && (notifyPos == nil || candidate.Value.(*minimalBlockInfo).number < notifyPos.Value.(*minimalBlockInfo).number) {
+				if candidate != nil && (notifyPos == nil || candidate.Value.(*minimalBlockInfo).number <= notifyPos.Value.(*minimalBlockInfo).number) {
 					notifyPos = candidate
 				}
 			}
