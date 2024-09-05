@@ -549,6 +549,9 @@ func (bl *blockListener) waitClosed() {
 		bl.wsBackend.Close()
 	}
 	if listenLoopDone != nil {
-		<-listenLoopDone
+		select {
+		case <-listenLoopDone:
+		case <-bl.ctx.Done():
+		}
 	}
 }

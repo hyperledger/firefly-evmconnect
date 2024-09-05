@@ -506,6 +506,32 @@ func TestLeadGroupCatchupRetry(t *testing.T) {
 	<-retried
 
 }
+func TestLeadGroupCatchupExitWhenNoBlockHeightEstablished(t *testing.T) {
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "0",
+		},
+	}
+	ctx, c, mRPC, cDone := newTestConnector(t)
+
+	attempted := make(chan struct{})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+		close(attempted)
+		cDone()
+	}).Once()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(&rpcbackend.RPCError{Message: "pop"}).Maybe()
+	_, _, mRPC, done := testEventStreamExistingConnector(t, ctx, cDone, c, mRPC, l1req)
+	defer done()
+	<-attempted
+
+}
 
 func TestStreamLoopNewFilterFail(t *testing.T) {
 
