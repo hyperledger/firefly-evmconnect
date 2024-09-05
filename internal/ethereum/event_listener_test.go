@@ -131,8 +131,6 @@ func TestGetInitialBlockTimeout(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		<-blockRPC // make it timeout
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Maybe()
 
 	_, err := l.getInitialBlock(ctx, "latest")
 	assert.Regexp(t, "FF23046", err)
@@ -156,8 +154,6 @@ func TestGetHWMNotInit(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		<-blockRPC // make it timeout
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Maybe()
 
 	_, err := l.getInitialBlock(ctx, "latest")
 	assert.Regexp(t, "FF23046", err)

@@ -513,8 +513,8 @@ func (bl *blockListener) addConsumer(ctx context.Context, c *blockUpdateConsumer
 	bl.checkAndStartListenerLoop()
 	bl.waitUntilStarted(ctx) // need to make sure the listener is started before adding any consumers
 	bl.mux.Lock()
+	defer bl.mux.Unlock()
 	bl.consumers[*c.id] = c
-	bl.mux.Unlock()
 }
 
 func (bl *blockListener) getHighestBlock(ctx context.Context) (int64, bool) {

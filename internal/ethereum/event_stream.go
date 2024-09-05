@@ -301,7 +301,6 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	var ag *aggregatedListener
 	lastUpdate := -1
 	failCount := 0
-	filterRPC := ""
 	filterResetRequired := false
 	for {
 		if es.c.doFailureDelay(es.ctx, failCount) {
@@ -330,7 +329,6 @@ func (es *eventStream) leadGroupSteadyState() bool {
 					es.uninstallFilter(&filter)
 				}
 				filterResetRequired = false
-				filterRPC = "eth_getFilterLogs" // first JSON/RPC after getting a new filter ID
 				// Determine the earliest block we need to poll from
 				fromBlock := int64(-1)
 				for _, l := range ag.listeners {
@@ -364,14 +362,14 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			}
 			// Get the next batch of logs
 			var ethLogs []*logJSONRPC
-			rpcErr := es.c.backend.CallRPC(es.ctx, &ethLogs, filterRPC, filter)
+			rpcErr := es.c.backend.CallRPC(es.ctx, &ethLogs, "eth_getFilterLogs", filter)
 			// If we fail to query we just retry - setting filter to nil if not found
 			if rpcErr != nil {
 				if mapError(filterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
 					log.L(es.ctx).Infof("Filter '%v' reset: %s", filter, rpcErr.Message)
 					filter = ""
 				}
-				log.L(es.ctx).Errorf("Failed to query filter (%s): %s", filterRPC, rpcErr.Message)
+				log.L(es.ctx).Errorf("Failed to query filter (eth_getFilterLogs): %s", rpcErr.Message)
 				failCount++
 				continue
 			}

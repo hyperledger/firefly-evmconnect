@@ -407,7 +407,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			},
 		}
-	}).Maybe()
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
 			Number: ethtypes.NewHexInteger64(212122),
