@@ -500,31 +500,27 @@ func (bl *blockListener) dispatchToConsumers(consumers []*blockUpdateConsumer, u
 	}
 }
 
-func (bl *blockListener) checkStartedLocked(ctx context.Context) {
+func (bl *blockListener) checkAndStartListenerLoop() {
 	bl.mux.Lock()
+	defer bl.mux.Unlock()
 	if bl.listenLoopDone == nil {
 		bl.listenLoopDone = make(chan struct{})
-		bl.mux.Unlock()
 		go bl.listenLoop()
-	} else {
-		bl.mux.Unlock()
 	}
-
-	bl.waitUntilStarted(ctx)
 }
 
 func (bl *blockListener) addConsumer(ctx context.Context, c *blockUpdateConsumer) {
-	bl.checkStartedLocked(ctx) // need to make sure the listener is started before adding any consumers
+	bl.checkAndStartListenerLoop()
+	bl.waitUntilStarted(ctx) // need to make sure the listener is started before adding any consumers
 	bl.mux.Lock()
 	bl.consumers[*c.id] = c
 	bl.mux.Unlock()
 }
 
 func (bl *blockListener) getHighestBlock(ctx context.Context) (int64, bool) {
-	bl.checkStartedLocked(ctx)
-	if err := ctx.Err(); err != nil {
-		return -1, false
-	}
+	bl.checkAndStartListenerLoop()
+	// block height will be established as the first step of listener startup process
+	// so we don't need to wait for the entire startup process to finish to return the result
 	bl.mux.Lock()
 	highestBlock := bl.highestBlock
 	bl.mux.Unlock()
@@ -539,10 +535,6 @@ func (bl *blockListener) getHighestBlock(ctx context.Context) (int64, bool) {
 	}
 	bl.mux.Lock()
 	highestBlock = bl.highestBlock
-	if bl.highestBlock == -1 {
-		// handle edge case when bl.initialBlockHeightObtained channel is closed
-		return -1, false
-	}
 	bl.mux.Unlock()
 	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
 	return highestBlock, true

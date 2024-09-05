@@ -263,7 +263,7 @@ func TestBlockListenerWSShoulderTap(t *testing.T) {
 		}
 	}()
 
-	bl.checkStartedLocked(ctx)
+	bl.checkAndStartListenerLoop()
 
 	// Wait until we close because it worked
 	<-bl.listenLoopDone
@@ -966,7 +966,7 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 		return bh == block1003Hash.String()
 	}), false).Return(nil)
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1006,7 +1006,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 		return bh == block1003Hash.String()
 	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1044,7 +1044,7 @@ func TestBlockListenerProcessNonStandardHashRejectedWhenNotInHederaCompatibility
 		go done() // Close after we've processed the log
 	})
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1082,7 +1082,7 @@ func TestBlockListenerProcessNonStandardHashRejectedWhenWrongSizeForHedera(t *te
 		go done() // Close after we've processed the log
 	})
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1125,7 +1125,7 @@ func TestBlockListenerProcessNonStandardHashAcceptedWhenInHederaCompatbilityMode
 		return bh == truncatedBlock1003Hash.String()
 	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1156,7 +1156,7 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 		go done() // Close after we've processed the log
 	})
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1177,7 +1177,7 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 		go done()
 	})
 
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
 
 	c.WaitClosed()
 
@@ -1207,7 +1207,7 @@ func TestBlockListenerWillNotCloseBlockFilterSignalChannelMoreThanOnce(t *testin
 	loopDone := make(chan struct{}, loopCount)
 	for i := 0; i < loopCount; i++ {
 		go func() {
-			bl.checkStartedLocked(context.Background()) // start block listener loop
+			bl.checkAndStartListenerLoop() // start block listener loop
 			loopDone <- struct{}{}
 		}()
 	}
@@ -1223,13 +1223,14 @@ func TestBlockListenerWillNotCloseBlockFilterSignalChannelMoreThanOnce(t *testin
 		}
 	}
 
+	bl.waitUntilStarted(context.Background())
 	c.WaitClosed()
 
 	mRPC.AssertExpectations(t)
 
 }
 
-func TestBlockListenerCheckStartedLockedOnlyReturnsAfterEstablishingBlockFilter(t *testing.T) {
+func TestBlockListenerWaitUntilStartedOnlyReturnsAfterEstablishingBlockFilter(t *testing.T) {
 	_, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
@@ -1245,7 +1246,8 @@ func TestBlockListenerCheckStartedLockedOnlyReturnsAfterEstablishingBlockFilter(
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
 
 	assert.False(t, bl.isStarted)
-	bl.checkStartedLocked(context.Background())
+	bl.checkAndStartListenerLoop()
+	bl.waitUntilStarted(context.Background())
 	assert.True(t, bl.isStarted)
 	_, ok := <-bl.startDone
 	if ok {
