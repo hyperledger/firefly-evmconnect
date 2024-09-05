@@ -393,7 +393,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 
 func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 
-	_, c, mRPC, done := newTestConnector(t)
+	_, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -407,19 +407,23 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 		hbh := args[1].(*ethtypes.HexInteger)
 		*hbh = *ethtypes.NewHexInteger64(1000)
 	}).Once()
+
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*string)
-		*hbh = "filter_id1"
+		*hbh = testBlockFilterID1
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
-		*hbh = []ethtypes.HexBytes0xPrefix{
-			block1001HashA,
-			block1001HashB,
-			block1002Hash,
-			block1003Hash,
-		}
-	}).Once()
+	conditionalMockOnce(
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil),
+		func() bool { return len(bl.consumers) > 0 },
+		func(args mock.Arguments) {
+			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+			*hbh = []ethtypes.HexBytes0xPrefix{
+				block1001HashA,
+				block1001HashB,
+				block1002Hash,
+				block1003Hash,
+			}
+		})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
 
@@ -461,7 +465,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 	})
 
 	updates := make(chan *ffcapi.BlockHashEvent)
-	bl.addConsumer(&blockUpdateConsumer{
+	bl.addConsumer(context.Background(), &blockUpdateConsumer{
 		id:      fftypes.NewUUID(),
 		ctx:     context.Background(),
 		updates: updates,
@@ -484,7 +488,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 
 func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T) {
 
-	_, c, mRPC, done := newTestConnector(t)
+	_, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -500,17 +504,20 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*string)
-		*hbh = "filter_id1"
+		*hbh = testBlockFilterID1
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
-		*hbh = []ethtypes.HexBytes0xPrefix{
-			block1001HashB, // valid hash is in the front of the array, so will need to re-build the chain
-			block1001HashA,
-			block1002Hash,
-			block1003Hash,
-		}
-	}).Once()
+	conditionalMockOnce(
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil),
+		func() bool { return len(bl.consumers) > 0 },
+		func(args mock.Arguments) {
+			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+			*hbh = []ethtypes.HexBytes0xPrefix{
+				block1001HashB, // valid hash is in the front of the array, so will need to re-build the chain
+				block1001HashA,
+				block1002Hash,
+				block1003Hash,
+			}
+		})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
 
@@ -576,7 +583,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		}
 	})
 	updates := make(chan *ffcapi.BlockHashEvent)
-	bl.addConsumer(&blockUpdateConsumer{
+	bl.addConsumer(context.Background(), &blockUpdateConsumer{
 		id:      fftypes.NewUUID(),
 		ctx:     context.Background(),
 		updates: updates,
@@ -599,7 +606,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 
 func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 
-	_, c, mRPC, done := newTestConnector(t)
+	_, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -615,17 +622,21 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*string)
-		*hbh = "filter_id1"
+		*hbh = testBlockFilterID1
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
-		*hbh = []ethtypes.HexBytes0xPrefix{
-			block1001Hash,
-			block1002HashA,
-			block1002HashB,
-			block1003Hash,
-		}
-	}).Once()
+	conditionalMockOnce(
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil),
+		func() bool { return len(bl.consumers) > 0 },
+		func(args mock.Arguments) {
+			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+			*hbh = []ethtypes.HexBytes0xPrefix{
+				block1001Hash,
+				block1002HashA,
+				block1002HashB,
+				block1003Hash,
+			}
+		})
+
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
@@ -666,7 +677,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 		}
 	})
 	updates := make(chan *ffcapi.BlockHashEvent)
-	bl.addConsumer(&blockUpdateConsumer{
+	bl.addConsumer(context.Background(), &blockUpdateConsumer{
 		id:      fftypes.NewUUID(),
 		ctx:     context.Background(),
 		updates: updates,
@@ -689,7 +700,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 
 func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 
-	_, c, mRPC, done := newTestConnector(t)
+	_, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 	bl := c.blockListener
 	bl.blockPollingInterval = 1 * time.Microsecond
 
@@ -705,17 +716,21 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*string)
-		*hbh = "filter_id1"
+		*hbh = testBlockFilterID1
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
-		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
-		*hbh = []ethtypes.HexBytes0xPrefix{
-			block1001Hash,
-			block1002Hash,
-			block1003HashA,
-			block1003HashB,
-		}
-	}).Once()
+	conditionalMockOnce(
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil),
+		func() bool { return len(bl.consumers) > 0 },
+		func(args mock.Arguments) {
+			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+			*hbh = []ethtypes.HexBytes0xPrefix{
+				block1001Hash,
+				block1002Hash,
+				block1003HashA,
+				block1003HashB,
+			}
+		})
+
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
@@ -756,7 +771,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 		}
 	})
 	updates := make(chan *ffcapi.BlockHashEvent)
-	bl.addConsumer(&blockUpdateConsumer{
+	bl.addConsumer(context.Background(), &blockUpdateConsumer{
 		id:      fftypes.NewUUID(),
 		ctx:     context.Background(),
 		updates: updates,
