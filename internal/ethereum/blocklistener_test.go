@@ -446,6 +446,121 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 	mRPC.AssertExpectations(t)
 }
 
+func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T) {
+
+	_, c, mRPC, done := newTestConnector(t)
+	bl := c.blockListener
+	bl.blockPollingInterval = 1 * time.Microsecond
+
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String()) // parent
+	block1001HashA := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	block1001HashB := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*ethtypes.HexInteger)
+		*hbh = *ethtypes.NewHexInteger64(1000)
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*string)
+		*hbh = "filter_id1"
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{
+			block1001HashB, // valid hash is in the front of the array, so will need to re-build the chain
+			block1001HashA,
+			block1002Hash,
+			block1003Hash,
+		}
+	}).Once()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
+		return bn.BigInt().Int64() == 1001
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1001),
+			Hash:       block1001HashB,
+			ParentHash: block1000Hash,
+		}
+	})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
+		return bn.BigInt().Int64() == 1002
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1002),
+			Hash:       block1002Hash,
+			ParentHash: block1001HashB,
+		}
+	})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
+		return bn.BigInt().Int64() == 1003
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1003),
+			Hash:       block1003Hash,
+			ParentHash: block1002Hash,
+		}
+	})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
+		return bn.BigInt().Int64() == 1004 // not found
+	}), false).Return(nil)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == block1001HashA.String()
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1001),
+			Hash:       block1001HashA,
+			ParentHash: block1000Hash,
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == block1001HashB.String()
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1001),
+			Hash:       block1001HashB,
+			ParentHash: block1000Hash,
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
+		return bh == block1002Hash.String()
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1002),
+			Hash:       block1002Hash,
+			ParentHash: block1001HashB,
+		}
+	})
+	updates := make(chan *ffcapi.BlockHashEvent)
+	bl.addConsumer(&blockUpdateConsumer{
+		id:      fftypes.NewUUID(),
+		ctx:     context.Background(),
+		updates: updates,
+	})
+
+	bu := <-updates
+	assert.Equal(t, []string{
+		block1001HashB.String(),
+		block1002Hash.String(),
+		block1003Hash.String(),
+	}, bu.BlockHashes)
+
+	done()
+	<-bl.listenLoopDone
+
+	assert.Equal(t, int64(1003), bl.highestBlock)
+
+	mRPC.AssertExpectations(t)
+}
+
 func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 
 	_, c, mRPC, done := newTestConnector(t)
