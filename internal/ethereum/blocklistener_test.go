@@ -1219,10 +1219,10 @@ func TestBlockListenerCheckStartedLockedOnlyReturnsAfterEstablishingBlockFilter(
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil)
 
-	assert.False(t, bl.blockFilterEstablished.isEstablished)
+	assert.False(t, bl.blockFilterEstablished.isStarted)
 	bl.checkStartedLocked(context.Background())
-	assert.True(t, bl.blockFilterEstablished.isEstablished)
-	_, ok := <-bl.blockFilterEstablished.signal
+	assert.True(t, bl.blockFilterEstablished.isStarted)
+	_, ok := <-bl.blockFilterEstablished.startDone
 	if ok {
 		t.Errorf("Expected new block filter established signal channel to be closed")
 	}

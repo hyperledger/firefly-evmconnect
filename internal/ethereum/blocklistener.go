@@ -41,9 +41,8 @@ type blockUpdateConsumer struct {
 }
 
 type blockFilterStatus struct {
-	isEstablished bool
-	signal        chan struct{}
-	mux           sync.Mutex
+	isStarted bool
+	startDone chan struct{}
 }
 
 // blockListener has two functions:
@@ -80,7 +79,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		c:                          c,
 		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
-		blockFilterEstablished:     blockFilterStatus{isEstablished: false, signal: make(chan struct{})},
+		blockFilterEstablished:     blockFilterStatus{isStarted: false, startDone: make(chan struct{})},
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}),
 		highestBlock:               -1,
@@ -102,27 +101,15 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 
 // setting block filter status updates that new block filter has been created
 func (bl *blockListener) setBlockFilterStatus() {
-	bl.blockFilterEstablished.mux.Lock()
-	defer bl.blockFilterEstablished.mux.Unlock()
-	if !bl.blockFilterEstablished.isEstablished {
-		bl.blockFilterEstablished.isEstablished = true
-		close(bl.blockFilterEstablished.signal)
-	}
-}
-
-// un-setting block filter status updates that no block filter is present on block listener
-func (bl *blockListener) unsetBlockFilterStatus() {
-	bl.blockFilterEstablished.mux.Lock()
-	defer bl.blockFilterEstablished.mux.Unlock()
-	if bl.blockFilterEstablished.isEstablished {
-		bl.blockFilterEstablished.isEstablished = false
-		bl.blockFilterEstablished.signal = make(chan struct{})
+	if !bl.blockFilterEstablished.isStarted {
+		bl.blockFilterEstablished.isStarted = true
+		close(bl.blockFilterEstablished.startDone)
 	}
 }
 
 func (bl *blockListener) blockTillBlockFilterEstablished(ctx context.Context) {
 	select {
-	case <-bl.blockFilterEstablished.signal:
+	case <-bl.blockFilterEstablished.startDone:
 	case <-bl.ctx.Done():
 	case <-ctx.Done():
 	}
@@ -190,9 +177,6 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 
 func (bl *blockListener) listenLoop() {
 	defer close(bl.listenLoopDone)
-	defer func() {
-		bl.unsetBlockFilterStatus()
-	}()
 
 	err := bl.establishBlockHeightWithRetry()
 	close(bl.initialBlockHeightObtained)
