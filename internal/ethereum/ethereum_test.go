@@ -33,7 +33,17 @@ import (
 func strPtr(s string) *string { return &s }
 
 func newTestConnector(t *testing.T, confSetup ...func(conf config.Section)) (context.Context, *ethConnector, *rpcbackendmocks.Backend, func()) {
+	ctx, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t, confSetup...)
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+		filterID := args[1].(*string)
+		*filterID = testBlockFilterID1
+	}).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Maybe()
+	return ctx, c, mRPC, done
+}
+
+func newTestConnectorWithNoBlockerFilterDefaultMocks(t *testing.T, confSetup ...func(conf config.Section)) (context.Context, *ethConnector, *rpcbackendmocks.Backend, func()) {
 	mRPC := &rpcbackendmocks.Backend{}
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
@@ -56,7 +66,6 @@ func newTestConnector(t *testing.T, confSetup ...func(conf config.Section)) (con
 		mRPC.AssertExpectations(t)
 		c.WaitClosed()
 	}
-
 }
 
 func conditionalMockOnce(call *mock.Call, predicate func() bool, thenRun func(args mock.Arguments)) {

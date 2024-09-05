@@ -206,20 +206,8 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		},
 	}
 
-	es, events, mRPC, done := testEventStream(t, l1req)
-	defer done()
-
-	l2req := &ffcapi.EventListenerAddRequest{
-		StreamID:   es.id,
-		ListenerID: fftypes.NewUUID(),
-		EventListenerOptions: ffcapi.EventListenerOptions{
-			Filters: []fftypes.JSONAny{
-				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`),
-			},
-			Options:   fftypes.JSONAnyPtr(`{}`),
-			FromBlock: "1000",
-		},
-	}
+	ctx, c, mRPC, done := newTestConnector(t)
+	mockStreamLoopEmpty(mRPC)
 
 	closed := false
 	listenerCaughtUp := make(chan struct{})
@@ -241,7 +229,7 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 				},
 				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			})
-		case es.c.catchupPageSize + 1000:
+		case 500 /*default catch up page size*/ + 1000:
 			if !closed {
 				close(listenerCaughtUp)
 				closed = true
@@ -257,6 +245,21 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		}
 	})
+	es, events, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+
+	defer done()
+
+	l2req := &ffcapi.EventListenerAddRequest{
+		StreamID:   es.id,
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`),
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "1000",
+		},
+	}
 
 	_, _, err := es.c.EventListenerAdd(es.ctx, l2req)
 	assert.NoError(t, err)
@@ -343,7 +346,8 @@ func TestExitDuringCatchup(t *testing.T) {
 		},
 	}
 
-	_, _, mRPC, done := testEventStream(t, l1req)
+	ctx, c, mRPC, done := newTestConnector(t)
+	mockStreamLoopEmpty(mRPC)
 
 	completed := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -359,7 +363,9 @@ func TestExitDuringCatchup(t *testing.T) {
 		}
 		*args[1].(*[]*logJSONRPC) = ethLogs
 	}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Maybe()
+
+	_, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 
 	<-completed
 }
@@ -378,18 +384,14 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	}
 
 	ctx, c, mRPC, done := newTestConnector(t)
-
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*ethtypes.HexInteger) = *ethtypes.NewHexInteger64(testHighBlock)
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(*string) = "filter_id1"
+			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
-	}).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
 			{
 				BlockNumber:      ethtypes.NewHexInteger64(212122),
@@ -405,15 +407,12 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 				Data: ethtypes.MustNewHexBytes0xPrefix("0x00000000000000000000000000000000000000000000000000000000000003e8"),
 			},
 		}
-	}).Once()
+	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
 			Number: ethtypes.NewHexInteger64(212122),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		}
-	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
@@ -433,6 +432,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	assert.Equal(t, "0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4", e.Event.Data.JSONObject().GetString("from"))
 	assert.Equal(t, "0xd0f2f5103fd050739a9fb567251bc460cc24d091", e.Event.Data.JSONObject().GetString("to"))
 	assert.Equal(t, "1000", e.Event.Data.JSONObject().GetString("value"))
+	mRPC.AssertExpectations(t)
 }
 
 func TestLeadGroupNearBlockZeroEnsureNonNegative(t *testing.T) {
@@ -457,14 +457,13 @@ func TestLeadGroupNearBlockZeroEnsureNonNegative(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, int64(0), args[3].(*logFilterJSONRPC).FromBlock.BigInt().Int64())
-			*args[1].(*string) = "filter_id1"
+			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Once().Run(func(args mock.Arguments) {
 		close(filtered)
 	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
 	}).Maybe()
@@ -613,17 +612,14 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 			l2req.StreamID = es.id
 			_, _, err := c.EventListenerAdd(ctx, l2req)
 			assert.NoError(t, err)
-			*args[1].(*string) = "filter_id1"
+			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(*string) = "filter_id2"
+			*args[1].(*string) = testLogsFilterID2
 			close(reestablishedFilter)
 		})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
-	}).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -650,7 +646,6 @@ func TestStreamLoopFilterReset(t *testing.T) {
 		},
 	}
 	ctx, c, mRPC, done := newTestConnector(t)
-
 	reestablishedFilter := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -658,18 +653,15 @@ func TestStreamLoopFilterReset(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(*string) = "filter_id1"
+			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(*string) = "filter_id2"
+			*args[1].(*string) = testLogsFilterID2
 			close(reestablishedFilter)
 		})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "filter not found"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
-	}).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -705,7 +697,7 @@ func TestStreamLoopEnrichFail(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(*string) = "filter_id1"
+			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
@@ -729,9 +721,6 @@ func TestStreamLoopEnrichFail(t *testing.T) {
 			close(errorReturned)
 		}).
 		Return(&rpcbackend.RPCError{Message: "pop"}).Once()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
-	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
 	}).Maybe()

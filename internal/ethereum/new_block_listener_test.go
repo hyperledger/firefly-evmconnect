@@ -37,9 +37,9 @@ func TestNewBlockListenerOK(t *testing.T) {
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*string)
-		*hbh = "filter_id1"
+		*hbh = testBlockFilterID1
 	}).Maybe()
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", "filter_id1").Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{}
 	}).Maybe()

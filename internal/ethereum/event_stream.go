@@ -375,8 +375,6 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				failCount++
 				continue
 			}
-			filterRPC = "eth_getFilterChanges"
-
 			// Enrich the events
 			events, enrichErr := es.filterEnrichSort(es.ctx, ag, ethLogs)
 			if enrichErr != nil {

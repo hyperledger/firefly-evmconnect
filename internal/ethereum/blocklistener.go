@@ -40,21 +40,19 @@ type blockUpdateConsumer struct {
 	updates chan<- *ffcapi.BlockHashEvent
 }
 
-type blockFilterStatus struct {
-	isStarted bool
-	startDone chan struct{}
-}
-
 // blockListener has two functions:
 // 1) To establish and keep track of what the head block height of the blockchain is, so event streams know how far from the head they are
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
-	ctx                        context.Context
-	c                          *ethConnector
-	backend                    rpcbackend.RPC
-	wsBackend                  rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
-	listenLoopDone             chan struct{}
-	blockFilterEstablished     blockFilterStatus
+	ctx            context.Context
+	c              *ethConnector
+	backend        rpcbackend.RPC
+	wsBackend      rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
+	listenLoopDone chan struct{}
+
+	isStarted bool
+	startDone chan struct{}
+
 	initialBlockHeightObtained chan struct{}
 	newHeadsTap                chan struct{}
 	newHeadsSub                rpcbackend.Subscription
@@ -79,7 +77,8 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		c:                          c,
 		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
-		blockFilterEstablished:     blockFilterStatus{isStarted: false, startDone: make(chan struct{})},
+		isStarted:                  false,
+		startDone:                  make(chan struct{}),
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}),
 		highestBlock:               -1,
@@ -100,16 +99,16 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 }
 
 // setting block filter status updates that new block filter has been created
-func (bl *blockListener) setBlockFilterStatus() {
-	if !bl.blockFilterEstablished.isStarted {
-		bl.blockFilterEstablished.isStarted = true
-		close(bl.blockFilterEstablished.startDone)
+func (bl *blockListener) markStarted() {
+	if !bl.isStarted {
+		bl.isStarted = true
+		close(bl.startDone)
 	}
 }
 
-func (bl *blockListener) blockTillBlockFilterEstablished(ctx context.Context) {
+func (bl *blockListener) waitUntilStarted(ctx context.Context) {
 	select {
-	case <-bl.blockFilterEstablished.startDone:
+	case <-bl.startDone:
 	case <-bl.ctx.Done():
 	case <-ctx.Done():
 	}
@@ -216,7 +215,7 @@ func (bl *blockListener) listenLoop() {
 				failCount++
 				continue
 			}
-			bl.setBlockFilterStatus()
+			bl.markStarted()
 		}
 
 		var blockHashes []ethtypes.HexBytes0xPrefix
@@ -511,14 +510,14 @@ func (bl *blockListener) checkStartedLocked(ctx context.Context) {
 		bl.mux.Unlock()
 	}
 
-	bl.blockTillBlockFilterEstablished(ctx)
+	bl.waitUntilStarted(ctx)
 }
 
-func (bl *blockListener) addConsumer(c *blockUpdateConsumer) {
+func (bl *blockListener) addConsumer(ctx context.Context, c *blockUpdateConsumer) {
+	bl.checkStartedLocked(ctx) // need to make sure the listener is started before adding any consumers
 	bl.mux.Lock()
 	bl.consumers[*c.id] = c
 	bl.mux.Unlock()
-	bl.checkStartedLocked(context.Background())
 }
 
 func (bl *blockListener) getHighestBlock(ctx context.Context) (int64, bool) {

@@ -24,7 +24,7 @@ import (
 
 func (c *ethConnector) NewBlockListener(ctx context.Context, req *ffcapi.NewBlockListenerRequest) (*ffcapi.NewBlockListenerResponse, ffcapi.ErrorReason, error) {
 	// Add the block consumer
-	c.blockListener.addConsumer(&blockUpdateConsumer{
+	c.blockListener.addConsumer(req.ListenerContext, &blockUpdateConsumer{
 		id:      req.ID,
 		ctx:     req.ListenerContext,
 		updates: req.BlockListener,
