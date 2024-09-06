@@ -29,7 +29,7 @@ func configCommand() *cobra.Command {
 		Use:   "docs",
 		Short: "Prints the config info as markdown",
 		Long:  "",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			InitConfig()
 			b, err := config.GenerateConfigMarkdown(context.Background(), "", config.GetKnownKeys())
 			fmt.Println(string(b))

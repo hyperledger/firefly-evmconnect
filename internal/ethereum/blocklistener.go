@@ -128,7 +128,7 @@ func (bl *blockListener) newHeadsSubListener() {
 // getBlockHeightWithRetry keeps retrying attempting to get the initial block height until successful
 func (bl *blockListener) establishBlockHeightWithRetry() error {
 	wsConnected := false
-	return bl.c.retry.Do(bl.ctx, "get initial block height", func(attempt int) (retry bool, err error) {
+	return bl.c.retry.Do(bl.ctx, "get initial block height", func(_ int) (retry bool, err error) {
 
 		// If we have a WebSocket backend, then we connect it and switch over to using it
 		// (we accept an un-locked update here to backend, as the most important routine that's
@@ -404,7 +404,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	for {
 		var bi *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
-		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
+		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
 			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
@@ -458,7 +458,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 		currentViewBlock := lastElem.Value.(*minimalBlockInfo)
 		var freshBlockInfo *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
-		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(attempt int) (retry bool, err error) {
+		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
 			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})

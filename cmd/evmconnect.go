@@ -41,7 +41,7 @@ var rootCmd = &cobra.Command{
 	Use:   "evmconnect",
 	Short: "Hyperledger FireFly Connector for EVM based blockchains",
 	Long:  ``,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return run()
 	},
 }
