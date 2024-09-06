@@ -62,7 +62,7 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 	go es.streamLoop()
 
 	// Add the block consumer
-	c.blockListener.addConsumer(&blockUpdateConsumer{
+	c.blockListener.addConsumer(req.StreamContext, &blockUpdateConsumer{
 		id:      es.id,
 		ctx:     req.StreamContext,
 		updates: req.BlockListener,
