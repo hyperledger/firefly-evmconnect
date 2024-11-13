@@ -487,7 +487,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 	}
 
 	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.number {
-		log.L(bl.ctx).Warnf("Trimmed canonical chain to from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.number, bl.unstableHeadLength)
+		log.L(bl.ctx).Warnf("Trimming canonical chain to from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.number, bl.unstableHeadLength)
 	}
 	return lastValidBlock
 }
