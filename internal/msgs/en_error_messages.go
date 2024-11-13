@@ -70,4 +70,5 @@ var (
 	MsgUnableToCallDebug         = ffe("FF23052", "Failed to call debug_traceTransaction to get error detail: %s")
 	MsgReturnValueNotDecoded     = ffe("FF23053", "Error return value for custom error: %s")
 	MsgReturnValueNotAvailable   = ffe("FF23054", "Error return value unavailable")
+	MsgInvalidProtocolID         = ffe("FF23055", "Invalid protocol ID in event log: %s")
 )

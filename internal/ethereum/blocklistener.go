@@ -381,8 +381,7 @@ func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.El
 // a recent block advertisement. So we need to work backwards to the last point of consistency with the current
 // chain and re-query the chain state from there.
 func (bl *blockListener) rebuildCanonicalChain() *list.Element {
-
-	log.L(bl.ctx).Debugf("Rebuilding in-memory canonical chain")
+	log.L(bl.ctx).Warn("Rebuilding in-memory canonical chain")
 
 	// If none of our blocks were valid, start from the first block number we've notified about previously
 	lastValidBlock := bl.trimToLastValidBlock()
@@ -452,10 +451,14 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInfo) {
 	// First remove from the end until we get a block that matches the current un-cached query view from the chain
 	lastElem := bl.canonicalChain.Back()
+	var startingNumber *int64
 	for lastElem != nil && lastElem.Value != nil {
 
 		// Query the block that is no at this blockNumber
 		currentViewBlock := lastElem.Value.(*minimalBlockInfo)
+		if startingNumber == nil {
+			startingNumber = &currentViewBlock.number
+		}
 		var freshBlockInfo *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
@@ -481,7 +484,10 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 			break
 		}
 		lastElem = lastElem.Prev()
+	}
 
+	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.number {
+		log.L(bl.ctx).Warnf("Trimmed canonical chain to from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.number, bl.unstableHeadLength)
 	}
 	return lastValidBlock
 }
