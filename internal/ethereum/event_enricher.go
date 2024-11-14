@@ -21,7 +21,9 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -84,6 +86,10 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		}
 	}
 
+	if blockNumber < 0 || transactionIndex < 0 || logIndex < 0 {
+		log.L(ctx).Errorf("Invalid block number, transaction index or log index for event '%s'", protoID)
+		return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgInvalidProtocolID, protoID)
+	}
 	signature := f.Signature
 	return &ffcapi.Event{
 		ID: ffcapi.EventID{
