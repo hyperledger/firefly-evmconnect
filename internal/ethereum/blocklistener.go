@@ -381,14 +381,13 @@ func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.El
 // a recent block advertisement. So we need to work backwards to the last point of consistency with the current
 // chain and re-query the chain state from there.
 func (bl *blockListener) rebuildCanonicalChain() *list.Element {
-	log.L(bl.ctx).Warn("Rebuilding in-memory canonical chain")
-
 	// If none of our blocks were valid, start from the first block number we've notified about previously
 	lastValidBlock := bl.trimToLastValidBlock()
 	var nextBlockNumber int64
 	var expectedParentHash string
 	if lastValidBlock != nil {
 		nextBlockNumber = lastValidBlock.number + 1
+		log.L(bl.ctx).Warnf("rebuildCanonicalChain partial rebuild from block %d", nextBlockNumber)
 		expectedParentHash = lastValidBlock.hash
 	} else {
 		firstBlock := bl.canonicalChain.Front()
@@ -396,6 +395,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 			return nil
 		}
 		nextBlockNumber = firstBlock.Value.(*minimalBlockInfo).number
+		log.L(bl.ctx).Warnf("rebuildCanonicalChain brand new in-memory canonical chain from block %d", nextBlockNumber)
 		// Clear out the whole chain
 		bl.canonicalChain = bl.canonicalChain.Init()
 	}
@@ -413,7 +413,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 			}
 		}
 		if bi == nil {
-			log.L(bl.ctx).Debugf("Block listener canonical chain view rebuilt to head at block %d", nextBlockNumber-1)
+			log.L(bl.ctx).Infof("rebuildCanonicalChain successfully rebuilt the chain to the head block %d", nextBlockNumber-1)
 			break
 		}
 		mbi := &minimalBlockInfo{
@@ -425,7 +425,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 		// It's possible the chain will change while we're doing this, and we fall back to the next block notification
 		// to sort that out.
 		if expectedParentHash != "" && mbi.parentHash != expectedParentHash {
-			log.L(bl.ctx).Debugf("Block listener canonical chain view rebuilt up to new re-org at block %d", nextBlockNumber)
+			log.L(bl.ctx).Warnf("rebuildCanonicalChain rebuild stopped at block: %d due to mismatch hash for parent block (%d): %s (expected: %s)", nextBlockNumber, nextBlockNumber-1, mbi.parentHash, expectedParentHash)
 			break
 		}
 		expectedParentHash = mbi.hash
@@ -458,10 +458,12 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 		currentViewBlock := lastElem.Value.(*minimalBlockInfo)
 		if startingNumber == nil {
 			startingNumber = &currentViewBlock.number
+			log.L(bl.ctx).Debugf("trimToLastValidBlock checking from last block: %d", startingNumber)
 		}
 		var freshBlockInfo *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
+			log.L(bl.ctx).Debugf("trimToLastValidBlock checking block: %d", currentViewBlock.number)
 			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
@@ -472,7 +474,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 		}
 
 		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.hash {
-			log.L(bl.ctx).Debugf("Canonical chain matches current chain up to block %d", currentViewBlock.number)
+			log.L(bl.ctx).Debugf("trimToLastValidBlock found last valid block %d", currentViewBlock.number)
 			lastValidBlock = currentViewBlock
 			// Trim everything after this point, as it's invalidated
 			nextElem := lastElem.Next()
@@ -487,7 +489,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 	}
 
 	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.number {
-		log.L(bl.ctx).Warnf("Trimming canonical chain to from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.number, bl.unstableHeadLength)
+		log.L(bl.ctx).Debugf("trimToLastValidBlock trimmed canonical chain from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.number, bl.unstableHeadLength)
 	}
 	return lastValidBlock
 }
