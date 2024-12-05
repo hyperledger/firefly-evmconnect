@@ -32,14 +32,19 @@ const (
 	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
 	EventsBlockTimestamps       = "events.blockTimestamps"
 	EventsFilterPollingInterval = "events.filterPollingInterval"
-	RetryInitDelay              = "retry.initialDelay"
-	RetryMaxDelay               = "retry.maxDelay"
-	RetryFactor                 = "retry.factor"
-	MaxConcurrentRequests       = "maxConcurrentRequests"
-	TxCacheSize                 = "txCacheSize"
-	HederaCompatibilityMode     = "hederaCompatibilityMode"
-	TraceTXForRevertReason      = "traceTXForRevertReason"
-	WebSocketsEnabled           = "ws.enabled"
+	RetryInitDelay              = "blockListenerRetry.initialDelay"
+	RetryMaxDelay               = "blockListenerRetry.maxDelay"
+	RetryFactor                 = "blockListenerRetry.factor"
+
+	DeprecatedRetryInitDelay = "retry.initialDelay"
+	DeprecatedRetryMaxDelay  = "retry.maxDelay"
+	DeprecatedRetryFactor    = "retry.factor"
+
+	MaxConcurrentRequests   = "maxConcurrentRequests"
+	TxCacheSize             = "txCacheSize"
+	HederaCompatibilityMode = "hederaCompatibilityMode"
+	TraceTXForRevertReason  = "traceTXForRevertReason"
+	WebSocketsEnabled       = "ws.enabled"
 )
 
 const (
@@ -72,6 +77,9 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(RetryFactor, DefaultRetryDelayFactor)
 	conf.AddKnownKey(RetryInitDelay, DefaultRetryInitDelay)
 	conf.AddKnownKey(RetryMaxDelay, DefaultRetryMaxDelay)
+	conf.AddKnownKey(DeprecatedRetryFactor)
+	conf.AddKnownKey(DeprecatedRetryInitDelay)
+	conf.AddKnownKey(DeprecatedRetryMaxDelay)
 	conf.AddKnownKey(MaxConcurrentRequests, 50)
 	conf.AddKnownKey(TxCacheSize, 250)
 	conf.AddKnownKey(HederaCompatibilityMode, false)
