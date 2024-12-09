@@ -70,7 +70,7 @@
 |connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |dataFormat|Configure the JSON data format for query output and events|map,flat_array,self_describing|`map`
 |expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
-|gasEstimationFactor|The factor to apply to the gas estimation to determine the gas limit|float|`1.5`
+|gasEstimationFactor|The factor to apply to the gas estimation to determine the gas limit|`float32`|`1.5`
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
 |hederaCompatibilityMode|Compatibility mode for Hedera, allowing non-standard block header hashes to be processed|`boolean`|`false`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
@@ -95,7 +95,7 @@
 
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
-|factor|Factor to increase the delay by, between each block indexing http requests retry to the RPC endpoint|`int`|`2`
+|factor|Factor to increase the delay by, between each block indexing http requests retry to the RPC endpoint|`float32`|`2`
 |initialDelay|Initial delay for retrying block indexing http requests to the RPC endpoint|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
 |maxDelay|Maximum delay for between each block indexing http requests retry to the RPC endpoint|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
@@ -123,7 +123,7 @@
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
 |errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
-|factor|<Deprecated> use 'connector.blockListenerRetry.factor' instead|`int`|`<nil>`
+|factor|<Deprecated> use 'connector.blockListenerRetry.factor' instead|`float32`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
 |initialDelay|<Deprecated> use 'connector.blockListenerRetry.initialDelay' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
 |maxDelay|<Deprecated> use 'connector.blockListenerRetry.maxDelay' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
