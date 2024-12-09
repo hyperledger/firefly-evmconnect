@@ -154,37 +154,39 @@ func TestConnectorInit(t *testing.T) {
 	cc, err = NewEthereumConnector(context.Background(), conf)
 	assert.Regexp(t, "FF23051", err)
 }
-func TestNewEthereumConnector(t *testing.T) {
+
+// TODO: remove once deprecated fields are removed
+func TestNewEthereumConnectorConfigDeprecates(t *testing.T) {
 	// Test deprecated fields
 	config.RootConfigReset()
 	conf := config.RootSection("unittest")
 	InitConfig(conf)
 	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
 
-	// check default
+	// check deprecates
+	conf.Set(DeprecatedRetryInitDelay, "100ms")
+	conf.Set(DeprecatedRetryFactor, 2.0)
+	conf.Set(DeprecatedRetryMaxDelay, "30s")
 	cc, err := NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, cc)
 	assert.Equal(t, 100*time.Millisecond, cc.(*ethConnector).retry.InitialDelay)
 	assert.Equal(t, 2.0, cc.(*ethConnector).retry.Factor)
 	assert.Equal(t, 30*time.Second, cc.(*ethConnector).retry.MaximumDelay)
+}
 
-	// check default
-	conf.Set(DeprecatedRetryInitDelay, "100ms")
-	conf.Set(DeprecatedRetryFactor, 2.0)
-	conf.Set(DeprecatedRetryMaxDelay, "30s")
-	cc, err = NewEthereumConnector(context.Background(), conf)
-	assert.NoError(t, err)
-	assert.NotNil(t, cc)
-	assert.Equal(t, 100*time.Millisecond, cc.(*ethConnector).retry.InitialDelay)
-	assert.Equal(t, 2.0, cc.(*ethConnector).retry.Factor)
-	assert.Equal(t, 30*time.Second, cc.(*ethConnector).retry.MaximumDelay)
+func TestNewEthereumConnectorConfig(t *testing.T) {
+	// Test deprecated fields
+	config.RootConfigReset()
+	conf := config.RootSection("unittest")
+	InitConfig(conf)
+	conf.Set(ffresty.HTTPConfigURL, "http://localhost:8545")
 
 	// check new values set
 	conf.Set(RetryInitDelay, "10s")
 	conf.Set(RetryFactor, 4.0)
 	conf.Set(RetryMaxDelay, "30s")
-	cc, err = NewEthereumConnector(context.Background(), conf)
+	cc, err := NewEthereumConnector(context.Background(), conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, cc)
 	assert.Equal(t, 10*time.Second, cc.(*ethConnector).retry.InitialDelay)
