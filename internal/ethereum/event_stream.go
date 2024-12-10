@@ -302,6 +302,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	lastUpdate := -1
 	failCount := 0
 	filterResetRequired := false
+	filterRPCMethodToUse := ""
 	for {
 		if es.c.doFailureDelay(es.ctx, failCount) {
 			log.L(es.ctx).Debugf("Stream loop exiting")
@@ -329,6 +330,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 					es.uninstallFilter(&filter)
 				}
 				filterResetRequired = false
+				filterRPCMethodToUse = "eth_getFilterLogs" // first JSON/RPC for a new filter ID fetches all the historical logs to ensure no gaps
 				// Determine the earliest block we need to poll from
 				fromBlock := int64(-1)
 				for _, l := range ag.listeners {
@@ -362,17 +364,18 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			}
 			// Get the next batch of logs
 			var ethLogs []*logJSONRPC
-			rpcErr := es.c.backend.CallRPC(es.ctx, &ethLogs, "eth_getFilterLogs", filter)
+			rpcErr := es.c.backend.CallRPC(es.ctx, &ethLogs, filterRPCMethodToUse, filter)
 			// If we fail to query we just retry - setting filter to nil if not found
 			if rpcErr != nil {
 				if mapError(filterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
 					log.L(es.ctx).Infof("Filter '%v' reset: %s", filter, rpcErr.Message)
 					filter = ""
 				}
-				log.L(es.ctx).Errorf("Failed to query filter (eth_getFilterLogs): %s", rpcErr.Message)
+				log.L(es.ctx).Errorf("Failed to query filter (%s): %s", filterRPCMethodToUse, rpcErr.Message)
 				failCount++
 				continue
 			}
+			filterRPCMethodToUse = "eth_getFilterChanges" // subsequent JSON/RPC calls after the initial fetch, this fetches only the new logs
 			// Enrich the events
 			events, enrichErr := es.filterEnrichSort(es.ctx, ag, ethLogs)
 			if enrichErr != nil {
