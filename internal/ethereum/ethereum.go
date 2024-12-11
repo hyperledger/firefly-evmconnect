@@ -66,12 +66,27 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
 		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
 		traceTXForRevertReason:     conf.GetBool(TraceTXForRevertReason),
-		retry: &retry.Retry{
-			InitialDelay: conf.GetDuration(RetryInitDelay),
-			MaximumDelay: conf.GetDuration(RetryMaxDelay),
-			Factor:       conf.GetFloat64(RetryFactor),
-		},
+		retry:                      &retry.Retry{},
 	}
+
+	if !conf.IsSet(DeprecatedRetryInitDelay) || (conf.IsSet(DeprecatedRetryInitDelay) && conf.IsSet(RetryInitDelay)) {
+		c.retry.InitialDelay = conf.GetDuration(RetryInitDelay)
+	} else {
+		c.retry.InitialDelay = conf.GetDuration(DeprecatedRetryInitDelay)
+	}
+
+	if !conf.IsSet(DeprecatedRetryFactor) || (conf.IsSet(DeprecatedRetryFactor) && conf.IsSet(RetryFactor)) {
+		c.retry.Factor = conf.GetFloat64(RetryFactor)
+	} else {
+		c.retry.Factor = conf.GetFloat64(DeprecatedRetryFactor)
+	}
+
+	if !conf.IsSet(DeprecatedRetryMaxDelay) || (conf.IsSet(DeprecatedRetryMaxDelay) && conf.IsSet(RetryMaxDelay)) {
+		c.retry.MaximumDelay = conf.GetDuration(RetryMaxDelay)
+	} else {
+		c.retry.MaximumDelay = conf.GetDuration(DeprecatedRetryMaxDelay)
+	}
+
 	if c.catchupThreshold < c.catchupPageSize {
 		log.L(ctx).Warnf("Catchup threshold %d must be at least as large as the catchup page size %d (overridden to %d)", c.catchupThreshold, c.catchupPageSize, c.catchupPageSize)
 		c.catchupThreshold = c.catchupPageSize

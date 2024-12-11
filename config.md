@@ -70,7 +70,7 @@
 |connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |dataFormat|Configure the JSON data format for query output and events|map,flat_array,self_describing|`map`
 |expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
-|gasEstimationFactor|The factor to apply to the gas estimation to determine the gas limit|float|`1.5`
+|gasEstimationFactor|The factor to apply to the gas estimation to determine the gas limit|`float32`|`1.5`
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
 |hederaCompatibilityMode|Compatibility mode for Hedera, allowing non-standard block header hashes to be processed|`boolean`|`false`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
@@ -108,6 +108,14 @@
 |---|-----------|----|-------------|
 |url|Optional HTTP proxy server to connect through|`string`|`<nil>`
 
+## connector.queryLoopRetry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|factor|Factor to increase the delay by, between each query request retry to the RPC endpoint, applicable to all the query loops|`float32`|`2`
+|initialDelay|Initial delay for retrying query requests to the RPC endpoint, applicable to all the query loops|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
+|maxDelay|Maximum delay for between each query request retry to the RPC endpoint, applicable to all the query loops|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
 ## connector.retry
 
 |Key|Description|Type|Default Value|
@@ -115,10 +123,10 @@
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
 |errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
-|factor|The retry backoff factor|`float32`|`2`
+|factor|<Deprecated> Please refer to 'connector.queryLoopRetry.factor' to understand its original purpose and use that instead|`float32`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
-|initialDelay|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
-|maxDelay|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+|initialDelay|<Deprecated> Please refer to 'connector.queryLoopRetry.initialDelay' to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|maxDelay|<Deprecated> Please refer to 'connector.queryLoopRetry.maxDelay' to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
 ## connector.throttle
