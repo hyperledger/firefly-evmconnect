@@ -91,14 +91,6 @@
 |password|Password|`string`|`<nil>`
 |username|Username|`string`|`<nil>`
 
-## connector.blockListenerRetry
-
-|Key|Description|Type|Default Value|
-|---|-----------|----|-------------|
-|factor|Factor to increase the delay by, between each block indexing http requests retry to the RPC endpoint|`float32`|`2`
-|initialDelay|Initial delay for retrying block indexing http requests to the RPC endpoint|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
-|maxDelay|Maximum delay for between each block indexing http requests retry to the RPC endpoint|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
-
 ## connector.events
 
 |Key|Description|Type|Default Value|
@@ -116,6 +108,14 @@
 |---|-----------|----|-------------|
 |url|Optional HTTP proxy server to connect through|`string`|`<nil>`
 
+## connector.queryLoopRetry
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|factor|Factor to increase the delay by, between each query request retry to the RPC endpoint, applicable to all the query loops|`float32`|`2`
+|initialDelay|Initial delay for retrying query requests to the RPC endpoint, applicable to all the query loops|[`time.Duration`](https://pkg.go.dev/time#Duration)|`100ms`
+|maxDelay|Maximum delay for between each query request retry to the RPC endpoint, applicable to all the query loops|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
+
 ## connector.retry
 
 |Key|Description|Type|Default Value|
@@ -123,10 +123,10 @@
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
 |errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
-|factor|<Deprecated> use 'connector.blockListenerRetry.factor' instead|`float32`|`<nil>`
+|factor|<Deprecated> Please refer to 'connector.queryLoopRetry.factor' to understand its original purpose and use that instead|`float32`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
-|initialDelay|<Deprecated> use 'connector.blockListenerRetry.initialDelay' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
-|maxDelay|<Deprecated> use 'connector.blockListenerRetry.maxDelay' instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|initialDelay|<Deprecated> Please refer to 'connector.queryLoopRetry.initialDelay' to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|maxDelay|<Deprecated> Please refer to 'connector.queryLoopRetry.maxDelay' to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
 ## connector.throttle

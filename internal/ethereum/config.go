@@ -32,9 +32,9 @@ const (
 	EventsCheckpointBlockGap    = "events.checkpointBlockGap"
 	EventsBlockTimestamps       = "events.blockTimestamps"
 	EventsFilterPollingInterval = "events.filterPollingInterval"
-	RetryInitDelay              = "blockListenerRetry.initialDelay"
-	RetryMaxDelay               = "blockListenerRetry.maxDelay"
-	RetryFactor                 = "blockListenerRetry.factor"
+	RetryInitDelay              = "queryLoopRetry.initialDelay"
+	RetryMaxDelay               = "queryLoopRetry.maxDelay"
+	RetryFactor                 = "queryLoopRetry.factor"
 
 	DeprecatedRetryInitDelay = "retry.initialDelay"
 	DeprecatedRetryMaxDelay  = "retry.maxDelay"
