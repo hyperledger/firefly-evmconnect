@@ -123,10 +123,10 @@
 |count|The maximum number of times to retry|`int`|`5`
 |enabled|Enables retries|`boolean`|`false`
 |errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
-|factor|<Deprecated> Please refer to 'connector.queryLoopRetry.factor' to understand its original purpose and use that instead|`float32`|`<nil>`
+|factor|(Deprecated) Please refer to `connector.queryLoopRetry.factor` to understand its original purpose and use that instead|`float32`|`<nil>`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`
-|initialDelay|<Deprecated> Please refer to 'connector.queryLoopRetry.initialDelay' to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
-|maxDelay|<Deprecated> Please refer to 'connector.queryLoopRetry.maxDelay' to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|initialDelay|(Deprecated) Please refer to `connector.queryLoopRetry.initialDelay` to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
+|maxDelay|(Deprecated) Please refer to `connector.queryLoopRetry.maxDelay` to understand its original purpose and use that instead|[`time.Duration`](https://pkg.go.dev/time#Duration)|`<nil>`
 |maxWaitTime|The maximum retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 
 ## connector.throttle
