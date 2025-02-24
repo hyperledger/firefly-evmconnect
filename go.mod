@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hyperledger/firefly-common v1.4.11
 	github.com/hyperledger/firefly-signer v1.1.17
-	github.com/hyperledger/firefly-transaction-manager v1.3.18
+	github.com/hyperledger/firefly-transaction-manager v1.3.19
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
@@ -73,7 +73,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
-	github.com/rs/cors v1.11.0 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect

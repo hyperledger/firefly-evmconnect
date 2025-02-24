@@ -104,8 +104,8 @@ github.com/hyperledger/firefly-common v1.4.11 h1:WKv2hQuNpS7yP51THxzpzrqU3jkln23
 github.com/hyperledger/firefly-common v1.4.11/go.mod h1:E7w/RxNtVnX52WXLQW9f2xVAgZnW70voZeE9sZrx/q0=
 github.com/hyperledger/firefly-signer v1.1.17 h1:JV38nNeCS/K31kPDk5mwnoqw6SoulcYF+12JW8a3/Mw=
 github.com/hyperledger/firefly-signer v1.1.17/go.mod h1:HDaDdht94JypRTunRGrcPL5Pvxfh4yigjatTrie5JUI=
-github.com/hyperledger/firefly-transaction-manager v1.3.18 h1:had6Mp9KZ1WwX2GuhJToSzwvjKaRy45c2K/DeqLLQ7k=
-github.com/hyperledger/firefly-transaction-manager v1.3.18/go.mod h1:TLMmYp2QhzbC1jQEhvjYYlx3kByR1m9ALQ1CxUVTkiM=
+github.com/hyperledger/firefly-transaction-manager v1.3.19 h1:AzRYulDpk+AzeVPFGqw8nLRMPNJcX32FP7VBdsTM+L0=
+github.com/hyperledger/firefly-transaction-manager v1.3.19/go.mod h1:qZgj628oCJ+DP3CwS2y9pRN8zwJAJ8/U3ait/+fmQlg=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
 github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
@@ -199,8 +199,8 @@ github.com/prometheus/procfs v0.12.0 h1:jluTpSng7V9hY0O2R9DzzJHYb2xULk9VTR1V1R/k
 github.com/prometheus/procfs v0.12.0/go.mod h1:pcuDEFsWDnvcgNzo4EEweacyhjeA9Zk3cnaOZAZEfOo=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
-github.com/rs/cors v1.11.0 h1:0B9GE/r9Bc2UxRMMtymBkHTenPkHDv0CW4Y98GBY+po=
-github.com/rs/cors v1.11.0/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU=
+github.com/rs/cors v1.11.1 h1:eU3gRzXLRK57F5rKMGMZURNdIG4EoAmX8k94r9wXWHA=
+github.com/rs/cors v1.11.1/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sagikazarmark/locafero v0.4.0 h1:HApY1R9zGo4DBgr7dqsTH/JJxLTTsOt7u6keLGt6kNQ=
 github.com/sagikazarmark/locafero v0.4.0/go.mod h1:Pe1W6UlPYUk/+wc/6KFhbORCfqzgYEpgQ3O5fPuL3H4=
