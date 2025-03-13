@@ -129,7 +129,6 @@ func (bl *blockListener) newHeadsSubListener() {
 func (bl *blockListener) establishBlockHeightWithRetry() error {
 	wsConnected := false
 	return bl.c.retry.Do(bl.ctx, "get initial block height", func(_ int) (retry bool, err error) {
-
 		// If we have a WebSocket backend, then we connect it and switch over to using it
 		// (we accept an un-locked update here to backend, as the most important routine that's
 		// querying block state is the one we're called on)
@@ -197,11 +196,11 @@ func (bl *blockListener) listenLoop() {
 			// Sleep for the polling interval, or until we're shoulder tapped by the newHeads listener
 			if !firstIteration {
 				select {
-				case <-time.After(bl.blockPollingInterval):
-				case <-bl.newHeadsTap:
 				case <-bl.ctx.Done():
 					log.L(bl.ctx).Debugf("Block listener loop stopping")
 					return
+				case <-time.After(bl.blockPollingInterval):
+				case <-bl.newHeadsTap:
 				}
 			} else {
 				firstIteration = false
@@ -296,7 +295,6 @@ func (bl *blockListener) listenLoop() {
 // head of the canonical chain we have. If these blocks do not just fit onto the end of the chain, then we
 // work backwards building a new view and notify about all blocks that are changed in that process.
 func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Element {
-
 	mbi := &minimalBlockInfo{
 		number:     bi.Number.BigInt().Int64(),
 		hash:       bi.Hash.String(),
@@ -336,7 +334,6 @@ func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Ele
 // handleNewBlock rebuilds the canonical chain around a new block, checking if we need to rebuild our
 // view of the canonical chain behind it, or trimming anything after it that is invalidated by a new fork.
 func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.Element) *list.Element {
-
 	// If we have an existing canonical chain before this point, then we need to check we've not
 	// invalidated that with this block. If we have, then we have to re-verify our whole canonical
 	// chain from the first block. Then notify from the earliest point where it has diverged.
@@ -374,7 +371,6 @@ func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.El
 	log.L(bl.ctx).Debugf("Added block %d / %s parent=%s to in-memory canonical chain (new length=%d)", mbi.number, mbi.hash, mbi.parentHash, bl.canonicalChain.Len())
 
 	return newElem
-
 }
 
 // rebuildCanonicalChain is called (only on non-empty case) when our current chain does not seem to line up with
