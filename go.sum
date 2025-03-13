@@ -100,10 +100,10 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/huandu/xstrings v1.3.3/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/huandu/xstrings v1.4.0 h1:D17IlohoQq4UcpqD7fDk80P7l+lwAmlFaBHgOipl2FU=
 github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
-github.com/hyperledger/firefly-common v1.4.11 h1:WKv2hQuNpS7yP51THxzpzrqU3jkln23C9vq5iminzBk=
-github.com/hyperledger/firefly-common v1.4.11/go.mod h1:E7w/RxNtVnX52WXLQW9f2xVAgZnW70voZeE9sZrx/q0=
-github.com/hyperledger/firefly-signer v1.1.17 h1:JV38nNeCS/K31kPDk5mwnoqw6SoulcYF+12JW8a3/Mw=
-github.com/hyperledger/firefly-signer v1.1.17/go.mod h1:HDaDdht94JypRTunRGrcPL5Pvxfh4yigjatTrie5JUI=
+github.com/hyperledger/firefly-common v1.4.15 h1:dp4Mo2JQRPMbL7hoMw8T/ktvIUgematOLkXIppQtBp0=
+github.com/hyperledger/firefly-common v1.4.15/go.mod h1:bA7tAJxcpfQMrHN3/YycTSpyk4g2WlnDlpHx8WOUtAY=
+github.com/hyperledger/firefly-signer v1.1.20 h1:U/oGj+QuHdFp4NVZyYOzt3RW51m9nsdYQAGGeChG7g0=
+github.com/hyperledger/firefly-signer v1.1.20/go.mod h1:4S8Ki1f1d8U+Ujojea/a3mkXnJ5Fuz+JBfrf9HBdyO0=
 github.com/hyperledger/firefly-transaction-manager v1.3.19 h1:AzRYulDpk+AzeVPFGqw8nLRMPNJcX32FP7VBdsTM+L0=
 github.com/hyperledger/firefly-transaction-manager v1.3.19/go.mod h1:qZgj628oCJ+DP3CwS2y9pRN8zwJAJ8/U3ait/+fmQlg=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
