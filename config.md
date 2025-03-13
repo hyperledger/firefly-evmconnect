@@ -77,6 +77,7 @@
 |maxConcurrentRequests|Maximum of concurrent requests to be submitted to the blockchain|`int`|`50`
 |maxConnsPerHost|The max number of connections, per unique hostname. Zero means no limit|`int`|`0`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|maxIdleConnsPerHost|The max number of idle connections, per unique hostname. Zero means net/http uses the default of only 2.|`int`|`100`
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
@@ -418,6 +419,7 @@
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxConnsPerHost|The max number of connections, per unique hostname. Zero means no limit|`int`|`0`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|maxIdleConnsPerHost|The max number of idle connections, per unique hostname. Zero means net/http uses the default of only 2.|`int`|`100`
 |method|Deprecated: Please use 'transactions.handler.simple.gasOracle.method' instead|`string`|`GET`
 |mode|Deprecated: Please use 'transactions.handler.simple.gasOracle.mode' instead|'connector', 'restapi', 'fixed', or 'disabled'|`connector`
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
@@ -519,6 +521,7 @@
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxConnsPerHost|The max number of connections, per unique hostname. Zero means no limit|`int`|`0`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|maxIdleConnsPerHost|The max number of idle connections, per unique hostname. Zero means net/http uses the default of only 2.|`int`|`100`
 |method|The HTTP Method to use when invoking the Gas Oracle REST API|`string`|`GET`
 |mode|The gas oracle mode|'connector', 'restapi', 'fixed', or 'disabled'|`connector`
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
@@ -592,6 +595,7 @@
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
 |maxConnsPerHost|The max number of connections, per unique hostname. Zero means no limit|`int`|`0`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
+|maxIdleConnsPerHost|The max number of idle connections, per unique hostname. Zero means net/http uses the default of only 2.|`int`|`100`
 |passthroughHeadersEnabled|Enable passing through the set of allowed HTTP request headers|`boolean`|`false`
 |requestTimeout|The maximum amount of time that a request is allowed to remain open|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |tlsHandshakeTimeout|The maximum amount of time to wait for a successful TLS handshake|[`time.Duration`](https://pkg.go.dev/time#Duration)|`10s`
