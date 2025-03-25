@@ -55,7 +55,8 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	data, decoded := ee.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
 
 	info := eventInfo{
-		logJSONRPC: *ethLog,
+		logJSONRPC:      *ethLog,
+		ChainIdentifier: fftypes.JSONAnyPtr("asd"),
 	}
 
 	var timestamp *fftypes.FFTime
