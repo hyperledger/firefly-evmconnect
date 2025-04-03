@@ -19,7 +19,6 @@ package ethereum
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -64,9 +63,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 
 	info := eventInfo{
 		logJSONRPC: *ethLog,
-		ChainIdentifier: fftypes.JSONAnyPtr(fmt.Sprintf(`{
-			"chainId": "%s"
-		}`, ee.connector.chainID)),
+		ChainId:    ee.connector.chainID,
 	}
 
 	var timestamp *fftypes.FFTime
