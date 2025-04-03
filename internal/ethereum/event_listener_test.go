@@ -169,6 +169,7 @@ func TestListenerCatchupErrorsThenDeliveryExit(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(&rpcbackend.RPCError{Message: "12345"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
