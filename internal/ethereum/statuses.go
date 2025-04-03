@@ -30,8 +30,7 @@ func (c *ethConnector) IsLive(_ context.Context) (*ffcapi.LiveResponse, ffcapi.E
 }
 
 func (c *ethConnector) IsReady(ctx context.Context) (*ffcapi.ReadyResponse, ffcapi.ErrorReason, error) {
-	var chainID string
-	err := c.backend.CallRPC(ctx, &chainID, "net_version")
+	err := c.backend.CallRPC(ctx, &c.chainID, "net_version")
 	if err != nil {
 		return &ffcapi.ReadyResponse{
 			Ready: false,
@@ -39,7 +38,7 @@ func (c *ethConnector) IsReady(ctx context.Context) (*ffcapi.ReadyResponse, ffca
 	}
 
 	details := &fftypes.JSONObject{
-		"chainID": chainID,
+		"chainID": c.chainID,
 	}
 
 	return &ffcapi.ReadyResponse{
