@@ -51,6 +51,7 @@ func testEventStreamExistingConnector(t *testing.T, ctx context.Context, done fu
 	es := c.eventStreams[*esID]
 	es.c.eventFilterPollingInterval = 1 * time.Millisecond
 	es.c.retry.MaximumDelay = 1 * time.Microsecond
+	c.chainID = "12345"
 	assert.NotNil(t, es)
 
 	es.preStartProcessing()

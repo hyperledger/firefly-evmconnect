@@ -63,7 +63,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 
 	info := eventInfo{
 		logJSONRPC: *ethLog,
-		ChainId:    ee.connector.chainID,
+		ChainID:    ee.connector.chainID,
 	}
 
 	var timestamp *fftypes.FFTime

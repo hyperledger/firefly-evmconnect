@@ -48,7 +48,7 @@ type eventInfo struct {
 	InputMethod string                 `json:"inputMethod,omitempty"` // the method invoked, if it matched one of the signatures in the listener definition
 	InputArgs   *fftypes.JSONAny       `json:"inputArgs,omitempty"`   // the method parameters, if the method matched one of the signatures in the listener definition
 	InputSigner *ethtypes.Address0xHex `json:"inputSigner,omitempty"` // the signing `from` address of the transaction
-	ChainId     string                 `json:"chainId,omitempty"`     // an identifier for the chain this event relates to
+	ChainID     string                 `json:"chainId,omitempty"`     // an identifier for the chain this event relates to
 }
 
 // eventStream is the state we hold in memory for each eventStream
