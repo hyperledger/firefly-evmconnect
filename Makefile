@@ -21,7 +21,7 @@ lint: ${LINT}
 ${MOCKERY}:
 		$(VGO) install github.com/vektra/mockery/cmd/mockery@latest
 ${LINT}:
-		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 mockpaths:
 		$(eval FFTM_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/hyperledger/firefly-transaction-manager/pkg/fftm))
 		$(eval FF_SIGNER_PATH := $(shell $(VGO) list -f '{{.Dir}}' github.com/hyperledger/firefly-signer/pkg/rpcbackend))
