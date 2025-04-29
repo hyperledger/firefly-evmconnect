@@ -51,6 +51,7 @@ type ethConnector struct {
 	blockListener              *blockListener
 	eventFilterPollingInterval time.Duration
 	traceTXForRevertReason     bool
+	chainID                    string
 
 	mux          sync.Mutex
 	eventStreams map[fftypes.UUID]*eventStream

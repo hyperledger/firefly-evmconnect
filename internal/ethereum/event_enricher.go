@@ -54,8 +54,16 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	log.L(ctx).Infof("detected event '%s'", protoID)
 	data, decoded := ee.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
 
+	if len(ee.connector.chainID) == 0 {
+		resp, _, err := ee.connector.IsReady(ctx)
+		if !resp.Ready || err != nil {
+			return nil, matched, decoded, err
+		}
+	}
+
 	info := eventInfo{
 		logJSONRPC: *ethLog,
+		ChainID:    ee.connector.chainID,
 	}
 
 	var timestamp *fftypes.FFTime

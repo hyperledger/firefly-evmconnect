@@ -572,6 +572,9 @@ func TestGetReceiptEventDecodeOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		c.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
 		"0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2").
 		Return(nil).

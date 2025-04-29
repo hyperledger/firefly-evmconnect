@@ -169,6 +169,9 @@ func TestListenerCatchupErrorsThenDeliveryExit(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
@@ -194,6 +197,9 @@ func TestListenerCatchupScalesBackOnExpectedError(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
@@ -221,6 +227,9 @@ func TestListenerCatchupScalesBackNTimesOnExpectedError(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
@@ -248,6 +257,9 @@ func TestListenerCatchupScalesBackToOne(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
@@ -275,6 +287,9 @@ func TestListenerNoCatchupScaleBackOnErrorMismatch(t *testing.T) {
 	l.catchupLoopDone = make(chan struct{})
 	l.hwmBlock = 0
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
@@ -306,6 +321,9 @@ func TestListenerCatchupScalesBackCustomRegex(t *testing.T) {
 
 	assert.NoError(t, err)
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
@@ -344,6 +362,10 @@ func TestListenerCatchupNoScaleBackEmptyRegex(t *testing.T) {
 			Number: ethtypes.NewHexInteger64(1001),
 		}
 	})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "ACME JSON/RPC endpoint error - eth_getLogs response size is too large"}).Times(5)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
@@ -453,6 +475,9 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
 	assert.NoError(t, err)
 
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		l.ee.connector.chainID = "12345"
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
