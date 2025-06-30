@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func strPtr(s string) *string { return &s }
@@ -59,6 +60,8 @@ func newTestConnectorWithNoBlockerFilterDefaultMocks(t *testing.T, confSetup ...
 	ctx, done := context.WithCancel(context.Background())
 	cc, err := NewEthereumConnector(ctx, conf)
 	assert.NoError(t, err)
+	assert.NotNil(t, cc.RPC())
+
 	c := cc.(*ethConnector)
 	c.backend = mRPC
 	c.blockListener.backend = mRPC
@@ -192,4 +195,26 @@ func TestNewEthereumConnectorConfig(t *testing.T) {
 	assert.Equal(t, 10*time.Second, cc.(*ethConnector).retry.InitialDelay)
 	assert.Equal(t, 4.0, cc.(*ethConnector).retry.Factor)
 	assert.Equal(t, 30*time.Second, cc.(*ethConnector).retry.MaximumDelay)
+}
+
+func TestWithDeprecatedConfFallback(t *testing.T) {
+
+	config.RootConfigReset()
+	conf := config.RootSection("tdcf")
+	conf.AddKnownKey("deprecatedKey")
+	conf.AddKnownKey("newKey")
+
+	conf.Set("deprecatedKey", 1111)
+	require.Equal(t, 1111, withDeprecatedConfFallback(conf, conf.GetInt, "deprecatedKey", "newKey"))
+
+	conf.Set("newKey", 2222)
+	require.Equal(t, 2222, withDeprecatedConfFallback(conf, conf.GetInt, "deprecatedKey", "newKey"))
+
+	config.RootConfigReset()
+	conf = config.RootSection("tdcf")
+	conf.AddKnownKey("deprecatedKey")
+	conf.AddKnownKey("newKey")
+	conf.Set("newKey", 2222)
+	require.Equal(t, 2222, withDeprecatedConfFallback(conf, conf.GetInt, "deprecatedKey", "newKey"))
+
 }
