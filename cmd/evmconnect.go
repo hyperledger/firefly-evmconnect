@@ -100,7 +100,7 @@ func run() error {
 	}
 
 	// Init connector
-	c, err := ethereum.NewEthereumConnector(ctx, connectorConfig)
+	c, err := NewEthereumConnector(ctx, connectorConfig)
 	if err != nil {
 		return err
 	}
