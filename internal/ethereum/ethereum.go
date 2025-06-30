@@ -58,7 +58,12 @@ type ethConnector struct {
 	txCache      *lru.Cache
 }
 
-func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
+type Connector interface {
+	ffcapi.API
+	RPC() rpcbackend.RPC
+}
+
+func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
 	c := &ethConnector{
 		eventStreams:               make(map[fftypes.UUID]*eventStream),
 		catchupPageSize:            conf.GetInt64(EventsCatchupPageSize),
@@ -70,23 +75,9 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 		retry:                      &retry.Retry{},
 	}
 
-	if !conf.IsSet(DeprecatedRetryInitDelay) || (conf.IsSet(DeprecatedRetryInitDelay) && conf.IsSet(RetryInitDelay)) {
-		c.retry.InitialDelay = conf.GetDuration(RetryInitDelay)
-	} else {
-		c.retry.InitialDelay = conf.GetDuration(DeprecatedRetryInitDelay)
-	}
-
-	if !conf.IsSet(DeprecatedRetryFactor) || (conf.IsSet(DeprecatedRetryFactor) && conf.IsSet(RetryFactor)) {
-		c.retry.Factor = conf.GetFloat64(RetryFactor)
-	} else {
-		c.retry.Factor = conf.GetFloat64(DeprecatedRetryFactor)
-	}
-
-	if !conf.IsSet(DeprecatedRetryMaxDelay) || (conf.IsSet(DeprecatedRetryMaxDelay) && conf.IsSet(RetryMaxDelay)) {
-		c.retry.MaximumDelay = conf.GetDuration(RetryMaxDelay)
-	} else {
-		c.retry.MaximumDelay = conf.GetDuration(DeprecatedRetryMaxDelay)
-	}
+	c.retry.InitialDelay = withDeprecatedConfFallback(conf, conf.GetDuration, DeprecatedRetryInitDelay, RetryInitDelay)
+	c.retry.Factor = withDeprecatedConfFallback(conf, conf.GetFloat64, DeprecatedRetryFactor, RetryFactor)
+	c.retry.MaximumDelay = withDeprecatedConfFallback(conf, conf.GetDuration, DeprecatedRetryMaxDelay, RetryMaxDelay)
 
 	if c.catchupThreshold < c.catchupPageSize {
 		log.L(ctx).Warnf("Catchup threshold %d must be at least as large as the catchup page size %d (overridden to %d)", c.catchupThreshold, c.catchupPageSize, c.catchupPageSize)
@@ -152,6 +143,10 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.A
 	return c, nil
 }
 
+func (c *ethConnector) RPC() rpcbackend.RPC {
+	return c.backend
+}
+
 // WaitClosed can be called after cancelling all the contexts, to wait for everything to close down
 func (c *ethConnector) WaitClosed() {
 	if c.blockListener != nil {
@@ -160,4 +155,11 @@ func (c *ethConnector) WaitClosed() {
 	for _, s := range c.eventStreams {
 		<-s.streamLoopDone
 	}
+}
+
+func withDeprecatedConfFallback[T any](conf config.Section, getter func(string) T, deprecatedKey, newKey string) T {
+	if !conf.IsSet(deprecatedKey) || (conf.IsSet(deprecatedKey) && conf.IsSet(newKey)) {
+		return getter(newKey)
+	}
+	return getter(deprecatedKey)
 }
