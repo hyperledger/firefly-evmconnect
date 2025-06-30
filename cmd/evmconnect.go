@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/ethereum"
 	fftmcmd "github.com/hyperledger/firefly-transaction-manager/cmd"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/fftm"
 	txhandlerfactory "github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/registry"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/simple"
@@ -76,6 +77,10 @@ func InitConfig() {
 	txhandlerfactory.RegisterHandler(&simple.TransactionHandlerFactory{})
 }
 
+func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
+	return ethereum.NewEthereumConnector(ctx, conf)
+}
+
 func run() error {
 
 	err := config.ReadConfig("evmconnect", cfgFile)
@@ -95,7 +100,7 @@ func run() error {
 	}
 
 	// Init connector
-	c, err := ethereum.NewEthereumConnector(ctx, connectorConfig)
+	c, err := NewEthereumConnector(ctx, connectorConfig)
 	if err != nil {
 		return err
 	}
