@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/hashicorp/golang-lru v1.0.2
-	github.com/hyperledger/firefly-common v1.5.1
+	github.com/hyperledger/firefly-common v1.5.5
 	github.com/hyperledger/firefly-signer v1.1.21
 	github.com/hyperledger/firefly-transaction-manager v1.3.20
 	github.com/sirupsen/logrus v1.9.3
@@ -99,3 +99,5 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/hyperledger/firefly-transaction-manager => ../firefly-transaction-manager
