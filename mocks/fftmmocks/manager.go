@@ -7,7 +7,11 @@ import (
 
 	apitypes "github.com/hyperledger/firefly-transaction-manager/pkg/apitypes"
 
+	eventapi "github.com/hyperledger/firefly-transaction-manager/pkg/eventapi"
+
 	mock "github.com/stretchr/testify/mock"
+
+	mux "github.com/gorilla/mux"
 
 	txhandler "github.com/hyperledger/firefly-transaction-manager/pkg/txhandler"
 )
@@ -17,9 +21,84 @@ type Manager struct {
 	mock.Mock
 }
 
+// APIRouter provides a mock function with no fields
+func (_m *Manager) APIRouter() *mux.Router {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for APIRouter")
+	}
+
+	var r0 *mux.Router
+	if rf, ok := ret.Get(0).(func() *mux.Router); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*mux.Router)
+		}
+	}
+
+	return r0
+}
+
+// CleanupAPIManagedEventStream provides a mock function with given fields: name
+func (_m *Manager) CleanupAPIManagedEventStream(name string) error {
+	ret := _m.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CleanupAPIManagedEventStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Close provides a mock function with no fields
 func (_m *Manager) Close() {
 	_m.Called()
+}
+
+// GetAPIManagedEventStream provides a mock function with given fields: spec, listeners
+func (_m *Manager) GetAPIManagedEventStream(spec *apitypes.EventStream, listeners []*apitypes.Listener) (bool, eventapi.EventStream, error) {
+	ret := _m.Called(spec, listeners)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAPIManagedEventStream")
+	}
+
+	var r0 bool
+	var r1 eventapi.EventStream
+	var r2 error
+	if rf, ok := ret.Get(0).(func(*apitypes.EventStream, []*apitypes.Listener) (bool, eventapi.EventStream, error)); ok {
+		return rf(spec, listeners)
+	}
+	if rf, ok := ret.Get(0).(func(*apitypes.EventStream, []*apitypes.Listener) bool); ok {
+		r0 = rf(spec, listeners)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(*apitypes.EventStream, []*apitypes.Listener) eventapi.EventStream); ok {
+		r1 = rf(spec, listeners)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(eventapi.EventStream)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(*apitypes.EventStream, []*apitypes.Listener) error); ok {
+		r2 = rf(spec, listeners)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetTransactionByIDWithStatus provides a mock function with given fields: ctx, txID, withHistory
@@ -65,6 +144,26 @@ func (_m *Manager) Start() error {
 		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// TransactionCompletions provides a mock function with no fields
+func (_m *Manager) TransactionCompletions() txhandler.TransactionCompletions {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransactionCompletions")
+	}
+
+	var r0 txhandler.TransactionCompletions
+	if rf, ok := ret.Get(0).(func() txhandler.TransactionCompletions); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(txhandler.TransactionCompletions)
+		}
 	}
 
 	return r0
