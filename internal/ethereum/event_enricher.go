@@ -47,7 +47,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	addrMatches := f.Address == nil || bytes.Equal(ethLog.Address[:], f.Address[:])
 	if !topicMatches || !addrMatches {
 		log.L(ctx).Debugf("skipping event '%s' topicMatches=%t addrMatches=%t", protoID, topicMatches, addrMatches)
-		return nil, false, false, nil
+		return nil, matched, decoded, nil
 	}
 	matched = true
 
