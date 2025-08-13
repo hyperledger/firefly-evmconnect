@@ -15,7 +15,7 @@ RUN DB_MIGRATIONS_DIR=$(go list -f '{{.Dir}}' github.com/hyperledger/firefly-tra
     && cp -R $DB_MIGRATIONS_DIR db
 
 
-FROM debian:buster-slim
+FROM alpine:3.21.3
 WORKDIR /evmconnect
 RUN chgrp -R 0 /evmconnect \
     && chmod -R g+rwX /evmconnect
