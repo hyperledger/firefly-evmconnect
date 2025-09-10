@@ -21,34 +21,13 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/apitypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-type ConfirmationMapUpdateResult struct {
-	*ConfirmationMap
-	HasNewFork              bool `json:"hasNewFork"`              // when set to true, it means a fork is detected based on the existing confirmations
-	Rebuilt                 bool `json:"rebuilt"`                 // when set to true, it means all of the existing confirmations are discarded
-	HasNewConfirmation      bool `json:"hasNewConfirmation"`      // when set to true, it means new blocks from canonical chain are added to the confirmation queue
-	Confirmed               bool `json:"confirmed"`               // when set to true, it means the confirmation queue is complete and all the blocks are confirmed
-	TargetConfirmationCount int  `json:"targetConfirmationCount"` // the target number of confirmations for this event
-}
-
-type ConfirmationMap struct {
-	// confirmation map is contains a list of possible confirmations for a transaction
-	// the key is the hash of the first block that contains the transaction hash
-	// the first block is the block that contains the transaction hash
-	ConfirmationQueueMap map[string][]*apitypes.Confirmation `json:"confirmationQueueMap,omitempty"`
-	// which block hash that leads a confirmation queue matches the canonical block hash
-	CanonicalBlockHash string `json:"canonicalBlockHash,omitempty"`
-}
-
-func (bl *blockListener) BuildConfirmationsForTransaction(ctx context.Context, txHash string, confirmMap *ConfirmationMap, targetConfirmationCount int) (*ConfirmationMapUpdateResult, error) {
+func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, confirmMap *ffcapi.ConfirmationMap, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
 	// Initialize the output context
-	occ := &ConfirmationMapUpdateResult{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
 		ConfirmationMap:         confirmMap,
 		HasNewFork:              false,
 		Rebuilt:                 false,
@@ -57,35 +36,15 @@ func (bl *blockListener) BuildConfirmationsForTransaction(ctx context.Context, t
 		TargetConfirmationCount: targetConfirmationCount,
 	}
 
-	// Query the chain to find the transaction block
-	// Note: should consider have an in-memory map of transaction hash to block for faster lookup
-	// The extra memory usage of the map should be outweighed by the speed of lookup
-	// But I saw we have a minimalBlockInfo struct that intentionally removes the tx hashes
-	// so need to figure out the reason first
-
-	res, reason, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
-		TransactionHash: txHash,
-	})
-	if receiptErr != nil || res == nil {
-		if receiptErr != nil && reason != ffcapi.ErrorReasonNotFound {
-			log.L(ctx).Debugf("Failed to query receipt for transaction %s: %s", txHash, receiptErr)
-			return nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
-		}
-		log.L(ctx).Debugf("Receipt for transaction %s not yet available: %v", txHash, receiptErr)
-		return nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
-	}
-
-	txBlockHash := res.BlockHash
-	txBlockNumber := res.BlockNumber.Int64()
-	// get the parent hash of the transaction block
-	bi, _, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
+	txBlockInfo, err := bl.getBlockInfoContainsTxHash(ctx, txHash)
 	if err != nil {
-		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
+		log.L(ctx).Errorf("Failed to fetch block info using tx hash %s: %v", txHash, err)
+		return nil, err
 	}
-	txBlockInfo := &minimalBlockInfo{
-		number:     bi.Number.BigInt().Int64(),
-		hash:       bi.Hash.String(),
-		parentHash: bi.ParentHash.String(),
+
+	if txBlockInfo == nil {
+		log.L(ctx).Debugf("Transaction %s not found in any block", txHash)
+		return occ, nil
 	}
 
 	// Compare the existing confirmation queue with the in-memory linked list
@@ -97,16 +56,17 @@ func (bl *blockListener) BuildConfirmationsForTransaction(ctx context.Context, t
 // NOTE: this function only build up the confirmation queue uses the in-memory canonical chain
 // it does not build up the canonical chain
 // compareAndUpdateConfirmationQueue compares the existing confirmation queue with the in-memory linked list
+// this function obtains the read lock on the canonical chain, so it should not make any long-running queries
 
-func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, occ *ConfirmationMapUpdateResult, txBlockInfo *minimalBlockInfo, targetConfirmationCount int) {
+func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, occ *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) {
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
-	txBlockNumber := txBlockInfo.number
-	txBlockHash := txBlockInfo.hash
+	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
+	txBlockHash := txBlockInfo.BlockHash
 
-	chainHead := bl.canonicalChain.Front().Value.(*minimalBlockInfo)
-	chainTail := bl.canonicalChain.Back().Value.(*minimalBlockInfo)
-	if chainHead == nil || chainTail == nil || chainTail.number < txBlockNumber {
+	chainHead := bl.canonicalChain.Front().Value.(*ffcapi.MinimalBlockInfo)
+	chainTail := bl.canonicalChain.Back().Value.(*ffcapi.MinimalBlockInfo)
+	if chainHead == nil || chainTail == nil || chainTail.BlockNumber.Uint64() < txBlockNumber {
 		log.L(ctx).Debugf("Canonical chain is waiting for the transaction block %d to be indexed", txBlockNumber)
 		return
 	}
@@ -124,13 +84,13 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = newQueue
 }
 
-func (bl *blockListener) initializeConfirmationMap(occ *ConfirmationMapUpdateResult, txBlockInfo *minimalBlockInfo) []*apitypes.Confirmation {
-	txBlockHash := txBlockInfo.hash
+func (bl *blockListener) initializeConfirmationMap(occ *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
+	txBlockHash := txBlockInfo.BlockHash
 
 	if occ.ConfirmationMap == nil || len(occ.ConfirmationMap.ConfirmationQueueMap) == 0 {
-		occ.ConfirmationMap = &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
-				txBlockHash: {txBlockInfo.ToConfirmation()},
+		occ.ConfirmationMap = &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
+				txBlockHash: {txBlockInfo},
 			},
 			CanonicalBlockHash: txBlockHash,
 		}
@@ -141,12 +101,12 @@ func (bl *blockListener) initializeConfirmationMap(occ *ConfirmationMapUpdateRes
 	existingQueue := occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash]
 	if len(existingQueue) > 0 {
 		existingTxBlock := existingQueue[0]
-		if !isSameBlock(existingTxBlock, txBlockInfo) {
+		if !existingTxBlock.Equal(txBlockInfo) {
 			// the tx block in the existing queue does not match the new tx block we queried from the chain
 			// rebuild a new confirmation queue with the new tx block
 			occ.HasNewFork = true
 			occ.Rebuilt = true
-			occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*apitypes.Confirmation{txBlockInfo.ToConfirmation()}
+			occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 			return nil
 		}
 	}
@@ -154,14 +114,14 @@ func (bl *blockListener) initializeConfirmationMap(occ *ConfirmationMapUpdateRes
 	return existingQueue
 }
 
-func (bl *blockListener) processExistingConfirmations(ctx context.Context, occ *ConfirmationMapUpdateResult, txBlockInfo *minimalBlockInfo, existingQueue []*apitypes.Confirmation, chainHead *minimalBlockInfo, targetConfirmationCount int) ([]*apitypes.Confirmation, *list.Element) {
-	txBlockNumber := txBlockInfo.number
+func (bl *blockListener) processExistingConfirmations(ctx context.Context, occ *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, existingQueue []*ffcapi.MinimalBlockInfo, chainHead *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) ([]*ffcapi.MinimalBlockInfo, *list.Element) {
+	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
 
-	newQueue := []*apitypes.Confirmation{txBlockInfo.ToConfirmation()}
+	newQueue := []*ffcapi.MinimalBlockInfo{txBlockInfo}
 
 	currentBlock := bl.canonicalChain.Front()
 	// iterate to the tx block if the chain head is earlier than the tx block
-	if currentBlock != nil && currentBlock.Value.(*minimalBlockInfo).number <= txBlockNumber {
+	if currentBlock != nil && currentBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64() <= txBlockNumber {
 		currentBlock = currentBlock.Next()
 	}
 
@@ -177,13 +137,13 @@ func (bl *blockListener) processExistingConfirmations(ctx context.Context, occ *
 	return bl.validateExistingConfirmations(ctx, occ, newQueue, existingConfirmations, currentBlock, chainHead, txBlockInfo, targetConfirmationCount)
 }
 
-func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ *ConfirmationMapUpdateResult, newQueue []*apitypes.Confirmation, existingConfirmations []*apitypes.Confirmation, currentBlock *list.Element, chainHead *minimalBlockInfo, txBlockInfo *minimalBlockInfo, targetConfirmationCount int) ([]*apitypes.Confirmation, *list.Element) {
-	txBlockNumber := txBlockInfo.number
+func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ *ffcapi.ConfirmationMapUpdateResult, newQueue []*ffcapi.MinimalBlockInfo, existingConfirmations []*ffcapi.MinimalBlockInfo, currentBlock *list.Element, chainHead *ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) ([]*ffcapi.MinimalBlockInfo, *list.Element) {
+	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
 	lastExistingConfirmation := existingConfirmations[len(existingConfirmations)-1]
-	if lastExistingConfirmation.BlockNumber.Uint64() < uint64(chainHead.number) && //nolint:gosec
+	if lastExistingConfirmation.BlockNumber.Uint64() < chainHead.BlockNumber.Uint64() &&
 		// ^^ the highest block number in the existing confirmations is lower than the highest block number in the canonical chain
-		(lastExistingConfirmation.BlockNumber.Uint64() != uint64(chainHead.number-1) || //nolint:gosec // block numbers are always positive
-			lastExistingConfirmation.BlockHash != chainHead.parentHash) {
+		(lastExistingConfirmation.BlockNumber.Uint64() != chainHead.BlockNumber.Uint64()-1 ||
+			lastExistingConfirmation.BlockHash != chainHead.ParentHash) {
 		// ^^ and the last existing confirmation is not the parent of the canonical chain head
 		// Therefore, there is no connection between the existing confirmations and the canonical chain
 		// so that we cannot validate the existing confirmations are from the same fork as the canonical chain
@@ -192,14 +152,14 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 		return newQueue, currentBlock
 	}
 
-	var previousExistingConfirmation *apitypes.Confirmation
+	var previousExistingConfirmation *ffcapi.MinimalBlockInfo
 	queueIndex := 0
 
-	connectionBlockNumber := currentBlock.Value.(*minimalBlockInfo).number
+	connectionBlockNumber := currentBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64()
 
 	for currentBlock != nil && queueIndex < len(existingConfirmations) {
 		existingConfirmation := existingConfirmations[queueIndex]
-		if existingConfirmation.BlockNumber.Uint64() <= uint64(txBlockNumber) { //nolint:gosec // block numbers are always positive
+		if existingConfirmation.BlockNumber.Uint64() <= txBlockNumber {
 			log.L(ctx).Debugf("Existing confirmation queue is corrupted, the first block is earlier than the tx block: %d", existingConfirmation.BlockNumber.Uint64())
 			// if any block in the existing confirmation queue is earlier than the tx block
 			// the existing confirmation queue is no valid
@@ -216,8 +176,8 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 			(previousExistingConfirmation.BlockNumber.Uint64()+1 != existingConfirmation.BlockNumber.Uint64() ||
 				previousExistingConfirmation.BlockHash != existingConfirmation.ParentHash) ||
 			// check the link between the first confirmation block and the existing tx block
-			(existingConfirmation.BlockNumber.Uint64() == uint64(txBlockNumber)+1 && //nolint:gosec // block numbers are always positive
-				existingConfirmation.ParentHash != txBlockInfo.hash)
+			(existingConfirmation.BlockNumber.Uint64() == txBlockNumber+1 &&
+				existingConfirmation.ParentHash != txBlockInfo.BlockHash)
 			//  we allow gaps between the tx block and the first block in the existing confirmation queue
 			// NOTE: we don't allow gaps after the first block in the existing confirmation queue
 			// any gaps, we need to rebuild the confirmations queue
@@ -229,8 +189,8 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 			return newQueue[:1], currentBlock
 		}
 
-		currentBlockInfo := currentBlock.Value.(*minimalBlockInfo)
-		if existingConfirmation.BlockNumber.Uint64() < uint64(currentBlockInfo.number) { //nolint:gosec
+		currentBlockInfo := currentBlock.Value.(*ffcapi.MinimalBlockInfo)
+		if existingConfirmation.BlockNumber.Uint64() < currentBlockInfo.BlockNumber.Uint64() {
 			// NOTE: we are not doing the confirmation count check here
 			// because we've not reached the current head in the canonical chain to validate
 			// all the confirmations we copied over are still valid
@@ -240,14 +200,14 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 			continue
 		}
 
-		if existingConfirmation.BlockNumber.Uint64() == uint64(currentBlockInfo.number) { //nolint:gosec // block numbers are always positive
+		if existingConfirmation.BlockNumber.Uint64() == currentBlockInfo.BlockNumber.Uint64() {
 			// existing confirmation has caught up to the current block
 			// checking the overlaps
 
-			if !isSameBlock(existingConfirmation, currentBlockInfo) {
+			if !existingConfirmation.Equal(currentBlockInfo) {
 				// we detected a potential fork
-				if connectionBlockNumber == currentBlockInfo.number &&
-					previousExistingConfirmation.BlockHash != currentBlockInfo.parentHash {
+				if connectionBlockNumber == currentBlockInfo.BlockNumber.Uint64() &&
+					!previousExistingConfirmation.IsParentOf(currentBlockInfo) {
 					// this is the connection node (first overlap between existing confirmation queue and canonical chain)
 					// if the first node doesn't chain to to the previous confirmation, it means all the historical confirmation are on a different fork
 					// therefore, we need to rebuild the confirmations queue
@@ -261,7 +221,7 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 			}
 
 			newQueue = append(newQueue, existingConfirmation)
-			if existingConfirmation.BlockNumber.Uint64()-uint64(txBlockNumber) >= uint64(targetConfirmationCount) { //nolint:gosec // block numbers are always positive
+			if existingConfirmation.BlockNumber.Uint64()-txBlockNumber >= targetConfirmationCount {
 				break
 			}
 			currentBlock = currentBlock.Next()
@@ -276,23 +236,23 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 
 	// Check if we have enough confirmations
 	lastBlockInNewQueue := newQueue[len(newQueue)-1]
-	confirmationBlockNumber := uint64(txBlockNumber) + uint64(targetConfirmationCount) //nolint:gosec // block numbers are always positive
+	confirmationBlockNumber := txBlockNumber + targetConfirmationCount
 	if lastBlockInNewQueue.BlockNumber.Uint64() >= confirmationBlockNumber {
-		chainHead := bl.canonicalChain.Front().Value.(*minimalBlockInfo)
+		chainHead := bl.canonicalChain.Front().Value.(*ffcapi.MinimalBlockInfo)
 		// we've got a confirmable so whether the rest of the chain has forked is not longer relevant
 		// this could happen when user chose a different target confirmation count for the new checks
 		// but we still need to validate the existing confirmations are connectable to the canonical chain
 		// Check if the queue connects to the canonical chain
-		if lastBlockInNewQueue.BlockNumber.Uint64() >= uint64(chainHead.number) || //nolint:gosec // block numbers are always positive
-			(lastBlockInNewQueue.BlockNumber.Uint64() == uint64(chainHead.number-1) && //nolint:gosec // block numbers are always positive
-				lastBlockInNewQueue.BlockHash == chainHead.parentHash) {
+		if lastBlockInNewQueue.BlockNumber.Uint64() >= chainHead.BlockNumber.Uint64() ||
+			(lastBlockInNewQueue.BlockNumber.Uint64() == chainHead.BlockNumber.Uint64()-1 &&
+				lastBlockInNewQueue.BlockHash == chainHead.ParentHash) {
 			occ.HasNewFork = false
 			occ.HasNewConfirmation = false
 			occ.Rebuilt = false
 			occ.Confirmed = true
 
 			// Trim the queue to only include blocks up to the max confirmation count
-			trimmedQueue := []*apitypes.Confirmation{}
+			trimmedQueue := []*ffcapi.MinimalBlockInfo{}
 			for _, confirmation := range newQueue {
 				if confirmation.BlockNumber.Uint64() > confirmationBlockNumber {
 					break
@@ -303,7 +263,7 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 			// If we've trimmed off all the existing confirmations, we need to add the canonical chain head
 			// to tell use the head block we used to confirmed the transaction
 			if len(trimmedQueue) == 1 {
-				trimmedQueue = append(trimmedQueue, chainHead.ToConfirmation())
+				trimmedQueue = append(trimmedQueue, chainHead)
 			}
 			return trimmedQueue, currentBlock
 		}
@@ -312,17 +272,17 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 	return newQueue, currentBlock
 }
 
-func (bl *blockListener) buildNewConfirmations(occ *ConfirmationMapUpdateResult, newQueue []*apitypes.Confirmation, currentBlock *list.Element, txBlockNumber int64, targetConfirmationCount int) []*apitypes.Confirmation {
+func (bl *blockListener) buildNewConfirmations(occ *ffcapi.ConfirmationMapUpdateResult, newQueue []*ffcapi.MinimalBlockInfo, currentBlock *list.Element, txBlockNumber uint64, targetConfirmationCount uint64) []*ffcapi.MinimalBlockInfo {
 	for currentBlock != nil {
-		currentBlockInfo := currentBlock.Value.(*minimalBlockInfo)
-		if currentBlockInfo.number > int64(newQueue[len(newQueue)-1].BlockNumber.Uint64()) { //nolint:gosec // block numbers are always positive
+		currentBlockInfo := currentBlock.Value.(*ffcapi.MinimalBlockInfo)
+		if currentBlockInfo.BlockNumber.Uint64() > newQueue[len(newQueue)-1].BlockNumber.Uint64() {
 			occ.HasNewConfirmation = true
-			newQueue = append(newQueue, &apitypes.Confirmation{
-				BlockHash:   currentBlockInfo.hash,
-				BlockNumber: fftypes.FFuint64(currentBlockInfo.number), //nolint:gosec // block numbers are always positive
-				ParentHash:  currentBlockInfo.parentHash,
+			newQueue = append(newQueue, &ffcapi.MinimalBlockInfo{
+				BlockHash:   currentBlockInfo.BlockHash,
+				BlockNumber: fftypes.FFuint64(currentBlockInfo.BlockNumber.Uint64()),
+				ParentHash:  currentBlockInfo.ParentHash,
 			})
-			if currentBlockInfo.number >= txBlockNumber+int64(targetConfirmationCount) { //nolint:gosec // block numbers are always positive
+			if currentBlockInfo.BlockNumber.Uint64() >= txBlockNumber+targetConfirmationCount {
 				occ.Confirmed = true
 				break
 			}
@@ -332,8 +292,6 @@ func (bl *blockListener) buildNewConfirmations(occ *ConfirmationMapUpdateResult,
 	return newQueue
 }
 
-func isSameBlock(c1 *apitypes.Confirmation, bi *minimalBlockInfo) bool {
-	return c1.BlockHash == bi.hash &&
-		c1.BlockNumber.Uint64() == uint64(bi.number) && //nolint:gosec // block numbers are always positive
-		c1.ParentHash == bi.parentHash
+func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, confirmMap *ffcapi.ConfirmationMap, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+	return c.blockListener.reconcileConfirmationsForTransaction(ctx, txHash, confirmMap, targetConfirmationCount)
 }

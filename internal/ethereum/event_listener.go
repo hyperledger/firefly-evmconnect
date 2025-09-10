@@ -94,20 +94,20 @@ func (cp *listenerCheckpoint) LessThan(b ffcapi.EventListenerCheckpoint) bool {
 				(cp.TransactionIndex == bcp.TransactionIndex && (cp.LogIndex < bcp.LogIndex))))
 }
 
-func (l *listener) getInitialBlock(ctx context.Context, fromBlockInstruction string) (int64, error) {
+func (l *listener) getInitialBlock(ctx context.Context, fromBlockInstruction string) (uint64, error) {
 	if fromBlockInstruction == ffcapi.FromBlockLatest || fromBlockInstruction == "" {
 		// Get the latest block number of the chain
 		chainHead, ok := l.c.blockListener.getHighestBlock(ctx)
 		if !ok {
-			return -1, i18n.NewError(ctx, msgs.MsgTimedOutQueryingChainHead)
+			return 0, i18n.NewError(ctx, msgs.MsgTimedOutQueryingChainHead)
 		}
 		return chainHead, nil
 	}
 	num, ok := new(big.Int).SetString(fromBlockInstruction, 0)
 	if !ok {
-		return -1, i18n.NewError(ctx, msgs.MsgInvalidFromBlock, fromBlockInstruction)
+		return 0, i18n.NewError(ctx, msgs.MsgInvalidFromBlock, fromBlockInstruction)
 	}
-	return num.Int64(), nil
+	return num.Uint64(), nil
 }
 
 func parseListenerOptions(ctx context.Context, o *fftypes.JSONAny) (*listenerOptions, error) {
@@ -131,7 +131,7 @@ func (l *listener) ensureHWM(ctx context.Context) error {
 			return err
 		}
 		// HWM is the configured fromBlock
-		l.hwmBlock = firstBlock
+		l.hwmBlock = int64(firstBlock) //nolint:gosec // convert to int64 to match the type of hwmBlock, we should change the type of hwmBlock to uint64
 	}
 	return nil
 }

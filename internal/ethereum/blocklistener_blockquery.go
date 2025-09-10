@@ -53,10 +53,43 @@ func (bl *blockListener) addToBlockCache(blockInfo *blockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
 
-func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber int64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
+func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, error) {
+
+	// Query the chain to find the transaction block
+	// Note: should consider have an in-memory map of transaction hash to block for faster lookup
+	// The extra memory usage of the map should be outweighed by the speed improvement of lookup
+	// But I saw we have a ffcapi.MinimalBlockInfo struct that intentionally removes the tx hashes
+	// so need to figure out the reason first
+
+	// TODO: add a cache if map cannot be used
+	res, _, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
+		TransactionHash: txHash,
+	})
+	if receiptErr != nil {
+		return nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
+	}
+	if res == nil {
+		return nil, nil
+	}
+	txBlockHash := res.BlockHash
+	txBlockNumber := res.BlockNumber.Uint64()
+	// get the parent hash of the transaction block
+	bi, _, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
+	if err != nil {
+		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
+	}
+
+	return &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
+		BlockHash:   bi.Hash.String(),
+		ParentHash:  bi.ParentHash.String(),
+	}, nil
+}
+
+func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
 	var blockInfo *blockInfoJSONRPC
 	if allowCache {
-		cached, ok := bl.blockCache.Get(strconv.FormatInt(blockNumber, 10))
+		cached, ok := bl.blockCache.Get(strconv.FormatUint(blockNumber, 10))
 		if ok {
 			blockInfo = cached.(*blockInfoJSONRPC)
 			if expectedHashStr != "" && blockInfo.ParentHash.String() != expectedHashStr {
@@ -67,7 +100,7 @@ func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber i
 	}
 
 	if blockInfo == nil {
-		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexInteger64(blockNumber), false /* only the txn hashes */)
+		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexIntegerU64(blockNumber), false /* only the txn hashes */)
 		if rpcErr != nil {
 			if mapError(blockRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
 				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", rpcErr.Message)

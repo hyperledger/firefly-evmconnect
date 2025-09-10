@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/apitypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,18 +33,18 @@ func TestCompareAndUpdateConfirmationQueue_EmptyChain(t *testing.T) {
 		canonicalChain: createTestChain(50, 50), // Single block at 50, tx is at 100
 	}
 	ctx := context.Background()
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{},
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
 
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -65,18 +65,18 @@ func TestCompareAndUpdateConfirmationQueue_ChainTooShort(t *testing.T) {
 		canonicalChain: createTestChain(50, 99), // Chain ends at 99, tx is at 100
 	}
 	ctx := context.Background()
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{},
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
 
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -96,17 +96,17 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
 		canonicalChain: createTestChain(50, 150),
 	}
 	ctx := context.Background()
-	occ := &ConfirmationMapUpdateResult{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
 		ConfirmationMap: nil,
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -120,12 +120,12 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
 	assert.Equal(t, txBlockHash, occ.ConfirmationMap.CanonicalBlockHash)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
 
 }
 
@@ -135,17 +135,17 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *test
 		canonicalChain: createTestChain(100, 104),
 	}
 	ctx := context.Background()
-	occ := &ConfirmationMapUpdateResult{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
 		ConfirmationMap: nil,
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -159,11 +159,11 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *test
 	assert.Equal(t, txBlockHash, occ.ConfirmationMap.CanonicalBlockHash)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 5)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
 
 }
 
@@ -173,19 +173,19 @@ func TestCompareAndUpdateConfirmationQueue_EmptyConfirmationQueue(t *testing.T) 
 		canonicalChain: createTestChain(50, 150),
 	}
 	ctx := context.Background()
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: make(map[string][]*apitypes.Confirmation),
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: make(map[string][]*ffcapi.MinimalBlockInfo),
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -198,12 +198,12 @@ func TestCompareAndUpdateConfirmationQueue_EmptyConfirmationQueue(t *testing.T) 
 	assert.Equal(t, txBlockHash, occ.ConfirmationMap.CanonicalBlockHash)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
 }
 
 // theoretically, this should never happen because block hash generation has block number as part of the input
@@ -213,24 +213,24 @@ func TestCompareAndUpdateConfirmationQueue_DifferentBlockNumber(t *testing.T) {
 		canonicalChain: createTestChain(50, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(99), ParentHash: "0xblock99"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -240,12 +240,12 @@ func TestCompareAndUpdateConfirmationQueue_DifferentBlockNumber(t *testing.T) {
 	assert.True(t, occ.Rebuilt)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_MismatchConfirmationBlock(t *testing.T) {
@@ -254,27 +254,27 @@ func TestCompareAndUpdateConfirmationQueue_MismatchConfirmationBlock(t *testing.
 		canonicalChain: createTestChain(103, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock101"}, // wrong parent hash, so the existing queue should be discarded
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 		{BlockHash: "0xblock103", BlockNumber: fftypes.FFuint64(103), ParentHash: "0xblock102"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -284,10 +284,10 @@ func TestCompareAndUpdateConfirmationQueue_MismatchConfirmationBlock(t *testing.
 	assert.True(t, occ.Rebuilt)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 4)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *testing.T) {
@@ -296,25 +296,25 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *te
 		canonicalChain: createTestChain(145, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -327,8 +327,8 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *te
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 2)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, bl.canonicalChain.Front().Value.(*minimalBlockInfo).number, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, bl.canonicalChain.Front().Value.(*ffcapi.MinimalBlockInfo).BlockNumber, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber)
 }
 
 func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmation(t *testing.T) {
@@ -338,25 +338,25 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmation(t *test
 	}
 	ctx := context.Background()
 	// Create corrupted confirmation (wrong parent hash)
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xwrongparent"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -367,7 +367,7 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmation(t *test
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
 	assert.Equal(t, "0xblock100", occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].ParentHash)
 }
 
@@ -377,27 +377,27 @@ func TestCompareAndUpdateConfirmationQueue_ConnectionNodeMismatch(t *testing.T) 
 		canonicalChain: createTestChain(102, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblockwrong", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 		{BlockHash: "0xblock103", BlockNumber: fftypes.FFuint64(103), ParentHash: "0xblock102"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -408,7 +408,7 @@ func TestCompareAndUpdateConfirmationQueue_ConnectionNodeMismatch(t *testing.T) 
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 5)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
 	assert.Equal(t, "0xblock102", occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockHash)
 	assert.Equal(t, "0xblock102", occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].ParentHash)
 }
@@ -419,26 +419,26 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationAfterFir
 		canonicalChain: createTestChain(100, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblockwrong"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -449,7 +449,7 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationAfterFir
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 5)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
 	assert.Equal(t, "0xblock102", occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockHash)
 	assert.Equal(t, "0xblock102", occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].ParentHash)
 }
@@ -460,26 +460,26 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation(t *test
 		canonicalChain: createTestChain(100, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "fork1", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -492,33 +492,33 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation(t *test
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
 }
 
-func TestCompareAndUpdateConfirmationQueue_NewFork(t *testing.T) {
+func TestCompareAndUpdateConfirmationQueue_NewForkAndNoConnectionToCanonicalChain(t *testing.T) {
 	// Setup
 	bl := &blockListener{
 		canonicalChain: createTestChain(103, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "fork1", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "fork2", BlockNumber: fftypes.FFuint64(102), ParentHash: "fork1"},
 		{BlockHash: "fork3", BlockNumber: fftypes.FFuint64(103), ParentHash: "fork2"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -529,10 +529,10 @@ func TestCompareAndUpdateConfirmationQueue_NewFork(t *testing.T) {
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 4)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationLaterThanCurrentBlock(t *testing.T) {
@@ -541,25 +541,25 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationLaterThanCurrentB
 		canonicalChain: createTestChain(100, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock103", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -570,12 +570,12 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationLaterThanCurrentB
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
@@ -586,7 +586,7 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
@@ -596,21 +596,21 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 		{BlockHash: "0xblock104", BlockNumber: fftypes.FFuint64(104), ParentHash: "0xblock103"}, // discarded
 		{BlockHash: "0xblock105", BlockNumber: fftypes.FFuint64(105), ParentHash: "0xblock104"}, // discarded
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 2
+	targetConfirmationCount := uint64(2)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -621,9 +621,9 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 	assert.False(t, occ.HasNewFork)
 	assert.False(t, occ.HasNewConfirmation)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 3)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *testing.T) {
@@ -634,28 +634,28 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *test
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 		// didn't have block 103, which is the first block of the canonical chain
 		// but we should still be able to validate the existing confirmations are valid using parent hash
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 1
+	targetConfirmationCount := uint64(1)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -668,8 +668,8 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *test
 	assert.False(t, occ.HasNewFork)
 	assert.False(t, occ.HasNewConfirmation)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 2)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfirmationsAreTooHighForTargetConfirmationCount(t *testing.T) {
@@ -680,26 +680,26 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfi
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		// gap of 101 is allowed, and is the confirmation required for the transaction with target confirmation count of 1
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 1
+	targetConfirmationCount := uint64(1)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -712,8 +712,8 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfi
 	assert.False(t, occ.HasNewFork)
 	assert.False(t, occ.HasNewConfirmation)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 2)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, int64(103), int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, uint64(103), uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
 
 }
 
@@ -725,26 +725,26 @@ func TestCompareAndUpdateConfirmationQueue_HasSufficientConfirmationsButNoOverla
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 1
+	targetConfirmationCount := uint64(1)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -757,8 +757,8 @@ func TestCompareAndUpdateConfirmationQueue_HasSufficientConfirmationsButNoOverla
 	assert.True(t, occ.Rebuilt)
 	assert.True(t, occ.HasNewConfirmation)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 2)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, int64(104), int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, uint64(104), uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
 
 }
 
@@ -768,26 +768,26 @@ func TestCompareAndUpdateConfirmationQueue_ValidExistingConfirmations(t *testing
 		canonicalChain: createTestChain(50, 150),
 	}
 	ctx := context.Background()
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -798,12 +798,12 @@ func TestCompareAndUpdateConfirmationQueue_ValidExistingConfirmations(t *testing
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.Len(t, occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash], 6)
-	assert.Equal(t, txBlockNumber, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, int64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
+	assert.Equal(t, txBlockNumber, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash][5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ReachTargetConfirmation(t *testing.T) {
@@ -812,19 +812,19 @@ func TestCompareAndUpdateConfirmationQueue_ReachTargetConfirmation(t *testing.T)
 		canonicalChain: createTestChain(50, 150),
 	}
 	ctx := context.Background()
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: make(map[string][]*apitypes.Confirmation),
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: make(map[string][]*ffcapi.MinimalBlockInfo),
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 3
+	targetConfirmationCount := uint64(3)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -843,27 +843,27 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithGap(t *testi
 	}
 	ctx := context.Background()
 	// Create confirmations with a gap (missing block 102)
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		// no block 101, which is the first block of the canonical chain
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblock101"},
 		{BlockHash: "0xblock103", BlockNumber: fftypes.FFuint64(103), ParentHash: "0xblock102"},
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -883,25 +883,25 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNu
 	}
 	ctx := context.Background()
 	// Create confirmations with a lower block number
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(99), ParentHash: "0xblock100"}, // somehow there is a lower block number
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -921,26 +921,26 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNu
 	}
 	ctx := context.Background()
 	// Create confirmations with a lower block number
-	existingQueue := []*apitypes.Confirmation{
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: "0xblock100", BlockNumber: fftypes.FFuint64(100), ParentHash: "0xblock99"},
 		{BlockHash: "0xblock101", BlockNumber: fftypes.FFuint64(101), ParentHash: "0xblock100"},
 		{BlockHash: "0xblock102", BlockNumber: fftypes.FFuint64(99), ParentHash: "0xblock101"}, // somehow there is a lower block number
 	}
-	occ := &ConfirmationMapUpdateResult{
-		ConfirmationMap: &ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
+	occ := &ffcapi.ConfirmationMapUpdateResult{
+		ConfirmationMap: &ffcapi.ConfirmationMap{
+			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
 				"0xblock100": existingQueue,
 			},
 		},
 	}
-	txBlockNumber := int64(100)
+	txBlockNumber := uint64(100)
 	txBlockHash := "0xblock100"
-	txBlockInfo := &minimalBlockInfo{
-		number:     txBlockNumber,
-		hash:       txBlockHash,
-		parentHash: "0xblock99",
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  "0xblock99",
 	}
-	targetConfirmationCount := 5
+	targetConfirmationCount := uint64(5)
 
 	// Execute
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
@@ -955,13 +955,13 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNu
 
 // Helper functions
 
-func createTestChain(startBlock, endBlock int64) *list.List {
+func createTestChain(startBlock, endBlock uint64) *list.List {
 	chain := list.New()
 	for i := startBlock; i <= endBlock; i++ {
-		blockInfo := &minimalBlockInfo{
-			number:     i,
-			hash:       fmt.Sprintf("0xblock%d", i),
-			parentHash: fmt.Sprintf("0xblock%d", i-1),
+		blockInfo := &ffcapi.MinimalBlockInfo{
+			BlockNumber: fftypes.FFuint64(i),
+			BlockHash:   fmt.Sprintf("0xblock%d", i),
+			ParentHash:  fmt.Sprintf("0xblock%d", i-1),
 		}
 		chain.PushBack(blockInfo)
 	}
