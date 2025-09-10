@@ -17,6 +17,7 @@
 package ethereum
 
 import (
+	"container/list"
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -107,198 +108,213 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	chainTail := bl.canonicalChain.Back().Value.(*minimalBlockInfo)
 	if chainHead == nil || chainTail == nil || chainTail.number < txBlockNumber {
 		log.L(ctx).Debugf("Canonical chain is waiting for the transaction block %d to be indexed", txBlockNumber)
-		// we cannot build any useful confirmation information yet, so return the existing confirmation map
 		return
 	}
-	var existingQueue []*apitypes.Confirmation
+
+	// Initialize confirmation map and get existing queue
+	existingQueue := bl.initializeConfirmationMap(occ, txBlockInfo)
+
+	// Validate and process existing confirmations
+	newQueue, currentBlock := bl.processExistingConfirmations(ctx, occ, txBlockInfo, existingQueue, chainHead, targetConfirmationCount)
+
+	// Build new confirmations from canonical chain only if not already confirmed
+	if !occ.Confirmed {
+		newQueue = bl.buildNewConfirmations(occ, newQueue, currentBlock, txBlockNumber, targetConfirmationCount)
+	}
+	occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = newQueue
+}
+
+func (bl *blockListener) initializeConfirmationMap(occ *ConfirmationMapUpdateResult, txBlockInfo *minimalBlockInfo) []*apitypes.Confirmation {
+	txBlockHash := txBlockInfo.hash
+
 	if occ.ConfirmationMap == nil || len(occ.ConfirmationMap.ConfirmationQueueMap) == 0 {
 		occ.ConfirmationMap = &ConfirmationMap{
 			ConfirmationQueueMap: map[string][]*apitypes.Confirmation{
-				txBlockHash: {&apitypes.Confirmation{
-					BlockHash:   txBlockHash,
-					BlockNumber: fftypes.FFuint64(txBlockNumber), //nolint:gosec // block numbers are always positive
-					ParentHash:  txBlockInfo.parentHash,
-				}},
+				txBlockHash: {txBlockInfo.ToConfirmation()},
 			},
 			CanonicalBlockHash: txBlockHash,
 		}
-		// starting a new confirmation queue
 		occ.HasNewFork = true
-	} else {
-		existingQueue = occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash]
+		return nil
 	}
 
-	var existingConfirmations []*apitypes.Confirmation
-	var previousExistingConfirmation *apitypes.Confirmation
-
-	// get the first item of the confirmation queue
-	// and compare with the transaction block
+	existingQueue := occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash]
 	if len(existingQueue) > 0 {
-		if existingQueue[0].BlockNumber.Uint64() != uint64(txBlockNumber) { //nolint:gosec // block numbers are always positive
-			// the existing queue of the current txBlockHash does not have the same block number as the new transaction block
-			// clear the accumulated confirmation queue
+		existingTxBlock := existingQueue[0]
+		if !isSameBlock(existingTxBlock, txBlockInfo) {
+			// the tx block in the existing queue does not match the new tx block we queried from the chain
+			// rebuild a new confirmation queue with the new tx block
 			occ.HasNewFork = true
 			occ.Rebuilt = true
-			occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*apitypes.Confirmation{{
-				BlockHash:   txBlockHash,
-				BlockNumber: fftypes.FFuint64(txBlockNumber), //nolint:gosec // block numbers are always positive
-				ParentHash:  txBlockInfo.parentHash,
-			}}
-
-		} else {
-			existingConfirmations = existingQueue[1:]
-			if len(existingConfirmations) > 0 {
-				// check whether the first item in the existing confirmation queue is the next block of the tx block
-				if existingConfirmations[0].BlockNumber.Uint64() == uint64(txBlockNumber)+1 { //nolint:gosec // block numbers are always positive
-					// if it is, set the previous existing confirmation to the first item
-					previousExistingConfirmation = existingQueue[0]
-				}
-				// otherwise, don't set the previous existing confirmation
-				// as we allow gaps between the tx block and the first block in the existing confirmation queue
-				// NOTE: we don't allow gaps after the first block in the existing confirmation queue
-				// any gaps, we need to rebuild the confirmations queue
-			}
+			occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*apitypes.Confirmation{txBlockInfo.ToConfirmation()}
+			return nil
 		}
 	}
-	// now start building the new confirmation queue
-	newQueue := []*apitypes.Confirmation{{
-		BlockHash:   txBlockHash,
-		BlockNumber: fftypes.FFuint64(txBlockNumber), //nolint:gosec // block numbers are always positive
-		ParentHash:  txBlockInfo.parentHash,
-	}}
 
-	// NOTE: the current block might be moved forward as apart of the existing confirmations check
+	return existingQueue
+}
+
+func (bl *blockListener) processExistingConfirmations(ctx context.Context, occ *ConfirmationMapUpdateResult, txBlockInfo *minimalBlockInfo, existingQueue []*apitypes.Confirmation, chainHead *minimalBlockInfo, targetConfirmationCount int) ([]*apitypes.Confirmation, *list.Element) {
+	txBlockNumber := txBlockInfo.number
+
+	newQueue := []*apitypes.Confirmation{txBlockInfo.ToConfirmation()}
+
 	currentBlock := bl.canonicalChain.Front()
 	// iterate to the tx block if the chain head is earlier than the tx block
 	if currentBlock != nil && currentBlock.Value.(*minimalBlockInfo).number <= txBlockNumber {
 		currentBlock = currentBlock.Next()
 	}
 
-	// NOTE: we assume the first block in the existing confirmation is the lowest block number
-	// and the last block in the existing confirmation is the highest block number
-	// check whether the tail of existing confirmations connects to the existing canonical chain
-	if len(existingConfirmations) > 0 {
-		lastExistingConfirmation := existingConfirmations[len(existingConfirmations)-1]
-		if lastExistingConfirmation.BlockNumber.Uint64() < uint64(chainHead.number) && //nolint:gosec // block numbers are always positive
-			(lastExistingConfirmation.BlockNumber.Uint64() != uint64(chainHead.number-1) || //nolint:gosec // block numbers are always positive
-				lastExistingConfirmation.BlockHash != chainHead.parentHash) {
-			// there is no connection between the existing confirmations and the canonical chain
-			// so we don't need to copy over any of the existing confirmations
-			// as we won't be able to validate whether they are from the same fork as
-			// the canonical chain
+	if len(existingQueue) == 0 {
+		return newQueue, currentBlock
+	}
+
+	existingConfirmations := existingQueue[1:]
+	if len(existingConfirmations) == 0 {
+		return newQueue, currentBlock
+	}
+
+	return bl.validateExistingConfirmations(ctx, occ, newQueue, existingConfirmations, currentBlock, chainHead, txBlockInfo, targetConfirmationCount)
+}
+
+func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ *ConfirmationMapUpdateResult, newQueue []*apitypes.Confirmation, existingConfirmations []*apitypes.Confirmation, currentBlock *list.Element, chainHead *minimalBlockInfo, txBlockInfo *minimalBlockInfo, targetConfirmationCount int) ([]*apitypes.Confirmation, *list.Element) {
+	txBlockNumber := txBlockInfo.number
+	lastExistingConfirmation := existingConfirmations[len(existingConfirmations)-1]
+	if lastExistingConfirmation.BlockNumber.Uint64() < uint64(chainHead.number) && //nolint:gosec
+		// ^^ the highest block number in the existing confirmations is lower than the highest block number in the canonical chain
+		(lastExistingConfirmation.BlockNumber.Uint64() != uint64(chainHead.number-1) || //nolint:gosec // block numbers are always positive
+			lastExistingConfirmation.BlockHash != chainHead.parentHash) {
+		// ^^ and the last existing confirmation is not the parent of the canonical chain head
+		// Therefore, there is no connection between the existing confirmations and the canonical chain
+		// so that we cannot validate the existing confirmations are from the same fork as the canonical chain
+		// so we need to rebuild the confirmations queue
+		occ.Rebuilt = true
+		return newQueue, currentBlock
+	}
+
+	var previousExistingConfirmation *apitypes.Confirmation
+	queueIndex := 0
+
+	connectionBlockNumber := currentBlock.Value.(*minimalBlockInfo).number
+
+	for currentBlock != nil && queueIndex < len(existingConfirmations) {
+		existingConfirmation := existingConfirmations[queueIndex]
+		if existingConfirmation.BlockNumber.Uint64() <= uint64(txBlockNumber) { //nolint:gosec // block numbers are always positive
+			log.L(ctx).Debugf("Existing confirmation queue is corrupted, the first block is earlier than the tx block: %d", existingConfirmation.BlockNumber.Uint64())
+			// if any block in the existing confirmation queue is earlier than the tx block
+			// the existing confirmation queue is no valid
+			// we need to rebuild the confirmations queue
 			occ.Rebuilt = true
-		} else {
-			// otherwise, the existing confirmations do have overlap with the canonical chain
-			// so we can give a better view on whether this is a new fork or has new confirmations
-			queueIndex := 0
-			for currentBlock != nil && queueIndex < len(existingConfirmations) {
-				existingConfirmation := existingConfirmations[queueIndex]
-				// if any block in the existing confirmation queue is earlier than the tx block
-				// we need to discard the existing confirmations
-				if existingConfirmation.BlockNumber.Uint64() <= uint64(txBlockNumber) { //nolint:gosec // block numbers are always positive
-					occ.Rebuilt = true
-					newQueue = newQueue[:1]
-					break
-				}
-				// the existing confirmation queue is not tightly controlled by our canonical chain
-				// so we need to check whether the existing confirmation queue is corrupted
-				isExistingBlockCorrupted := previousExistingConfirmation != nil &&
-					(previousExistingConfirmation.BlockNumber.Uint64()+1 != existingConfirmation.BlockNumber.Uint64() ||
-						previousExistingConfirmation.BlockHash != existingConfirmation.ParentHash)
-				currentBlockInfo := currentBlock.Value.(*minimalBlockInfo)
-				if isExistingBlockCorrupted {
-					// the existing confirmation queue is corrupted
-					// so we need to clear out the existing confirmations we copied over
-					occ.Rebuilt = true
-					newQueue = newQueue[:1]
-					break
-				}
-				if existingConfirmation.BlockNumber.Uint64() < uint64(currentBlockInfo.number) { //nolint:gosec // block numbers are always positive
-					// the existing confirmation is earlier than the current block
+			return newQueue[:1], currentBlock
+		}
 
-					// otherwise, we need to add the existing confirmation to the new queue
-					// NOTE: we are not doing the confirmation count check here
-					// because we've not reached the current head in the canonical chain to validate
-					// all the confirmations we copied over are still valid
-					newQueue = append(newQueue, existingConfirmation)
-					previousExistingConfirmation = existingConfirmation
-					queueIndex++
-					continue
-				} else if existingConfirmation.BlockNumber.Uint64() == uint64(currentBlockInfo.number) { //nolint:gosec // block numbers are always positive
-					// existing confirmation has caught up to the current block
-					// we also need to check the parent hash matches to decide
-					// whether the existing confirmations added are still valid
-					if previousExistingConfirmation.BlockHash != currentBlockInfo.parentHash {
-						// this indicates a fork that happened before the current block
-						// so all the previous carried over confirmations are invalid and needs to be cleared out
-						occ.Rebuilt = true
-						newQueue = newQueue[:1]
-						// not adding the current block and do confirmation count check here
-						// the downstream logic handle all the block addition of the new fork
-						break
-					} else if existingConfirmation.BlockHash != currentBlockInfo.hash {
-						// this indicate the existing confirmation cannot be used, thus all the following confirmations are invalid
-						occ.HasNewFork = true
-						break
-					}
-					// otherwise, we need to add the existing confirmation to the new queue
-					newQueue = append(newQueue, existingConfirmation)
+		// the existing confirmation queue is not tightly controlled by our canonical chain
+		// ^^ even though it supposed to be build by a canonical chain, we cannot rely on it
+		// because they are stored outside of current system
+		// Therefore, we need to check whether the existing confirmation queue is corrupted
+		isCorrupted := previousExistingConfirmation != nil &&
+			(previousExistingConfirmation.BlockNumber.Uint64()+1 != existingConfirmation.BlockNumber.Uint64() ||
+				previousExistingConfirmation.BlockHash != existingConfirmation.ParentHash) ||
+			// check the link between the first confirmation block and the existing tx block
+			(existingConfirmation.BlockNumber.Uint64() == uint64(txBlockNumber)+1 && //nolint:gosec // block numbers are always positive
+				existingConfirmation.ParentHash != txBlockInfo.hash)
+			//  we allow gaps between the tx block and the first block in the existing confirmation queue
+			// NOTE: we don't allow gaps after the first block in the existing confirmation queue
+			// any gaps, we need to rebuild the confirmations queue
 
-					// if the target confirmation count has been reached
-					if existingConfirmation.BlockNumber.Uint64()-uint64(txBlockNumber) >= uint64(targetConfirmationCount) { //nolint:gosec // block numbers are always positive
-						// there is a chance the new queue contains more blocks than the target confirmation count
-						break
-					}
-					// move to the next block for checking overlap
-					currentBlock = currentBlock.Next()
-					previousExistingConfirmation = existingConfirmation
-					queueIndex++
-					continue
+		if isCorrupted {
+			// any corruption in the existing confirmation queue will cause the confirmation queue to be rebuilt
+			// we don't keep any of the existing confirmations
+			occ.Rebuilt = true
+			return newQueue[:1], currentBlock
+		}
+
+		currentBlockInfo := currentBlock.Value.(*minimalBlockInfo)
+		if existingConfirmation.BlockNumber.Uint64() < uint64(currentBlockInfo.number) { //nolint:gosec
+			// NOTE: we are not doing the confirmation count check here
+			// because we've not reached the current head in the canonical chain to validate
+			// all the confirmations we copied over are still valid
+			newQueue = append(newQueue, existingConfirmation)
+			previousExistingConfirmation = existingConfirmation
+			queueIndex++
+			continue
+		}
+
+		if existingConfirmation.BlockNumber.Uint64() == uint64(currentBlockInfo.number) { //nolint:gosec // block numbers are always positive
+			// existing confirmation has caught up to the current block
+			// checking the overlaps
+
+			if !isSameBlock(existingConfirmation, currentBlockInfo) {
+				// we detected a potential fork
+				if connectionBlockNumber == currentBlockInfo.number &&
+					previousExistingConfirmation.BlockHash != currentBlockInfo.parentHash {
+					// this is the connection node (first overlap between existing confirmation queue and canonical chain)
+					// if the first node doesn't chain to to the previous confirmation, it means all the historical confirmation are on a different fork
+					// therefore, we need to rebuild the confirmations queue
+					occ.Rebuilt = true
+					return newQueue[:1], currentBlock
 				}
-				// the existing confirmation is later than the current block
-				// it means we have gaps to fill in, therefore, we need to replace the old confirmations
-				// and don't bother with what's in the existing confirmation already
-				occ.Rebuilt = true
-				newQueue = newQueue[:1]
+
+				// other scenarios, the historical confirmation are still trustworthy and linked to our canonical chain
+				occ.HasNewFork = true
+				return newQueue, currentBlock
+			}
+
+			newQueue = append(newQueue, existingConfirmation)
+			if existingConfirmation.BlockNumber.Uint64()-uint64(txBlockNumber) >= uint64(targetConfirmationCount) { //nolint:gosec // block numbers are always positive
 				break
 			}
-			// we've just iterated through all the existing confirmations
-			// now we need to check whether we've got a confirmable queue
-			lastBlockInNewQueue := newQueue[len(newQueue)-1]                                                       // at this point, it's guaranteed to be the highest block number
-			if lastBlockInNewQueue.BlockNumber.Uint64() >= uint64(txBlockNumber)+uint64(targetConfirmationCount) { //nolint:gosec // block numbers are always positive
-				// we've got a confirmable so whether the rest of the chain has forked is not longer relevant
-				// this could happen when user chose a different target confirmation count for the new checks
-				// but we still need to validate the existing confirmations are connectable to the canonical chain
-				if lastBlockInNewQueue.BlockNumber.Uint64() >= uint64(chainHead.number) || //nolint:gosec // block numbers are always positive
-					(lastBlockInNewQueue.BlockNumber.Uint64() == uint64(chainHead.number-1) && //nolint:gosec // block numbers are always positive
-						lastBlockInNewQueue.BlockHash == chainHead.parentHash) {
-					occ.HasNewFork = false
-					occ.HasNewConfirmation = false
-					occ.Rebuilt = false
-					occ.Confirmed = true
-					if lastBlockInNewQueue.BlockNumber.Uint64() == uint64(chainHead.number-1) && //nolint:gosec // block numbers are always positive
-						lastBlockInNewQueue.BlockHash == chainHead.parentHash {
-						newQueue = append(newQueue, &apitypes.Confirmation{
-							BlockHash:   chainHead.hash,
-							BlockNumber: fftypes.FFuint64(chainHead.number), //nolint:gosec // block numbers are always positive
-							ParentHash:  chainHead.parentHash,
-						})
-					}
-					// note: we don't trim the queue
-					occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = newQueue
-					return
+			currentBlock = currentBlock.Next()
+			previousExistingConfirmation = existingConfirmation
+			queueIndex++
+			continue
+		}
+
+		occ.Rebuilt = true
+		return newQueue[:1], currentBlock
+	}
+
+	// Check if we have enough confirmations
+	lastBlockInNewQueue := newQueue[len(newQueue)-1]
+	confirmationBlockNumber := uint64(txBlockNumber) + uint64(targetConfirmationCount) //nolint:gosec // block numbers are always positive
+	if lastBlockInNewQueue.BlockNumber.Uint64() >= confirmationBlockNumber {
+		chainHead := bl.canonicalChain.Front().Value.(*minimalBlockInfo)
+		// we've got a confirmable so whether the rest of the chain has forked is not longer relevant
+		// this could happen when user chose a different target confirmation count for the new checks
+		// but we still need to validate the existing confirmations are connectable to the canonical chain
+		// Check if the queue connects to the canonical chain
+		if lastBlockInNewQueue.BlockNumber.Uint64() >= uint64(chainHead.number) || //nolint:gosec // block numbers are always positive
+			(lastBlockInNewQueue.BlockNumber.Uint64() == uint64(chainHead.number-1) && //nolint:gosec // block numbers are always positive
+				lastBlockInNewQueue.BlockHash == chainHead.parentHash) {
+			occ.HasNewFork = false
+			occ.HasNewConfirmation = false
+			occ.Rebuilt = false
+			occ.Confirmed = true
+
+			// Trim the queue to only include blocks up to the max confirmation count
+			trimmedQueue := []*apitypes.Confirmation{}
+			for _, confirmation := range newQueue {
+				if confirmation.BlockNumber.Uint64() > confirmationBlockNumber {
+					break
 				}
+				trimmedQueue = append(trimmedQueue, confirmation)
 			}
+
+			// If we've trimmed off all the existing confirmations, we need to add the canonical chain head
+			// to tell use the head block we used to confirmed the transaction
+			if len(trimmedQueue) == 1 {
+				trimmedQueue = append(trimmedQueue, chainHead.ToConfirmation())
+			}
+			return trimmedQueue, currentBlock
 		}
 	}
 
-	// at this point, we know the following:
-	// 1. the existing confirmations that we copied over are valid
-	// 2. the new queue is not confirmable just using the existing confirmations
+	return newQueue, currentBlock
+}
 
+func (bl *blockListener) buildNewConfirmations(occ *ConfirmationMapUpdateResult, newQueue []*apitypes.Confirmation, currentBlock *list.Element, txBlockNumber int64, targetConfirmationCount int) []*apitypes.Confirmation {
 	for currentBlock != nil {
 		currentBlockInfo := currentBlock.Value.(*minimalBlockInfo)
-		// only add the blocks that are later than the last block in the newQueue
 		if currentBlockInfo.number > int64(newQueue[len(newQueue)-1].BlockNumber.Uint64()) { //nolint:gosec // block numbers are always positive
 			occ.HasNewConfirmation = true
 			newQueue = append(newQueue, &apitypes.Confirmation{
@@ -313,5 +329,11 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 		}
 		currentBlock = currentBlock.Next()
 	}
-	occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = newQueue
+	return newQueue
+}
+
+func isSameBlock(c1 *apitypes.Confirmation, bi *minimalBlockInfo) bool {
+	return c1.BlockHash == bi.hash &&
+		c1.BlockNumber.Uint64() == uint64(bi.number) && //nolint:gosec // block numbers are always positive
+		c1.ParentHash == bi.parentHash
 }

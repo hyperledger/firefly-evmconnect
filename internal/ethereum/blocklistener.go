@@ -31,6 +31,7 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/apitypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -71,6 +72,14 @@ type minimalBlockInfo struct {
 	number     int64
 	hash       string
 	parentHash string
+}
+
+func (mbi *minimalBlockInfo) ToConfirmation() *apitypes.Confirmation {
+	return &apitypes.Confirmation{
+		BlockHash:   mbi.hash,
+		BlockNumber: fftypes.FFuint64(mbi.number), //nolint:gosec // block numbers are always positive
+		ParentHash:  mbi.parentHash,
+	}
 }
 
 func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section, wsConf *wsclient.WSConfig) (bl *blockListener, err error) {
