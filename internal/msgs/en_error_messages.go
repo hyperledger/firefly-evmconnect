@@ -73,4 +73,6 @@ var (
 	MsgInvalidProtocolID               = ffe("FF23055", "Invalid protocol ID in event log: %s")
 	MsgFailedToRetrieveChainID         = ffe("FF23056", "Failed to retrieve chain ID for event enrichment")
 	MsgFailedToRetrieveTransactionInfo = ffe("FF23057", "Failed to retrieve transaction info for transaction hash '%s'")
+	MsgFailedToQueryReceipt            = ffe("FF23058", "Failed to query receipt for transaction %s")
+	MsgFailedToQueryBlockInfo          = ffe("FF23059", "Failed to query block info using hash %s")
 )

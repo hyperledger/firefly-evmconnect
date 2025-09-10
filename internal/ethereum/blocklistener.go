@@ -57,15 +57,16 @@ type blockListener struct {
 	newHeadsTap                chan struct{}
 	newHeadsSub                rpcbackend.Subscription
 	highestBlock               int64
-	mux                        sync.Mutex
+	mux                        sync.RWMutex
 	consumers                  map[fftypes.UUID]*blockUpdateConsumer
 	blockPollingInterval       time.Duration
-	unstableHeadLength         int
-	canonicalChain             *list.List
 	hederaCompatibilityMode    bool
 	blockCache                 *lru.Cache
-}
 
+	//  canonical chain
+	unstableHeadLength int
+	canonicalChain     *list.List
+}
 type minimalBlockInfo struct {
 	number     int64
 	hash       string
