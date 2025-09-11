@@ -74,8 +74,8 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	txBlockHash := res.BlockHash
 	txBlockNumber := res.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
-	bi, _, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
-	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, we don't throw error in this case and treating it as block not found
+	bi, reason, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
+	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
 		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
 	}
 	if bi == nil {
@@ -105,14 +105,10 @@ func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber u
 	if blockInfo == nil {
 		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexIntegerU64(blockNumber), false /* only the txn hashes */)
 		if rpcErr != nil {
-			if mapError(blockRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
-				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", rpcErr.Message)
-				return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
-			}
 			return nil, ffcapi.ErrorReason(""), rpcErr.Error()
 		}
 		if blockInfo == nil {
-			return nil, ffcapi.ErrorReason(""), nil
+			return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 		}
 		bl.addToBlockCache(blockInfo)
 	}
