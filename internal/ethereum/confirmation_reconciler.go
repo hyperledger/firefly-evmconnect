@@ -77,11 +77,21 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	// Validate and process existing confirmations
 	newQueue, currentBlock := bl.processExistingConfirmations(ctx, occ, txBlockInfo, existingQueue, chainHead, targetConfirmationCount)
 
+	if currentBlock == nil {
+		// the tx block is not in the canonical chain
+		// we should just return the existing block confirmations and wait for future call to correct it
+		return
+	}
+
 	// Build new confirmations from canonical chain only if not already confirmed
 	if !occ.Confirmed {
 		newQueue = bl.buildNewConfirmations(occ, newQueue, currentBlock, txBlockNumber, targetConfirmationCount)
 	}
 	occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = newQueue
+
+	if occ.CanonicalBlockHash != txBlockHash {
+		occ.CanonicalBlockHash = txBlockHash
+	}
 }
 
 func (bl *blockListener) initializeConfirmationMap(occ *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
@@ -121,7 +131,17 @@ func (bl *blockListener) processExistingConfirmations(ctx context.Context, occ *
 
 	currentBlock := bl.canonicalChain.Front()
 	// iterate to the tx block if the chain head is earlier than the tx block
-	if currentBlock != nil && currentBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64() <= txBlockNumber {
+	for currentBlock != nil && currentBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64() <= txBlockNumber {
+		if currentBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64() == txBlockNumber {
+			// the tx block is already in the canonical chain
+			// we need to check if the tx block is the same as the chain head
+			if !currentBlock.Value.(*ffcapi.MinimalBlockInfo).Equal(txBlockInfo) {
+				// the tx block information is different from the same block number in the canonical chain
+				// the tx confirmation block is not on the same fork as the canonical chain
+				// we should just return the existing block confirmations and wait for future call to correct it
+				return newQueue, nil
+			}
+		}
 		currentBlock = currentBlock.Next()
 	}
 

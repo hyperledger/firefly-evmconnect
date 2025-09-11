@@ -62,10 +62,10 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	// so need to figure out the reason first
 
 	// TODO: add a cache if map cannot be used
-	res, _, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
+	res, reason, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
 		TransactionHash: txHash,
 	})
-	if receiptErr != nil {
+	if receiptErr != nil && reason != ffcapi.ErrorReasonNotFound {
 		return nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
 	}
 	if res == nil {
@@ -75,8 +75,11 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	txBlockNumber := res.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
 	bi, _, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
-	if err != nil {
+	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
 		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
+	}
+	if bi == nil {
+		return nil, nil
 	}
 
 	return &ffcapi.MinimalBlockInfo{
