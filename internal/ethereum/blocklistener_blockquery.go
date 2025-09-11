@@ -75,7 +75,7 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	txBlockNumber := res.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
 	bi, _, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
-	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
+	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, we don't throw error in this case and treating it as block not found
 		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
 	}
 	if bi == nil {
