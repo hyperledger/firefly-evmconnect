@@ -146,13 +146,13 @@ func (bl *blockListener) processExistingConfirmations(ctx context.Context, occ *
 	}
 
 	if len(existingQueue) <= 1 {
-	    return newQueue, currentBlock
-     }
+		return newQueue, currentBlock
+	}
 
-      existingConfirmations := existingQueue[1:]
-      return bl.validateExistingConfirmations(
-	      ctx, occ, newQueue, existingConfirmations, currentBlock, chainHead, txBlockInfo, targetConfirmationCount,
-)
+	existingConfirmations := existingQueue[1:]
+	return bl.validateExistingConfirmations(
+		ctx, occ, newQueue, existingConfirmations, currentBlock, chainHead, txBlockInfo, targetConfirmationCount,
+	)
 }
 
 func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ *ffcapi.ConfirmationMapUpdateResult, newQueue []*ffcapi.MinimalBlockInfo, existingConfirmations []*ffcapi.MinimalBlockInfo, currentBlock *list.Element, chainHead *ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) ([]*ffcapi.MinimalBlockInfo, *list.Element) {
