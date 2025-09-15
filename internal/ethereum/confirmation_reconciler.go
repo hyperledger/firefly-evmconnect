@@ -74,6 +74,19 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	// Initialize confirmation map and get existing queue
 	existingQueue := bl.initializeConfirmationMap(occ, txBlockInfo)
 
+	if targetConfirmationCount == 0 {
+		// if the target confirmation count is 0, we should just return the transaction block
+		occ.Confirmed = true
+		// Only return the transaction block for zero confirmation
+		occ.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*ffcapi.MinimalBlockInfo{txBlockInfo}
+		// For zero confirmation, determine if we processed new confirmations
+		if occ.Rebuilt || occ.HasNewFork {
+			// If a fork was detected, we processed new confirmations
+			occ.HasNewConfirmation = true
+		}
+		return
+	}
+
 	// Validate and process existing confirmations
 	newQueue, currentBlock := bl.processExistingConfirmations(ctx, occ, txBlockInfo, existingQueue, chainHead, targetConfirmationCount)
 
@@ -104,6 +117,7 @@ func (bl *blockListener) initializeConfirmationMap(occ *ffcapi.ConfirmationMapUp
 			},
 			CanonicalBlockHash: txBlockHash,
 		}
+		occ.HasNewConfirmation = true
 		return nil
 	}
 
