@@ -104,7 +104,6 @@ func (bl *blockListener) initializeConfirmationMap(occ *ffcapi.ConfirmationMapUp
 			},
 			CanonicalBlockHash: txBlockHash,
 		}
-		occ.HasNewFork = true
 		return nil
 	}
 

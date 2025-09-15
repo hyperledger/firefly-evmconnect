@@ -353,7 +353,7 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
 
 	// Assert
 	assert.NotNil(t, occ.ConfirmationMap)
-	assert.True(t, occ.HasNewFork)
+	assert.False(t, occ.HasNewFork)
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.False(t, occ.Rebuilt)
@@ -392,7 +392,7 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *test
 
 	// Assert
 	assert.NotNil(t, occ.ConfirmationMap)
-	assert.True(t, occ.HasNewFork)
+	assert.False(t, occ.HasNewFork)
 	assert.True(t, occ.HasNewConfirmation)
 	assert.False(t, occ.Confirmed)
 	assert.False(t, occ.Rebuilt)
@@ -431,7 +431,7 @@ func TestCompareAndUpdateConfirmationQueue_EmptyConfirmationQueue(t *testing.T) 
 	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
 
 	// Assert
-	assert.True(t, occ.HasNewFork)
+	assert.False(t, occ.HasNewFork)
 	assert.True(t, occ.HasNewConfirmation)
 	assert.True(t, occ.Confirmed)
 	assert.False(t, occ.Rebuilt)
