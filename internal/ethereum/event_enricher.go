@@ -55,9 +55,15 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	data, decoded := ee.decodeLogData(ctx, f.Event, ethLog.Topics, ethLog.Data)
 
 	if len(ee.connector.chainID) == 0 {
+		// by calling IsReady, ee.connector.chainID SHOULD be set to the chain ID when the connector is ready
 		resp, _, err := ee.connector.IsReady(ctx)
-		if !resp.Ready || err != nil {
+		if err != nil {
+			log.L(ctx).Errorf("Failed to set chain ID due to failed to query chain readiness: %+v", err)
 			return nil, matched, decoded, err
+		}
+		if !resp.Ready {
+			log.L(ctx).Errorf("Failed to set chain ID due to the connector is not ready")
+			return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgFailedToRetrieveChainID)
 		}
 	}
 
@@ -69,22 +75,26 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	var timestamp *fftypes.FFTime
 	if ee.connector.eventBlockTimestamps {
 		bi, err := ee.connector.blockListener.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
-		if bi == nil || err != nil {
+		if err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
 			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
+		}
+		if bi == nil {
+			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': block not found", ethLog.BlockHash)
+			return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 		}
 		timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
 	}
 
 	if len(methods) > 0 || ee.extractSigner {
 		txInfo, err := ee.connector.getTransactionInfo(ctx, ethLog.TransactionHash)
-		if txInfo == nil || err != nil {
-			if txInfo == nil {
-				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': transaction hash not found", ethLog.TransactionHash)
-			} else {
-				log.L(ctx).Errorf("Failed to get transaction info for TX '%s': %v", ethLog.TransactionHash, err)
-			}
+		if err != nil {
+			log.L(ctx).Errorf("Failed to get transaction info for transaction hash '%s': %v", ethLog.TransactionHash, err)
 			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
+		}
+		if txInfo == nil {
+			log.L(ctx).Errorf("Failed to get transaction info for transaction hash '%s': transaction hash not found", ethLog.TransactionHash)
+			return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgFailedToRetrieveTransactionInfo, ethLog.TransactionHash)
 		}
 		if ee.extractSigner {
 			info.InputSigner = txInfo.From

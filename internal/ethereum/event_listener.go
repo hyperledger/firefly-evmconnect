@@ -251,7 +251,7 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, metho
 	}
 
 	e, matched, _, err := l.ee.filterEnrichEthLog(ctx, f, methods, ethLog)
-	if !matched || err != nil {
+	if !matched || err != nil || e == nil {
 		return nil, false, err
 	}
 
