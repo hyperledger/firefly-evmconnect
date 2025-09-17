@@ -28,13 +28,14 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/ethereum"
 	fftmcmd "github.com/hyperledger/firefly-transaction-manager/cmd"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/fftm"
 	txhandlerfactory "github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/registry"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/txhandler/simple"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+type EthereumConnector ethereum.Connector
 
 var sigs = make(chan os.Signal, 1)
 
@@ -77,7 +78,7 @@ func InitConfig() {
 	txhandlerfactory.RegisterHandler(&simple.TransactionHandlerFactory{})
 }
 
-func NewEthereumConnector(ctx context.Context, conf config.Section) (cc ffcapi.API, err error) {
+func NewEthereumConnector(ctx context.Context, conf config.Section) (EthereumConnector, error) {
 	return ethereum.NewEthereumConnector(ctx, conf)
 }
 
