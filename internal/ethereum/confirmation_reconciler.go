@@ -66,7 +66,7 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 
 	chainHead := bl.canonicalChain.Front().Value.(*ffcapi.MinimalBlockInfo)
 	chainTail := bl.canonicalChain.Back().Value.(*ffcapi.MinimalBlockInfo)
-	if chainHead == nil || chainTail == nil || chainTail.BlockNumber.Uint64() < txBlockNumber {
+	if chainTail == nil || chainTail.BlockNumber.Uint64() < txBlockNumber {
 		log.L(ctx).Debugf("Canonical chain is waiting for the transaction block %d to be indexed", txBlockNumber)
 		return
 	}
