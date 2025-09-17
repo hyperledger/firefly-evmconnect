@@ -270,7 +270,7 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 	confirmationBlockNumber := txBlockNumber + targetConfirmationCount
 	if lastBlockInNewQueue.BlockNumber.Uint64() >= confirmationBlockNumber {
 		chainHead := bl.canonicalChain.Front().Value.(*ffcapi.MinimalBlockInfo)
-		// we've got a confirmable so whether the rest of the chain has forked is not longer relevant
+		// we've got a confirmation so whether the rest of the chain has forked is no longer relevant
 		// this could happen when user chose a different target confirmation count for the new checks
 		// but we still need to validate the existing confirmations are connectable to the canonical chain
 		// Check if the queue connects to the canonical chain
@@ -292,7 +292,7 @@ func (bl *blockListener) validateExistingConfirmations(ctx context.Context, occ 
 			}
 
 			// If we've trimmed off all the existing confirmations, we need to add the canonical chain head
-			// to tell use the head block we used to confirmed the transaction
+			// to tell us the head block we used to confirm the transaction
 			if len(trimmedQueue) == 1 {
 				trimmedQueue = append(trimmedQueue, chainHead)
 			}
