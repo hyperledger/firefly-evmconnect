@@ -54,7 +54,7 @@ func TestBlockListenerStartGettingHighestBlockRetry(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Maybe()
 
 	h, ok := bl.getHighestBlock(bl.ctx)
-	assert.Equal(t, int64(12345), h)
+	assert.Equal(t, uint64(12345), h)
 	assert.True(t, ok)
 	done() // Stop immediately in this case, while we're in the polling interval
 
@@ -80,7 +80,7 @@ func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 
 	h, ok := bl.getHighestBlock(bl.ctx)
 	assert.False(t, ok)
-	assert.Equal(t, int64(-1), h)
+	assert.Equal(t, uint64(0), h)
 
 	<-bl.listenLoopDone
 
@@ -175,7 +175,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 
@@ -385,7 +385,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 
@@ -481,7 +481,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 }
@@ -599,7 +599,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 }
@@ -693,7 +693,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 }
@@ -787,7 +787,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 }
@@ -899,7 +899,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 
@@ -1050,7 +1050,7 @@ func TestBlockListenerGap(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1005), bl.highestBlock)
+	assert.Equal(t, uint64(1005), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 
@@ -1159,7 +1159,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 
@@ -1274,7 +1274,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 	done()
 	<-bl.listenLoopDone
 
-	assert.Equal(t, int64(1003), bl.highestBlock)
+	assert.Equal(t, uint64(1003), bl.highestBlock)
 
 	mRPC.AssertExpectations(t)
 
@@ -1687,10 +1687,10 @@ func TestBlockListenerRebuildCanonicalFailTerminate(t *testing.T) {
 
 	_, c, mRPC, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 	bl := c.blockListener
-	bl.canonicalChain.PushBack(&minimalBlockInfo{
-		number:     1000,
-		hash:       ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String()).String(),
-		parentHash: ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String()).String(),
+	bl.canonicalChain.PushBack(&ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(1000),
+		BlockHash:   ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String()).String(),
+		ParentHash:  ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String()).String(),
 	})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).

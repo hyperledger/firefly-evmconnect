@@ -254,7 +254,7 @@ func (es *eventStream) leadGroupCatchup() bool {
 		}
 
 		// Check if we're ready to exit catchup mode
-		headGap := (chainHeadBlock - fromBlock)
+		headGap := (int64(chainHeadBlock) - fromBlock) //nolint:gosec // convert to int64 to match the type of headGap
 		if headGap < es.c.catchupThreshold {
 			log.L(es.ctx).Infof("Stream head is up to date with chain fromBlock=%d chainHead=%d headGap=%d", fromBlock, chainHeadBlock, headGap)
 			return false
@@ -319,7 +319,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			// High water mark is a point safely behind the head of the chain in this case,
 			// where re-orgs are not expected.
 			bh, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
-			hwmBlock := bh - es.c.checkpointBlockGap
+			hwmBlock := int64(bh) - es.c.checkpointBlockGap     //nolint:gosec // convert to int64 to match the type of hwmBlock
 			if hwmBlock < 0 {
 				hwmBlock = 0
 			}
@@ -342,7 +342,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 
 				// Check we're not outside of the steady state window, and need to fall back to catchup mode
 				chainHeadBlock, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
-				blockGapEstimate := (chainHeadBlock - fromBlock)
+				blockGapEstimate := (int64(chainHeadBlock) - fromBlock)         //nolint:gosec // convert to int64 to match the type of blockGapEstimate
 				if blockGapEstimate > es.c.catchupThreshold {
 					log.L(es.ctx).Warnf("Block gap estimate reached %d (above threshold of %d) - reverting to catchup mode", blockGapEstimate, es.c.catchupThreshold)
 					return false
@@ -422,8 +422,8 @@ func (es *eventStream) preStartProcessing() {
 	for _, l := range es.listeners {
 		// During initial start we move the "head" block forwards to be the highest of all the initial streams
 		if l.hwmBlock > es.headBlock {
-			if l.hwmBlock > chainHead {
-				es.headBlock = chainHead
+			if l.hwmBlock > int64(chainHead) { //nolint:gosec // convert to int64 to match the type of headBlock
+				es.headBlock = int64(chainHead) //nolint:gosec // convert to int64 to match the type of headBlock
 			} else {
 				es.headBlock = l.hwmBlock
 			}

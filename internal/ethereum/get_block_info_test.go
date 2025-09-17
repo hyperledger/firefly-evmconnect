@@ -115,7 +115,11 @@ func TestGetBlockInfoByNumberBlockNotFoundError(t *testing.T) {
 	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).
-		Return(&rpcbackend.RPCError{Message: "cannot query unfinalized data"})
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte("null"), args[1])
+			assert.NoError(t, err)
+		})
 
 	var req ffcapi.BlockInfoByNumberRequest
 	err := json.Unmarshal([]byte(sampleGetBlockInfoByNumber), &req)
