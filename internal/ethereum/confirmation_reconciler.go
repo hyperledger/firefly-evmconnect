@@ -103,7 +103,7 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 }
 
 func (bl *blockListener) initializeConfirmationMap(reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
-	if reconcileResult.Confirmations == nil || len(reconcileResult.Confirmations) == 0 {
+	if len(reconcileResult.Confirmations) == 0 {
 		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 		reconcileResult.HasNewConfirmation = true
 		return nil
