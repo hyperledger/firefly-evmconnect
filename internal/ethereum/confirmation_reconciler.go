@@ -25,10 +25,10 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, confirmMap *ffcapi.ConfirmationMap, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
 	// Initialize the output context
 	reconcileResult := &ffcapi.ConfirmationMapUpdateResult{
-		ConfirmationMap:         confirmMap,
+		Confirmations:           existingConfirmations,
 		HasNewFork:              false,
 		Rebuilt:                 false,
 		HasNewConfirmation:      false,
@@ -62,7 +62,6 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
 	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
-	txBlockHash := txBlockInfo.BlockHash
 
 	chainHead := bl.canonicalChain.Front().Value.(*ffcapi.MinimalBlockInfo)
 	chainTail := bl.canonicalChain.Back().Value.(*ffcapi.MinimalBlockInfo)
@@ -78,7 +77,7 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 		// if the target confirmation count is 0, we should just return the transaction block
 		reconcileResult.Confirmed = true
 		// Only return the transaction block for zero confirmation
-		reconcileResult.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*ffcapi.MinimalBlockInfo{txBlockInfo}
+		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 		// For zero confirmation, determine if we processed new confirmations
 		if reconcileResult.Rebuilt || reconcileResult.HasNewFork {
 			// If a fork was detected, we processed new confirmations
@@ -100,28 +99,17 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	if !reconcileResult.Confirmed {
 		newQueue = bl.buildNewConfirmations(reconcileResult, newQueue, currentBlock, txBlockNumber, targetConfirmationCount)
 	}
-	reconcileResult.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = newQueue
-
-	if reconcileResult.CanonicalBlockHash != txBlockHash {
-		reconcileResult.CanonicalBlockHash = txBlockHash
-	}
+	reconcileResult.Confirmations = newQueue
 }
 
 func (bl *blockListener) initializeConfirmationMap(reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
-	txBlockHash := txBlockInfo.BlockHash
-
-	if reconcileResult.ConfirmationMap == nil || len(reconcileResult.ConfirmationMap.ConfirmationQueueMap) == 0 {
-		reconcileResult.ConfirmationMap = &ffcapi.ConfirmationMap{
-			ConfirmationQueueMap: map[string][]*ffcapi.MinimalBlockInfo{
-				txBlockHash: {txBlockInfo},
-			},
-			CanonicalBlockHash: txBlockHash,
-		}
+	if reconcileResult.Confirmations == nil || len(reconcileResult.Confirmations) == 0 {
+		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 		reconcileResult.HasNewConfirmation = true
 		return nil
 	}
 
-	existingQueue := reconcileResult.ConfirmationMap.ConfirmationQueueMap[txBlockHash]
+	existingQueue := reconcileResult.Confirmations
 	if len(existingQueue) > 0 {
 		existingTxBlock := existingQueue[0]
 		if !existingTxBlock.Equal(txBlockInfo) {
@@ -129,7 +117,7 @@ func (bl *blockListener) initializeConfirmationMap(reconcileResult *ffcapi.Confi
 			// rebuild a new confirmation queue with the new tx block
 			reconcileResult.HasNewFork = true
 			reconcileResult.Rebuilt = true
-			reconcileResult.ConfirmationMap.ConfirmationQueueMap[txBlockHash] = []*ffcapi.MinimalBlockInfo{txBlockInfo}
+			reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 			return nil
 		}
 	}
@@ -323,6 +311,6 @@ func (bl *blockListener) buildNewConfirmations(reconcileResult *ffcapi.Confirmat
 	return newQueue
 }
 
-func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, confirmMap *ffcapi.ConfirmationMap, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
-	return c.blockListener.reconcileConfirmationsForTransaction(ctx, txHash, confirmMap, targetConfirmationCount)
+func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+	return c.blockListener.reconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
 }

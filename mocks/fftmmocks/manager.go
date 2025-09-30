@@ -133,9 +133,9 @@ func (_m *Manager) GetTransactionByIDWithStatus(ctx context.Context, txID string
 	return r0, r1
 }
 
-// ReconcileConfirmationsForTransaction provides a mock function with given fields: ctx, txHash, confirmMap, targetConfirmationCount
-func (_m *Manager) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, confirmMap *ffcapi.ConfirmationMap, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
-	ret := _m.Called(ctx, txHash, confirmMap, targetConfirmationCount)
+// ReconcileConfirmationsForTransaction provides a mock function with given fields: ctx, txHash, existingConfirmations, targetConfirmationCount
+func (_m *Manager) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+	ret := _m.Called(ctx, txHash, existingConfirmations, targetConfirmationCount)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReconcileConfirmationsForTransaction")
@@ -143,19 +143,19 @@ func (_m *Manager) ReconcileConfirmationsForTransaction(ctx context.Context, txH
 
 	var r0 *ffcapi.ConfirmationMapUpdateResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *ffcapi.ConfirmationMap, uint64) (*ffcapi.ConfirmationMapUpdateResult, error)); ok {
-		return rf(ctx, txHash, confirmMap, targetConfirmationCount)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) (*ffcapi.ConfirmationMapUpdateResult, error)); ok {
+		return rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *ffcapi.ConfirmationMap, uint64) *ffcapi.ConfirmationMapUpdateResult); ok {
-		r0 = rf(ctx, txHash, confirmMap, targetConfirmationCount)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) *ffcapi.ConfirmationMapUpdateResult); ok {
+		r0 = rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*ffcapi.ConfirmationMapUpdateResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *ffcapi.ConfirmationMap, uint64) error); ok {
-		r1 = rf(ctx, txHash, confirmMap, targetConfirmationCount)
+	if rf, ok := ret.Get(1).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) error); ok {
+		r1 = rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	} else {
 		r1 = ret.Error(1)
 	}
