@@ -74,7 +74,7 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	txBlockHash := res.BlockHash
 	txBlockNumber := res.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
-	bi, reason, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, txBlockHash)
+	bi, reason, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash)
 	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
 		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
 	}
@@ -89,14 +89,14 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	}, nil
 }
 
-func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
+func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
 	var blockInfo *blockInfoJSONRPC
 	if allowCache {
 		cached, ok := bl.blockCache.Get(strconv.FormatUint(blockNumber, 10))
 		if ok {
 			blockInfo = cached.(*blockInfoJSONRPC)
-			if expectedHashStr != "" && blockInfo.ParentHash.String() != expectedHashStr {
-				log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedHashStr, blockInfo.ParentHash)
+			if (expectedParentHashStr != "" && blockInfo.ParentHash.String() != expectedParentHashStr) || (expectedBlockHashStr != "" && blockInfo.Hash.String() != expectedBlockHashStr) {
+				log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedParentHashStr, blockInfo.ParentHash)
 				blockInfo = nil
 			}
 		}

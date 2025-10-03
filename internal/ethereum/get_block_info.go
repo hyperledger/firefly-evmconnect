@@ -26,7 +26,7 @@ import (
 
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, reason, err := c.blockListener.getBlockInfoByNumber(ctx, req.BlockNumber.Uint64(), req.AllowCache, req.ExpectedParentHash)
+	blockInfo, reason, err := c.blockListener.getBlockInfoByNumber(ctx, req.BlockNumber.Uint64(), req.AllowCache, req.ExpectedParentHash, "")
 	if err != nil {
 		return nil, reason, err
 	}

@@ -75,4 +75,5 @@ var (
 	MsgFailedToRetrieveTransactionInfo = ffe("FF23057", "Failed to retrieve transaction info for transaction hash '%s'")
 	MsgFailedToQueryReceipt            = ffe("FF23058", "Failed to query receipt for transaction %s")
 	MsgFailedToQueryBlockInfo          = ffe("FF23059", "Failed to query block info using hash %s")
+	MsgFailedToBuildConfirmationQueue  = ffe("FF23060", "Failed to build confirmation queue")
 )

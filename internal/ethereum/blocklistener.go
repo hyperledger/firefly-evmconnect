@@ -391,7 +391,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 		var bi *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
-			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
+			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "", "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -448,7 +448,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
 			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.BlockNumber.Uint64())
-			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "")
+			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
