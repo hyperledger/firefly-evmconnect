@@ -56,12 +56,6 @@ func (bl *blockListener) addToBlockCache(blockInfo *blockInfoJSONRPC) {
 func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, error) {
 
 	// Query the chain to find the transaction block
-	// Note: should consider have an in-memory map of transaction hash to block for faster lookup
-	// The extra memory usage of the map should be outweighed by the speed improvement of lookup
-	// But I saw we have a ffcapi.MinimalBlockInfo struct that intentionally removes the tx hashes
-	// so need to figure out the reason first
-
-	// TODO: add a cache if map cannot be used
 	res, reason, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
 		TransactionHash: txHash,
 	})
