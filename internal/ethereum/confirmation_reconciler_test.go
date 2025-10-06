@@ -866,7 +866,7 @@ func TestCompareAndUpdateConfirmationQueue_ExistingTxBockInfoIsWrong(t *testing.
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{102})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{})
 	defer done()
 	ctx := context.Background()
 	// Create confirmations that already meet the target
@@ -992,7 +992,7 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfi
 	// and it connects to the canonical chain to validate they are still valid
 	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		// gap of 101 is allowed, and is the confirmation required for the transaction with target confirmation count of 1
+		// 101 will be fetched from the JSON-RPC endpoint to fill the gap
 		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
 	}
 	occ := &ffcapi.ConfirmationMapUpdateResult{
@@ -1165,7 +1165,7 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithGap(t *testi
 	// Create confirmations with a gap (missing block 102)
 	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		// no block 101, which is the first block of the canonical chain
+		// no block 101, which is the first block of the canonical chain, so no fetch to JSON-RPC endpoint is needed
 		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
 		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
 	}
@@ -1329,7 +1329,7 @@ func TestCheckAndFillInGap_GetBlockInfoError(t *testing.T) {
 	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
 
 	// Assertions
 	assert.Error(t, err)
@@ -1361,7 +1361,7 @@ func TestCheckAndFillInGap_BlockNotAvailable(t *testing.T) {
 	})
 
 	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
 
 	// Assertions
 	assert.Error(t, err)
@@ -1405,7 +1405,7 @@ func TestCheckAndFillInGap_InvalidBlockParentRelationship(t *testing.T) {
 	})
 
 	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
 
 	// Assertions - should fail because block 102 has wrong parent hash and doesn't connect to block 101
 	assert.Error(t, err)
@@ -1438,7 +1438,7 @@ func TestCheckAndFillInGap_TxBlockNotParentOfFirstConfirmation(t *testing.T) {
 	existingConfirmations := []*ffcapi.MinimalBlockInfo{}
 
 	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
 
 	// Assertions
 	assert.Error(t, err)

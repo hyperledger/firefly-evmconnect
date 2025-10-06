@@ -61,15 +61,27 @@ func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Contex
 func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
 	var err error
 	// Build new confirmations from the canonical chain and get existing confirmations
-	newConfirmationsWithoutTxBlock, existingConfirmations, returnResult := bl.buildConfirmationQueueUsingCanonicalChain(ctx, reconcileResult, txBlockInfo, targetConfirmationCount)
+	newConfirmationsWithoutTxBlock, lastValidatedBlock, returnResult := bl.buildConfirmationQueueUsingCanonicalChain(ctx, reconcileResult, txBlockInfo, targetConfirmationCount)
 	if returnResult {
+		return reconcileResult, nil
+	}
+
+	// Initialize confirmation map and get existing confirmations
+	// the init must happen after the canonical chain check to avoid
+	// confirming blocks that are not yet validated in the canonical chain
+	existingConfirmations := bl.initializeConfirmationMap(reconcileResult, txBlockInfo)
+
+	// Special case: if targetConfirmationCount is 0, transaction is immediately confirmed
+	if targetConfirmationCount == 0 {
+		reconcileResult.Confirmed = true
+		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 		return reconcileResult, nil
 	}
 
 	// Validate existing confirmations and fill gaps in the confirmation queue
 	var confirmations []*ffcapi.MinimalBlockInfo
 	var newFork bool
-	confirmations, newFork, err = bl.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	confirmations, newFork, err = bl.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, lastValidatedBlock)
 	if err != nil {
 		return reconcileResult, err
 	}
@@ -81,7 +93,7 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 // buildConfirmationQueueUsingCanonicalChain builds the confirmation queue using the in-memory canonical chain.
 // It does not modify the canonical chain itself, only reads from it.
 // This function holds a read lock on the canonical chain, so it should not make long-running queries.
-func (bl *blockListener) buildConfirmationQueueUsingCanonicalChain(ctx context.Context, reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, existingConfirmations []*ffcapi.MinimalBlockInfo, returnResult bool) {
+func (bl *blockListener) buildConfirmationQueueUsingCanonicalChain(ctx context.Context, reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, lastValidatedBlock *ffcapi.MinimalBlockInfo, returnResult bool) {
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
 	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
@@ -94,16 +106,6 @@ func (bl *blockListener) buildConfirmationQueueUsingCanonicalChain(ctx context.C
 		return nil, nil, true
 	}
 
-	// Initialize confirmation map and get existing confirmations
-	existingConfirmations = bl.initializeConfirmationMap(reconcileResult, txBlockInfo)
-
-	// Special case: if targetConfirmationCount is 0, transaction is immediately confirmed
-	if targetConfirmationCount == 0 {
-		reconcileResult.Confirmed = true
-		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
-		return nil, existingConfirmations, true
-	}
-
 	// Build new confirmations from blocks after the transaction block
 
 	newConfirmationsWithoutTxBlock = []*ffcapi.MinimalBlockInfo{}
@@ -114,6 +116,12 @@ func (bl *blockListener) buildConfirmationQueueUsingCanonicalChain(ctx context.C
 		// If we've reached the target confirmation count, mark as confirmed
 		if currentBlockInfo.BlockNumber.Uint64() > targetBlockNumber {
 			reconcileResult.Confirmed = true
+			// if the canonical chain contains the next block after the target block number,
+			// and the new confirmations queue is empty,
+			// we set the last validated block to the next block, so the downstream function can use it validate blocks before it
+			if len(newConfirmationsWithoutTxBlock) == 0 && currentBlockInfo.BlockNumber.Uint64() == targetBlockNumber+1 {
+				lastValidatedBlock = currentBlockInfo
+			}
 			break
 		}
 
@@ -131,7 +139,7 @@ func (bl *blockListener) buildConfirmationQueueUsingCanonicalChain(ctx context.C
 		})
 		currentBlock = currentBlock.Next()
 	}
-	return newConfirmationsWithoutTxBlock, existingConfirmations, false
+	return newConfirmationsWithoutTxBlock, lastValidatedBlock, false
 }
 
 // initializeConfirmationMap initializes the confirmation map with the transaction block
@@ -162,7 +170,7 @@ func (bl *blockListener) initializeConfirmationMap(reconcileResult *ffcapi.Confi
 // checkAndFillInGap validates existing confirmations, detects forks, and fills gaps
 // in the confirmation queue using existing confirmations or fetching missing blocks from the blockchain.
 // It ensures the confirmation chain is valid and connected to the transaction block.
-func (bl *blockListener) checkAndFillInGap(ctx context.Context, newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) ([]*ffcapi.MinimalBlockInfo, bool, error) {
+func (bl *blockListener) checkAndFillInGap(ctx context.Context, newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64, lastValidatedBlock *ffcapi.MinimalBlockInfo) ([]*ffcapi.MinimalBlockInfo, bool, error) {
 	var hasNewFork bool
 
 	// Detect forks by comparing new confirmations with existing ones
@@ -180,7 +188,6 @@ func (bl *blockListener) checkAndFillInGap(ctx context.Context, newConfirmations
 
 	// Determine the range of blocks to validate and fill gaps
 	blockNumberToReach := txBlockInfo.BlockNumber.Uint64() + targetConfirmationCount
-	var lastValidatedBlock *ffcapi.MinimalBlockInfo
 	if len(newConfirmationsWithoutTxBlock) > 0 {
 		// Start from the block before the first new confirmation
 		blockNumberToReach = newConfirmationsWithoutTxBlock[0].BlockNumber.Uint64() - 1
