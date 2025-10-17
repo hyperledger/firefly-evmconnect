@@ -59,12 +59,6 @@ func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Contex
 // compareAndUpdateConfirmationQueue orchestrates the confirmation reconciliation process.
 // It builds new confirmations from the in-memory partial chain and fills gaps in the confirmation queue.
 func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, reconcileResult *ffcapi.ConfirmationUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
-	var err error
-	// Build new confirmations from the in-memory partial chain and get existing confirmations
-	newConfirmationsWithoutTxBlock, lastValidatedBlock, err := bl.buildConfirmationQueueUsingInMemoryPartialChain(ctx, txBlockInfo, targetConfirmationCount)
-	if err != nil {
-		return nil, err
-	}
 
 	// Initialize confirmation map and get existing confirmations
 	// the init must happen after the in-memory partial chain check to avoid
@@ -90,6 +84,13 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 		} else {
 			existingConfirmations = existingQueue
 		}
+	}
+
+	var err error
+	// Build new confirmations from the in-memory partial chain and get existing confirmations
+	newConfirmationsWithoutTxBlock, lastValidatedBlock, err := bl.buildConfirmationQueueUsingInMemoryPartialChain(ctx, txBlockInfo, targetConfirmationCount)
+	if err != nil {
+		return nil, err
 	}
 
 	// Special case: if targetConfirmationCount is 0, transaction is immediately confirmed

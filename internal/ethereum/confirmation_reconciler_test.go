@@ -250,14 +250,11 @@ func TestCompareAndUpdateConfirmationQueue_EmptyChain(t *testing.T) {
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
 	// Assert - should return early due to chain being too short
-	assert.NotNil(t, occ.Confirmations)
-	assert.Len(t, occ.Confirmations, 0)
-	assert.NotNil(t, occ.Confirmations)
-	assert.False(t, occ.NewFork)
-	assert.False(t, occ.Confirmed)
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Regexp(t, "FF23062", err.Error())
+	assert.Nil(t, confirmationUpdateResult)
 }
 
 func TestCompareAndUpdateConfirmationQueue_ChainTooShort(t *testing.T) {
@@ -279,13 +276,9 @@ func TestCompareAndUpdateConfirmationQueue_ChainTooShort(t *testing.T) {
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
-	// Assert - should return early due to chain being too short
-	assert.Len(t, occ.Confirmations, 0)
-	assert.NotNil(t, occ.Confirmations)
-	assert.False(t, occ.NewFork)
-	assert.False(t, occ.Confirmed)
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
 }
 
 func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
@@ -306,20 +299,19 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
 	// Assert
-	assert.NotNil(t, occ.Confirmations)
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	// The code builds a full confirmation queue from the canonical chain
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.NoError(t, err)
+	assert.NotNil(t, confirmationUpdateResult)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 
 }
 
@@ -341,15 +333,15 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap_ZeroConfirmationCo
 	targetConfirmationCount := uint64(0)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.NotNil(t, occ.Confirmations)
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
+	assert.NotNil(t, confirmationUpdateResult.Confirmations)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
 	// The code builds a full confirmation queue from the canonical chain
-	assert.Len(t, occ.Confirmations, 1)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
+	assert.Len(t, confirmationUpdateResult.Confirmations, 1)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *testing.T) {
@@ -370,19 +362,19 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *test
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.NotNil(t, occ.Confirmations)
-	assert.False(t, occ.NewFork)
-	assert.False(t, occ.Confirmed)
+	assert.NotNil(t, confirmationUpdateResult.Confirmations)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.False(t, confirmationUpdateResult.Confirmed)
 	// The code builds a confirmation queue from the canonical chain up to the available blocks
-	assert.Len(t, occ.Confirmations, 5) // 100, 101, 102, 103, 104
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
+	assert.Len(t, confirmationUpdateResult.Confirmations, 5) // 100, 101, 102, 103, 104
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
 
 }
 
@@ -404,19 +396,19 @@ func TestCompareAndUpdateConfirmationQueue_EmptyConfirmationQueue(t *testing.T) 
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
 	// The code builds a full confirmation queue from the canonical chain
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_MismatchConfirmationBlock(t *testing.T) {
@@ -443,18 +435,18 @@ func TestCompareAndUpdateConfirmationQueue_MismatchConfirmationBlock(t *testing.
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.NewFork)
+	assert.True(t, confirmationUpdateResult.NewFork)
 	// The code builds a full confirmation queue from the canonical chain
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *testing.T) {
@@ -480,18 +472,18 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *te
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert all confirmations are in the confirmation queue
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationDoNotAffectConfirmations(t *testing.T) {
@@ -518,18 +510,18 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationDoNotAff
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ConnectionNodeMismatch(t *testing.T) {
@@ -556,18 +548,18 @@ func TestCompareAndUpdateConfirmationQueue_ConnectionNodeMismatch(t *testing.T) 
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationAfterFirstConfirmation(t *testing.T) {
@@ -594,18 +586,18 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationAfterFir
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_FailedToFetchBlockInfo(t *testing.T) {
@@ -640,11 +632,10 @@ func TestCompareAndUpdateConfirmationQueue_FailedToFetchBlockInfo(t *testing.T) 
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
-	// Assert
-	assert.Len(t, occ.Confirmations, 3) // still use the old confirmation queue
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Regexp(t, "pop", err.Error())
+	assert.Nil(t, confirmationUpdateResult)
 }
 
 func TestCompareAndUpdateConfirmationQueue_NilBlockInfo(t *testing.T) {
@@ -681,10 +672,10 @@ func TestCompareAndUpdateConfirmationQueue_NilBlockInfo(t *testing.T) {
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
-	// Assert
-	assert.Len(t, occ.Confirmations, 3) // still use the old confirmation queue
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Regexp(t, "FF23011", err.Error())
+	assert.Nil(t, confirmationUpdateResult)
 }
 func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation(t *testing.T) {
 	// Setup
@@ -710,12 +701,12 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation(t *test
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
 func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation_ZeroConfirmationCount(t *testing.T) {
@@ -741,12 +732,12 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation_ZeroCon
 	targetConfirmationCount := uint64(0)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 1)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 1)
 }
 
 func TestCompareAndUpdateConfirmationQueue_NewForkAndNoConnectionToCanonicalChain(t *testing.T) {
@@ -773,12 +764,12 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAndNoConnectionToCanonicalChai
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationLaterThanCurrentBlock(t *testing.T) {
@@ -804,18 +795,18 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationLaterThanCurrentB
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingTxBockInfoIsWrong(t *testing.T) {
@@ -841,19 +832,19 @@ func TestCompareAndUpdateConfirmationQueue_ExistingTxBockInfoIsWrong(t *testing.
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, generateTestHash(100), occ.Confirmations[0].BlockHash)
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, generateTestHash(100), confirmationUpdateResult.Confirmations[0].BlockHash)
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
@@ -886,15 +877,15 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 	targetConfirmationCount := uint64(2)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.Confirmed)
-	assert.False(t, occ.NewFork)
-	assert.Len(t, occ.Confirmations, 3)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 3)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable_ZeroConfirmationCount(t *testing.T) {
@@ -927,13 +918,13 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable_ZeroConfirmationCo
 	targetConfirmationCount := uint64(0)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.Confirmed)
-	assert.False(t, occ.NewFork)
-	assert.Len(t, occ.Confirmations, 1)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 1)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *testing.T) {
@@ -963,16 +954,16 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *test
 	targetConfirmationCount := uint64(1)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
 	// The confirmation queue should return the confirmation queue up to the first block of the canonical chain
 
-	assert.True(t, occ.Confirmed)
-	assert.False(t, occ.NewFork)
-	assert.Len(t, occ.Confirmations, 2)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 2)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfirmationsAreTooHighForTargetConfirmationCount(t *testing.T) {
@@ -1000,16 +991,16 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfi
 	targetConfirmationCount := uint64(1)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
 	// The confirmation queue should return the tx block and  the first block of the canonical chain
 
-	assert.True(t, occ.Confirmed)
-	assert.False(t, occ.NewFork)
-	assert.Len(t, occ.Confirmations, 2)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 2)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
 
 }
 
@@ -1038,16 +1029,16 @@ func TestCompareAndUpdateConfirmationQueue_HasSufficientConfirmationsButNoOverla
 	targetConfirmationCount := uint64(1)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
 	// Because the existing confirmations do not have overlap with the canonical chain,
 	// the confirmation queue should return the tx block and the first block of the canonical chain
-	assert.True(t, occ.Confirmed)
-	assert.False(t, occ.NewFork)
-	assert.Len(t, occ.Confirmations, 2)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 2)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
 
 }
 
@@ -1074,18 +1065,18 @@ func TestCompareAndUpdateConfirmationQueue_ValidExistingConfirmations(t *testing
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ValidExistingTxBlock(t *testing.T) {
@@ -1109,18 +1100,18 @@ func TestCompareAndUpdateConfirmationQueue_ValidExistingTxBlock(t *testing.T) {
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(occ.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(occ.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(occ.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(occ.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(occ.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(occ.Confirmations[5].BlockNumber))
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 func TestCompareAndUpdateConfirmationQueue_ReachTargetConfirmation(t *testing.T) {
@@ -1141,12 +1132,12 @@ func TestCompareAndUpdateConfirmationQueue_ReachTargetConfirmation(t *testing.T)
 	targetConfirmationCount := uint64(3)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.True(t, occ.Confirmed)
+	assert.True(t, confirmationUpdateResult.Confirmed)
 	// The code builds a full confirmation queue from the canonical chain
-	assert.GreaterOrEqual(t, len(occ.Confirmations), 4) // tx block + 3 confirmations
+	assert.GreaterOrEqual(t, len(confirmationUpdateResult.Confirmations), 4) // tx block + 3 confirmations
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithGap(t *testing.T) {
@@ -1174,12 +1165,12 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithGap(t *testi
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNumber(t *testing.T) {
@@ -1205,12 +1196,12 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNu
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
 func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNumberAfterFirstConfirmation(t *testing.T) {
@@ -1237,12 +1228,12 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNu
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
-
+	confirmationUpdateResult, err := bl.compareAndUpdateConfirmationQueue(ctx, occ, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
 	// Assert
-	assert.False(t, occ.NewFork)
-	assert.True(t, occ.Confirmed)
-	assert.Len(t, occ.Confirmations, 6)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
 // Helper functions
