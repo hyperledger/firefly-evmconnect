@@ -15,7 +15,7 @@
 // limitations under the License.
 
 // The confirmation reconciler manages transaction confirmation queues by:
-// - Copying blocks from the canonical chain and the existing confirmation queue
+// - Copying blocks from the in-memory partial chain and the existing confirmation queue
 // - Detecting blockchain forks and rebuilding confirmation queues when necessary
 // - Filling gaps in confirmation queues by fetching missing blocks
 // - Determining when transactions have reached the target confirmation count
@@ -32,9 +32,9 @@ import (
 )
 
 // reconcileConfirmationsForTransaction reconciles the confirmation queue for a transaction
-func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 	// Initialize the result with existing confirmations
-	reconcileResult := &ffcapi.ConfirmationMapUpdateResult{
+	reconcileResult := &ffcapi.ConfirmationUpdateResult{
 		Confirmations:           existingConfirmations,
 		NewFork:                 false,
 		Confirmed:               false,
@@ -50,31 +50,52 @@ func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Contex
 
 	if txBlockInfo == nil {
 		log.L(ctx).Debugf("Transaction %s not found in any block", txHash)
-		return reconcileResult, nil
+		return nil, i18n.NewError(ctx, msgs.MsgTransactionNotFound, txHash)
 	}
 
 	return bl.compareAndUpdateConfirmationQueue(ctx, reconcileResult, txBlockInfo, targetConfirmationCount)
 }
 
 // compareAndUpdateConfirmationQueue orchestrates the confirmation reconciliation process.
-// It builds new confirmations from the canonical chain and fills gaps in the confirmation queue.
-func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+// It builds new confirmations from the in-memory partial chain and fills gaps in the confirmation queue.
+func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, reconcileResult *ffcapi.ConfirmationUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 	var err error
-	// Build new confirmations from the canonical chain and get existing confirmations
-	newConfirmationsWithoutTxBlock, lastValidatedBlock, returnResult := bl.buildConfirmationQueueUsingCanonicalChain(ctx, reconcileResult, txBlockInfo, targetConfirmationCount)
-	if returnResult {
-		return reconcileResult, nil
+	// Build new confirmations from the in-memory partial chain and get existing confirmations
+	newConfirmationsWithoutTxBlock, lastValidatedBlock, err := bl.buildConfirmationQueueUsingInMemoryPartialChain(ctx, txBlockInfo, targetConfirmationCount)
+	if err != nil {
+		return nil, err
 	}
 
 	// Initialize confirmation map and get existing confirmations
-	// the init must happen after the canonical chain check to avoid
-	// confirming blocks that are not yet validated in the canonical chain
-	existingConfirmations := bl.initializeConfirmationMap(reconcileResult, txBlockInfo)
+	// the init must happen after the in-memory partial chain check to avoid
+	// confirming blocks that are not yet validated in the in-memory partial chain
+	var existingConfirmations []*ffcapi.MinimalBlockInfo
+	// If no existing confirmations, initialize with the transaction block
+	if len(reconcileResult.Confirmations) == 0 {
+		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
+		existingConfirmations = nil
+	} else {
+		// Validate existing confirmations against the current transaction block
+		existingQueue := reconcileResult.Confirmations
+		if len(existingQueue) > 0 {
+			existingTxBlock := existingQueue[0]
+			if !existingTxBlock.Equal(txBlockInfo) {
+				// Transaction block mismatch indicates a fork - rebuild confirmation queue
+				reconcileResult.NewFork = true
+				reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
+				existingConfirmations = nil
+			} else {
+				existingConfirmations = existingQueue
+			}
+		} else {
+			existingConfirmations = existingQueue
+		}
+	}
 
 	// Special case: if targetConfirmationCount is 0, transaction is immediately confirmed
 	if targetConfirmationCount == 0 {
-		reconcileResult.Confirmed = true
 		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
+		reconcileResult.Confirmed = true
 		return reconcileResult, nil
 	}
 
@@ -83,88 +104,63 @@ func (bl *blockListener) compareAndUpdateConfirmationQueue(ctx context.Context, 
 	var newFork bool
 	confirmations, newFork, err = bl.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, lastValidatedBlock)
 	if err != nil {
-		return reconcileResult, err
+		return nil, err
 	}
 	reconcileResult.NewFork = newFork
 	reconcileResult.Confirmations = confirmations
+	reconcileResult.Confirmed = uint64(len(confirmations)) >= targetConfirmationCount+1
 	return reconcileResult, err
 }
 
-// buildConfirmationQueueUsingCanonicalChain builds the confirmation queue using the in-memory canonical chain.
-// It does not modify the canonical chain itself, only reads from it.
-// This function holds a read lock on the canonical chain, so it should not make long-running queries.
-func (bl *blockListener) buildConfirmationQueueUsingCanonicalChain(ctx context.Context, reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, lastValidatedBlock *ffcapi.MinimalBlockInfo, returnResult bool) {
+// buildConfirmationQueueUsingInMemoryPartialChain builds the confirmation queue using the in-memory partial chain.
+// It does not modify the in-memory partial chain itself, only reads from it.
+// This function holds a read lock on the in-memory partial chain, so it should not make long-running queries.
+func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, lastValidatedBlock *ffcapi.MinimalBlockInfo, err error) {
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
 	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
 	targetBlockNumber := txBlockInfo.BlockNumber.Uint64() + targetConfirmationCount
 
-	// Check if the canonical chain has caught up to the transaction block
+	// Check if the in-memory partial chain has caught up to the transaction block
 	chainTail := bl.canonicalChain.Back().Value.(*ffcapi.MinimalBlockInfo)
 	if chainTail == nil || chainTail.BlockNumber.Uint64() < txBlockNumber {
-		log.L(ctx).Debugf("Canonical chain is waiting for the transaction block %d to be indexed", txBlockNumber)
-		return nil, nil, true
+		log.L(ctx).Debugf("in-memory partial chain is waiting for the transaction block %d to be indexed", txBlockNumber)
+		return nil, nil, i18n.NewError(ctx, msgs.MsgInMemoryPartialChainNotCaughtUp, txBlockNumber, txBlockInfo.BlockHash)
 	}
 
 	// Build new confirmations from blocks after the transaction block
 
 	newConfirmationsWithoutTxBlock = []*ffcapi.MinimalBlockInfo{}
-	currentBlock := bl.canonicalChain.Front()
-	for currentBlock != nil {
-		currentBlockInfo := currentBlock.Value.(*ffcapi.MinimalBlockInfo)
+	nextInMemoryBlock := bl.canonicalChain.Front()
+	for nextInMemoryBlock != nil {
+		nextInMemoryBlockInfo := nextInMemoryBlock.Value.(*ffcapi.MinimalBlockInfo)
 
 		// If we've reached the target confirmation count, mark as confirmed
-		if currentBlockInfo.BlockNumber.Uint64() > targetBlockNumber {
-			reconcileResult.Confirmed = true
-			// if the canonical chain contains the next block after the target block number,
+		if nextInMemoryBlockInfo.BlockNumber.Uint64() > targetBlockNumber {
+			// if the in-memory partial chain contains the next block after the target block number,
 			// and the new confirmations queue is empty,
 			// we set the last validated block to the next block, so the downstream function can use it validate blocks before it
-			if len(newConfirmationsWithoutTxBlock) == 0 && currentBlockInfo.BlockNumber.Uint64() == targetBlockNumber+1 {
-				lastValidatedBlock = currentBlockInfo
+			if len(newConfirmationsWithoutTxBlock) == 0 && nextInMemoryBlockInfo.BlockNumber.Uint64() == targetBlockNumber+1 {
+				lastValidatedBlock = nextInMemoryBlockInfo
 			}
 			break
 		}
 
 		// Skip blocks at or before the transaction block
-		if currentBlockInfo.BlockNumber.Uint64() <= txBlockNumber {
-			currentBlock = currentBlock.Next()
+		if nextInMemoryBlockInfo.BlockNumber.Uint64() <= txBlockNumber {
+			nextInMemoryBlock = nextInMemoryBlock.Next()
 			continue
 		}
 
 		// Add blocks after the transaction block to confirmations
 		newConfirmationsWithoutTxBlock = append(newConfirmationsWithoutTxBlock, &ffcapi.MinimalBlockInfo{
-			BlockHash:   currentBlockInfo.BlockHash,
-			BlockNumber: fftypes.FFuint64(currentBlockInfo.BlockNumber.Uint64()),
-			ParentHash:  currentBlockInfo.ParentHash,
+			BlockHash:   nextInMemoryBlockInfo.BlockHash,
+			BlockNumber: fftypes.FFuint64(nextInMemoryBlockInfo.BlockNumber.Uint64()),
+			ParentHash:  nextInMemoryBlockInfo.ParentHash,
 		})
-		currentBlock = currentBlock.Next()
+		nextInMemoryBlock = nextInMemoryBlock.Next()
 	}
-	return newConfirmationsWithoutTxBlock, lastValidatedBlock, false
-}
-
-// initializeConfirmationMap initializes the confirmation map with the transaction block
-// and validates existing confirmations against the current transaction block.
-// Returns existing confirmations if valid, or nil if a fork is detected.
-func (bl *blockListener) initializeConfirmationMap(reconcileResult *ffcapi.ConfirmationMapUpdateResult, txBlockInfo *ffcapi.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
-	// If no existing confirmations, initialize with the transaction block
-	if len(reconcileResult.Confirmations) == 0 {
-		reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
-		return nil
-	}
-
-	// Validate existing confirmations against the current transaction block
-	existingQueue := reconcileResult.Confirmations
-	if len(existingQueue) > 0 {
-		existingTxBlock := existingQueue[0]
-		if !existingTxBlock.Equal(txBlockInfo) {
-			// Transaction block mismatch indicates a fork - rebuild confirmation queue
-			reconcileResult.NewFork = true
-			reconcileResult.Confirmations = []*ffcapi.MinimalBlockInfo{txBlockInfo}
-			return nil
-		}
-	}
-
-	return existingQueue
+	return newConfirmationsWithoutTxBlock, lastValidatedBlock, nil
 }
 
 // checkAndFillInGap validates existing confirmations, detects forks, and fills gaps
@@ -254,6 +250,6 @@ func (bl *blockListener) checkAndFillInGap(ctx context.Context, newConfirmations
 
 // ReconcileConfirmationsForTransaction is the public API for reconciling transaction confirmations.
 // It delegates to the blockListener's internal reconciliation logic.
-func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationMapUpdateResult, error) {
+func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 	return c.blockListener.reconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
 }

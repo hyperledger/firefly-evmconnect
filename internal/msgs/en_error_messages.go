@@ -76,4 +76,6 @@ var (
 	MsgFailedToQueryReceipt            = ffe("FF23058", "Failed to query receipt for transaction %s")
 	MsgFailedToQueryBlockInfo          = ffe("FF23059", "Failed to query block info using hash %s")
 	MsgFailedToBuildConfirmationQueue  = ffe("FF23060", "Failed to build confirmation queue")
+	MsgTransactionNotFound             = ffe("FF23061", "Transaction not found: %s")
+	MsgInMemoryPartialChainNotCaughtUp = ffe("FF23062", "In-memory partial chain is waiting for the transaction block %d (%s) to be indexed")
 )
