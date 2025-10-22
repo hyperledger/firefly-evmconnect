@@ -113,12 +113,14 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 			}
 		}
 
-		if confirmations := splicedList.link(); confirmations != nil {
+		confirmations := splicedList.toSingleLinkedList()
+		if confirmations != nil {
 			// we have a contiguous list that starts with the transaction block and ends with the last block in the canonical chain
 			// so we can return the result
 			reconcileResult.Confirmations = confirmations
 			break
 		}
+
 		// we filled all gaps and still cannot link the 2 lists, must be a fork.  Create a gap of one and try again
 		reconcileResult.NewFork = true
 		splicedList.removeBrokenLink()
@@ -224,7 +226,7 @@ func (s *splice) removeBrokenLink() {
 
 }
 
-func (s *splice) link() []*ffcapi.MinimalBlockInfo {
+func (s *splice) toSingleLinkedList() []*ffcapi.MinimalBlockInfo {
 	if s.hasGap() {
 		return nil
 	}
