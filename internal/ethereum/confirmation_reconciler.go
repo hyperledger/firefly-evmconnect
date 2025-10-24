@@ -360,7 +360,7 @@ func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, 
 	return nil, i18n.NewError(ctx, msgs.MsgInMemoryPartialChainNotCaughtUp, txBlockInfo.BlockNumber.Uint64(), txBlockInfo.BlockHash)
 }
 
-func (bl *blockListener) handleTargetConfirmationCountLessThanExistingConfirmationsWithOverlap(ctx context.Context, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
+func (bl *blockListener) handleTargetCountLessThanExistingConfirmationLength(ctx context.Context, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
 	nextInMemoryBlock := bl.canonicalChain.Front()
@@ -409,7 +409,7 @@ func (bl *blockListener) handleSpecialCases(ctx context.Context, existingConfirm
 	}
 
 	if len(existingConfirmations) > 0 && existingConfirmations[len(existingConfirmations)-1].BlockNumber.Uint64()+1 >= txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount {
-		return bl.handleTargetConfirmationCountLessThanExistingConfirmationsWithOverlap(ctx, existingConfirmations, txBlockInfo, targetConfirmationCount)
+		return bl.handleTargetCountLessThanExistingConfirmationLength(ctx, existingConfirmations, txBlockInfo, targetConfirmationCount)
 	}
 	return nil, nil
 }
