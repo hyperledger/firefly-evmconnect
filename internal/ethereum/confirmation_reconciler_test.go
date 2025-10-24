@@ -229,9 +229,139 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	mRPC.AssertExpectations(t)
 }
 
-// Tests of the compareAndUpdateConfirmationQueue function
+func TestBuildConfirmationList_GapInExistingConfirmationsError(t *testing.T) {
+	// Setup
+	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
 
-func TestCompareAndUpdateConfirmationQueue_EmptyChain(t *testing.T) {
+	txHash := generateTestHash(100)
+	// Mock for TransactionReceipt call - return error to simulate RPC call error
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+		err := json.Unmarshal([]byte("null"), args[1])
+		assert.NoError(t, err)
+	})
+	ctx := context.Background()
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	}
+
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
+	assert.Regexp(t, "FF23063", err.Error())
+
+}
+
+func TestBuildConfirmationList_MismatchConfirmationBlockError(t *testing.T) {
+	// Setup
+	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+
+	txHash := generateTestHash(100)
+	// Mock for TransactionReceipt call - return error to simulate RPC call error
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+		err := json.Unmarshal([]byte("null"), args[1])
+		assert.NoError(t, err)
+	})
+	ctx := context.Background()
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)}, // wrong hash
+		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
+	}
+
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
+	assert.Regexp(t, "FF23063", err.Error())
+}
+
+func TestBuildConfirmationList_ExistingConfirmationLaterThanCurrentBlockError(t *testing.T) {
+	// Setup
+	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+
+	txHash := generateTestHash(100)
+	// Mock for TransactionReceipt call - return error to simulate RPC call error
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+		err := json.Unmarshal([]byte("null"), args[1])
+		assert.NoError(t, err)
+	})
+	ctx := context.Background()
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+
+		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	}
+
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
+	assert.Regexp(t, "FF23063", err.Error())
+}
+
+func TestBuildConfirmationList_ExistingTxBockInfoIsWrongError(t *testing.T) {
+	// Setup
+	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+
+	txHash := generateTestHash(100)
+	// Mock for TransactionReceipt call - return error to simulate RPC call error
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+		err := json.Unmarshal([]byte("null"), args[1])
+		assert.NoError(t, err)
+	})
+	ctx := context.Background()
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+
+		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)}, // incorrect block number
+		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	}
+
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
+	assert.Regexp(t, "FF23063", err.Error())
+}
+
+func TestReconcileConfirmationsForTransaction_ExistingConfirmationsWithLowerBlockNumberError(t *testing.T) {
+	// Setup
+	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+
+	txHash := generateTestHash(100)
+	// Mock for TransactionReceipt call - return error to simulate RPC call error
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+		err := json.Unmarshal([]byte("null"), args[1])
+		assert.NoError(t, err)
+	})
+	ctx := context.Background()
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(99), ParentHash: generateTestHash(100)}, // somehow there is a lower block number
+	}
+
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
+	assert.Regexp(t, "FF23063", err.Error())
+}
+
+// Tests of the buildConfirmationList function
+
+func TestBuildConfirmationList_EmptyChain(t *testing.T) {
 	// Setup - create a chain with one block that's older than the transaction
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 50, []uint64{})
 	defer done()
@@ -254,7 +384,7 @@ func TestCompareAndUpdateConfirmationQueue_EmptyChain(t *testing.T) {
 	assert.Nil(t, confirmationUpdateResult)
 }
 
-func TestCompareAndUpdateConfirmationQueue_ChainTooShort(t *testing.T) {
+func TestBuildConfirmationList_ChainTooShort(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 99, []uint64{})
 	defer done()
@@ -276,7 +406,7 @@ func TestCompareAndUpdateConfirmationQueue_ChainTooShort(t *testing.T) {
 	assert.Nil(t, confirmationUpdateResult)
 }
 
-func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
+func TestBuildConfirmationList_NilConfirmationMap(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -307,7 +437,7 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap(t *testing.T) {
 
 }
 
-func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap_ZeroConfirmationCount(t *testing.T) {
+func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCount(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -333,7 +463,28 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMap_ZeroConfirmationCo
 	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *testing.T) {
+func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCountError(t *testing.T) {
+	// Setup
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 99, []uint64{})
+	defer done()
+	ctx := context.Background()
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(txBlockNumber)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(txBlockNumber - 1),
+	}
+	targetConfirmationCount := uint64(0)
+
+	// Execute
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, nil, txBlockInfo, targetConfirmationCount)
+	assert.Error(t, err)
+	assert.Nil(t, confirmationUpdateResult)
+	assert.Regexp(t, "FF23062", err.Error())
+}
+
+func TestBuildConfirmationList_NilConfirmationMapUnconfirmed(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 104, []uint64{})
 	defer done()
@@ -364,7 +515,7 @@ func TestCompareAndUpdateConfirmationQueue_NilConfirmationMapUnconfirmed(t *test
 
 }
 
-func TestCompareAndUpdateConfirmationQueue_EmptyConfirmationQueue(t *testing.T) {
+func TestBuildConfirmationList_EmptyConfirmationQueue(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -395,43 +546,7 @@ func TestCompareAndUpdateConfirmationQueue_EmptyConfirmationQueue(t *testing.T) 
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_MismatchConfirmationBlock(t *testing.T) {
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{101})
-	defer done()
-	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)}, // wrong hash, so the block should be fetched
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.True(t, confirmationUpdateResult.NewFork)
-	// The code builds a full confirmation queue from the canonical chain
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
-}
-
-func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *testing.T) {
+func TestBuildConfirmationList_ExistingConfirmationsTooDistant(t *testing.T) {
 	// Setup
 
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 145, 150, []uint64{102, 103, 104, 105})
@@ -465,7 +580,7 @@ func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsTooDistant(t *te
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationDoNotAffectConfirmations(t *testing.T) {
+func TestBuildConfirmationList_CorruptedExistingConfirmationDoNotAffectConfirmations(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -500,7 +615,7 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationDoNotAff
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_ConnectionNodeMismatch(t *testing.T) {
+func TestBuildConfirmationList_ConnectionNodeMismatch(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
 	defer done()
@@ -535,7 +650,7 @@ func TestCompareAndUpdateConfirmationQueue_ConnectionNodeMismatch(t *testing.T) 
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationAfterFirstConfirmation(t *testing.T) {
+func TestBuildConfirmationList_CorruptedExistingConfirmationAfterFirstConfirmation(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
 	defer done()
@@ -570,7 +685,7 @@ func TestCompareAndUpdateConfirmationQueue_CorruptedExistingConfirmationAfterFir
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_FailedToFetchBlockInfo(t *testing.T) {
+func TestBuildConfirmationList_FailedToFetchBlockInfo(t *testing.T) {
 	// Setup
 	mRPC := &rpcbackendmocks.Backend{}
 	bl := &blockListener{
@@ -606,7 +721,7 @@ func TestCompareAndUpdateConfirmationQueue_FailedToFetchBlockInfo(t *testing.T) 
 	assert.Nil(t, confirmationUpdateResult)
 }
 
-func TestCompareAndUpdateConfirmationQueue_NilBlockInfo(t *testing.T) {
+func TestBuildConfirmationList_NilBlockInfo(t *testing.T) {
 	// Setup
 	mRPC := &rpcbackendmocks.Backend{}
 	bl := &blockListener{
@@ -643,7 +758,7 @@ func TestCompareAndUpdateConfirmationQueue_NilBlockInfo(t *testing.T) {
 	assert.Nil(t, confirmationUpdateResult)
 }
 
-func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation(t *testing.T) {
+func TestBuildConfirmationList_NewForkAfterFirstConfirmation(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
 	defer done()
@@ -672,7 +787,7 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation(t *test
 	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
-func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation_ZeroConfirmationCount(t *testing.T) {
+func TestBuildConfirmationList_NewForkAfterFirstConfirmation_ZeroConfirmationCount(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
 	defer done()
@@ -701,7 +816,7 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAfterFirstConfirmation_ZeroCon
 	assert.Len(t, confirmationUpdateResult.Confirmations, 1)
 }
 
-func TestCompareAndUpdateConfirmationQueue_NewForkAndNoConnectionToCanonicalChain(t *testing.T) {
+func TestBuildConfirmationList_NewForkAndNoConnectionToCanonicalChain(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{101, 102})
 	defer done()
@@ -730,81 +845,9 @@ func TestCompareAndUpdateConfirmationQueue_NewForkAndNoConnectionToCanonicalChai
 	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
-func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationLaterThanCurrentBlock(t *testing.T) {
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-
+func TestBuildConfirmationList_ConfirmWithNoFetches(t *testing.T) {
 	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
-	defer done()
-
-	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
-}
-
-func TestCompareAndUpdateConfirmationQueue_ExistingTxBockInfoIsWrong(t *testing.T) {
-	// Setup
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
-	defer done()
-
-	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)}, // should be corrected
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-	assert.Equal(t, generateTestHash(100), confirmationUpdateResult.Confirmations[0].BlockHash)
-	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
-}
-
-func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{})
 	defer done()
 	ctx := context.Background()
 	// Create confirmations that already meet the target
@@ -812,12 +855,6 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
 		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-
-		// all blocks after the first block of the canonical chain are discarded in the final confirmation queue
-		{BlockHash: "0xblock104", BlockNumber: fftypes.FFuint64(104), ParentHash: generateTestHash(103)}, // discarded
-		{BlockHash: "0xblock105", BlockNumber: fftypes.FFuint64(105), ParentHash: "0xblock104"},          // discarded
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
@@ -840,7 +877,43 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable(t *testing.T) {
 	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable_ZeroConfirmationCount(t *testing.T) {
+func TestBuildConfirmationList_AlreadyConfirmable(t *testing.T) {
+	// Setup
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{})
+	defer done()
+	ctx := context.Background()
+	// Create confirmations that already meet the target
+	// and it connects to the canonical chain to validate they are still valid
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
+		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
+		{BlockHash: generateTestHash(104), BlockNumber: fftypes.FFuint64(104), ParentHash: generateTestHash(103)},
+		{BlockHash: generateTestHash(105), BlockNumber: fftypes.FFuint64(105), ParentHash: generateTestHash(104)},
+	}
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(99),
+	}
+	targetConfirmationCount := uint64(2)
+
+	// Execute
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
+	// Assert
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 3)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+}
+
+func TestBuildConfirmationList_AlreadyConfirmable_ZeroConfirmationCount(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{})
 	defer done()
@@ -876,9 +949,9 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmable_ZeroConfirmationCo
 	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *testing.T) {
+func TestBuildConfirmationList_AlreadyConfirmableConnectable(t *testing.T) {
 	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{101})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{})
 	defer done()
 	ctx := context.Background()
 	// Create confirmations that already meet the target
@@ -912,44 +985,7 @@ func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableConnectable(t *test
 	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_AlreadyConfirmableButAllExistingConfirmationsAreTooHighForTargetConfirmationCount(t *testing.T) {
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{101})
-	defer done()
-	ctx := context.Background()
-	// Create confirmations that already meet the target
-	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		// 101 will be fetched from the JSON-RPC endpoint to fill the gap
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(1)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	// The confirmation queue should return the tx block and  the first block of the canonical chain
-
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 2)
-	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
-
-}
-
-func TestCompareAndUpdateConfirmationQueue_HasSufficientConfirmationsButNoOverlapWithCanonicalChain(t *testing.T) {
+func TestBuildConfirmationList_HasSufficientConfirmationsButNoOverlapWithCanonicalChain(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 104, 150, []uint64{101})
 	defer done()
@@ -985,7 +1021,7 @@ func TestCompareAndUpdateConfirmationQueue_HasSufficientConfirmationsButNoOverla
 
 }
 
-func TestCompareAndUpdateConfirmationQueue_ValidExistingConfirmations(t *testing.T) {
+func TestBuildConfirmationList_ValidExistingConfirmations(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -1020,7 +1056,7 @@ func TestCompareAndUpdateConfirmationQueue_ValidExistingConfirmations(t *testing
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_ValidExistingTxBlock(t *testing.T) {
+func TestBuildConfirmationList_ValidExistingTxBlock(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -1053,7 +1089,7 @@ func TestCompareAndUpdateConfirmationQueue_ValidExistingTxBlock(t *testing.T) {
 	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestCompareAndUpdateConfirmationQueue_ReachTargetConfirmation(t *testing.T) {
+func TestBuildConfirmationList_ReachTargetConfirmation(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
@@ -1075,100 +1111,6 @@ func TestCompareAndUpdateConfirmationQueue_ReachTargetConfirmation(t *testing.T)
 	assert.True(t, confirmationUpdateResult.Confirmed)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.GreaterOrEqual(t, len(confirmationUpdateResult.Confirmations), 4) // tx block + 3 confirmations
-}
-
-func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithGap(t *testing.T) {
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 101, 150, []uint64{})
-	defer done()
-	ctx := context.Background()
-	// Create confirmations with a gap (missing block 102)
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		// no block 101, which is the first block of the canonical chain, so no fetch to JSON-RPC endpoint is needed
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-}
-
-func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNumber(t *testing.T) {
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
-	defer done()
-	ctx := context.Background()
-	// Create confirmations with a lower block number
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(99), ParentHash: generateTestHash(100)}, // somehow there is a lower block number
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-}
-
-func TestCompareAndUpdateConfirmationQueue_ExistingConfirmationsWithLowerBlockNumberAfterFirstConfirmation(t *testing.T) {
-	t.Skip("Skipping test because I don't understand this behavior") //Trying to understand the reasoning behind supporting an invalid list of existing confirmations.  Should this not just be an error?
-
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 101, 150, []uint64{})
-	defer done()
-	ctx := context.Background()
-	// Create confirmations with a lower block number
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(99), ParentHash: generateTestHash(101)}, // somehow there is a lower block number
-	}
-
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 }
 
 func TestValidateExistingConfirmations_LowerBlockNumber(t *testing.T) {
@@ -1216,146 +1158,6 @@ func TestValidateExistingConfirmations_BrokenHash(t *testing.T) {
 	assert.Error(t, err)
 }
 
-/*
-func TestCheckAndFillInGap_GetBlockInfoError(t *testing.T) {
-	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	ctx := context.Background()
-	txBlockNumber := uint64(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   generateTestHash(txBlockNumber),
-		ParentHash:  generateTestHash(txBlockNumber - 1),
-	}
-	targetConfirmationCount := uint64(2)
-	newConfirmationsWithoutTxBlock := []*ffcapi.MinimalBlockInfo{}
-	existingConfirmations := []*ffcapi.MinimalBlockInfo{}
-
-	// Mock RPC to return an error for the gap blocks (blockNumberToReach = 100+2 = 102, then loops 102 down to 101)
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(102, 10)
-	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
-
-	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
-
-	// Assertions
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "pop")
-	assert.False(t, hasNewFork)
-	assert.Nil(t, result)
-	mRPC.AssertExpectations(t)
-}
-
-func TestCheckAndFillInGap_BlockNotAvailable(t *testing.T) {
-	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	ctx := context.Background()
-	txBlockNumber := uint64(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   generateTestHash(txBlockNumber),
-		ParentHash:  generateTestHash(txBlockNumber - 1),
-	}
-	targetConfirmationCount := uint64(2)
-	newConfirmationsWithoutTxBlock := []*ffcapi.MinimalBlockInfo{}
-	existingConfirmations := []*ffcapi.MinimalBlockInfo{}
-
-	// Setup RPC calls - return nil to simulate block not available (blockNumberToReach = 100+2 = 102)
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(102, 10)
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = nil // Block not available
-	})
-
-	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
-
-	// Assertions
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Block not available")
-	assert.False(t, hasNewFork)
-	assert.Nil(t, result)
-	mRPC.AssertExpectations(t)
-}
-
-func TestCheckAndFillInGap_InvalidBlockParentRelationship(t *testing.T) {
-	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	ctx := context.Background()
-	txBlockNumber := uint64(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   generateTestHash(txBlockNumber),
-		ParentHash:  generateTestHash(txBlockNumber - 1),
-	}
-	targetConfirmationCount := uint64(2)
-
-	// Setup test scenario where we have a previous block but fetch a block that doesn't connect
-	block102 := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(102),
-		BlockHash:   generateTestHash(102),
-		ParentHash:  "wrong_parent_hash", // Wrong parent - should cause validation to fail
-	}
-
-	newConfirmationsWithoutTxBlock := []*ffcapi.MinimalBlockInfo{block102} // Start with block 102
-	existingConfirmations := []*ffcapi.MinimalBlockInfo{}
-
-	// Mock getBlockInfoByNumber calls for gap block 101 (blockNumberToReach = block102.BlockNumber - 1 = 101)
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(101, 10)
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number:     ethtypes.NewHexInteger64(101),
-			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(101)),
-			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(99)), // Wrong parent - should cause validation to fail
-		}
-	})
-
-	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
-
-	// Assertions - should fail because block 102 has wrong parent hash and doesn't connect to block 101
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed to build confirmation queue")
-	assert.False(t, hasNewFork)
-	assert.Nil(t, result)
-	mRPC.AssertExpectations(t)
-}
-
-func TestCheckAndFillInGap_TxBlockNotParentOfFirstConfirmation(t *testing.T) {
-	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	ctx := context.Background()
-	txBlockNumber := uint64(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   generateTestHash(txBlockNumber),
-		ParentHash:  generateTestHash(txBlockNumber - 1),
-	}
-	targetConfirmationCount := uint64(1)
-
-	// Setup test scenario where txBlockInfo is NOT parent of the first confirmation block
-	wrongParentConfirmation := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(101),
-		BlockHash:   generateTestHash(101),
-		ParentHash:  "wrong_parent_hash", // This doesn't match txBlockInfo.BlockHash
-	}
-
-	newConfirmationsWithoutTxBlock := []*ffcapi.MinimalBlockInfo{wrongParentConfirmation}
-	existingConfirmations := []*ffcapi.MinimalBlockInfo{}
-
-	// Execute
-	result, hasNewFork, err := c.blockListener.checkAndFillInGap(ctx, newConfirmationsWithoutTxBlock, existingConfirmations, txBlockInfo, targetConfirmationCount, nil)
-
-	// Assertions
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed to build confirmation queue")
-	assert.False(t, hasNewFork)
-	assert.Nil(t, result)
-	mRPC.AssertExpectations(t)
-}
-*/
 // Helper functions
 
 // generateTestHash creates a predictable hash for testing with consistent prefix and last 4 digits as index
