@@ -79,7 +79,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 	// - The `lateList`. This is the most recent set of blocks that we are interesting in and we believe are accurate for the current state of the chain
 
 	earlyList := createEarlyList(existingConfirmations, txBlockInfo, reconcileResult)
-	lateList, err := createLateList(ctx, txBlockInfo, targetConfirmationCount, reconcileResult, bl)
+	lateList, err := createLateList(ctx, txBlockInfo, targetConfirmationCount, bl)
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +140,6 @@ func newSplice(earlyList []*ffcapi.MinimalBlockInfo, lateList []*ffcapi.MinimalB
 		earlyList: earlyList,
 		lateList:  lateList,
 	}
-	if len(s.earlyList) == 0 || len(s.lateList) == 0 {
-		return s, false
-	}
 	detectedFork := false
 	// if the early list is bigger than the gap between the transaction block number and the first block in the late list, then we have an overlap
 	txBlockNumber := s.earlyList[0].BlockNumber.Uint64()
@@ -178,11 +175,6 @@ func (s *splice) isEarlyListEmpty() bool {
 }
 
 func (s *splice) fillOneGap(ctx context.Context, blockListener *blockListener) error {
-	if !s.hasGap() {
-		// no gap to fill
-		return nil
-	}
-
 	// fill one slot in the gap between the late list and the early list
 	// always fill from the end of the gap ( i.e. the block before the start of the late list) because
 	// the late list is our best view of the current canonical chain so working backwards from there will increase the number of blocks that we have a high confidence in
@@ -190,9 +182,6 @@ func (s *splice) fillOneGap(ctx context.Context, blockListener *blockListener) e
 	freshBlockInfo, _, err := blockListener.getBlockInfoByNumber(ctx, s.lateList[0].BlockNumber.Uint64()-1, false, "", "")
 	if err != nil {
 		return err
-	}
-	if freshBlockInfo == nil {
-		return i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 	}
 
 	fetchedBlock := &ffcapi.MinimalBlockInfo{
@@ -213,25 +202,12 @@ func (s *splice) fillOneGap(ctx context.Context, blockListener *blockListener) e
 }
 
 func (s *splice) removeBrokenLink() {
-	if s.hasGap() {
-		// nothing to remove if there is a gap
-		return
-	}
 	// remove the last block from the early list because it is not the parent of the first block in the late list and we have higher confidence in the late list
 	s.earlyList = s.earlyList[:len(s.earlyList)-1]
 
 }
 
 func (s *splice) toSingleLinkedList() []*ffcapi.MinimalBlockInfo {
-	if s.hasGap() {
-		return nil
-	}
-	if len(s.earlyList) == 0 {
-		return s.lateList
-	}
-	if len(s.lateList) == 0 {
-		return s.earlyList
-	}
 	if s.earlyList[len(s.earlyList)-1].IsParentOf(s.lateList[0]) {
 		return append(s.earlyList, s.lateList...)
 	}
@@ -244,20 +220,20 @@ func (s *splice) toSingleLinkedList() []*ffcapi.MinimalBlockInfo {
 // any blocks that are not contiguous will be discarded
 func createEarlyList(existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, reconcileResult *ffcapi.ConfirmationUpdateResult) (earlyList []*ffcapi.MinimalBlockInfo) {
 	if len(existingConfirmations) > 0 && !existingConfirmations[0].Equal(txBlockInfo) {
-		// otherwise we discard the existing confirmations queue
+		// otherwise we discard the existing confirmations list
 		reconcileResult.NewFork = true
 	} else {
 		earlyList = existingConfirmations
 	}
 
-	if len(existingConfirmations) == 0 {
+	if len(earlyList) == 0 {
 		// either because this is the first time we are reconciling this transaction or because we just discarded the existing confirmations queue
 		earlyList = []*ffcapi.MinimalBlockInfo{txBlockInfo}
 	}
 	return earlyList
 }
 
-func createLateList(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64, reconcileResult *ffcapi.ConfirmationUpdateResult, blockListener *blockListener) (lateList []*ffcapi.MinimalBlockInfo, err error) {
+func createLateList(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64, blockListener *blockListener) (lateList []*ffcapi.MinimalBlockInfo, err error) {
 	lateList, err = blockListener.buildConfirmationQueueUsingInMemoryPartialChain(ctx, txBlockInfo, targetConfirmationCount)
 	if err != nil {
 		return nil, err
@@ -270,10 +246,6 @@ func createLateList(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, t
 		if err != nil {
 			return nil, err
 		}
-		if targetBlockInfo == nil {
-			return nil, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
-		}
-
 		lateList = []*ffcapi.MinimalBlockInfo{
 			{
 				BlockNumber: fftypes.FFuint64(targetBlockInfo.Number.BigInt().Uint64()),
@@ -360,7 +332,7 @@ func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, 
 	return nil, i18n.NewError(ctx, msgs.MsgInMemoryPartialChainNotCaughtUp, txBlockInfo.BlockNumber.Uint64(), txBlockInfo.BlockHash)
 }
 
-func (bl *blockListener) handleTargetCountLessThanExistingConfirmationLength(ctx context.Context, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
+func (bl *blockListener) handleTargetCountLessThanExistingConfirmationLength(_ context.Context, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
 	nextInMemoryBlock := bl.canonicalChain.Front()

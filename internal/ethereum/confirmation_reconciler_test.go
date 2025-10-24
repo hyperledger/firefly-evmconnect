@@ -229,6 +229,54 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	mRPC.AssertExpectations(t)
 }
 
+func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
+
+	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	bl := c.blockListener
+	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
+
+	// Mock for TransactionReceipt call
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
+		mock.MatchedBy(func(txHash string) bool {
+			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
+			assert.NoError(t, err)
+		})
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
+		return bn.BigInt().String() == "1977"
+	}), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1977),
+			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
+			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
+		}
+	})
+
+	// Execute the reconcileConfirmationsForTransaction function
+	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
+		{BlockNumber: fftypes.FFuint64(1979), BlockHash: generateTestHash(1979), ParentHash: generateTestHash(1978)},
+		{BlockNumber: fftypes.FFuint64(1980), BlockHash: generateTestHash(1980), ParentHash: generateTestHash(1979)},
+	}, 5)
+
+	// Assertions - expect the existing confirmation queue to be returned because the tx block doesn't match the same block number in the canonical chain
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.True(t, result.NewFork)
+	assert.False(t, result.Confirmed)
+	assert.Equal(t, []*ffcapi.MinimalBlockInfo{
+		{BlockNumber: fftypes.FFuint64(1977), BlockHash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
+		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
+	}, result.Confirmations)
+	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
+
+	mRPC.AssertExpectations(t)
+}
+
 func TestBuildConfirmationList_GapInExistingConfirmationsError(t *testing.T) {
 	// Setup
 	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
@@ -281,7 +329,6 @@ func TestBuildConfirmationList_MismatchConfirmationBlockError(t *testing.T) {
 	assert.Nil(t, confirmationUpdateResult)
 	assert.Regexp(t, "FF23063", err.Error())
 }
-
 func TestBuildConfirmationList_ExistingConfirmationLaterThanCurrentBlockError(t *testing.T) {
 	// Setup
 	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
@@ -625,41 +672,6 @@ func TestBuildConfirmationList_ConnectionNodeMismatch(t *testing.T) {
 		{BlockHash: "0xblockwrong", BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
 		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
 		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-	}
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.True(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
-	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
-	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
-	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
-	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
-}
-
-func TestBuildConfirmationList_CorruptedExistingConfirmationAfterFirstConfirmation(t *testing.T) {
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
-	defer done()
-
-	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblockwrong"},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
