@@ -284,7 +284,11 @@ func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx con
 	targetBlockNumber := txBlockInfo.BlockNumber.Uint64() + targetConfirmationCount
 
 	// Check if the in-memory partial chain has caught up to the transaction block
-	chainTail := bl.canonicalChain.Back().Value.(*ffcapi.MinimalBlockInfo)
+	chainTailElement := bl.canonicalChain.Back()
+	if chainTailElement == nil {
+		return nil, i18n.NewError(ctx, msgs.MsgInMemoryPartialChainNotCaughtUp, txBlockNumber, txBlockInfo.BlockHash)
+	}
+	chainTail := chainTailElement.Value.(*ffcapi.MinimalBlockInfo)
 	if chainTail == nil || chainTail.BlockNumber.Uint64() < txBlockNumber {
 		log.L(ctx).Debugf("in-memory partial chain is waiting for the transaction block %d to be indexed", txBlockNumber)
 		return nil, i18n.NewError(ctx, msgs.MsgInMemoryPartialChainNotCaughtUp, txBlockNumber, txBlockInfo.BlockHash)
