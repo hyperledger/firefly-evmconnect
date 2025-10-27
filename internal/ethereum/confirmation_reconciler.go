@@ -100,7 +100,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 			// the first block in the early list is transaction block
 			// if that block is removed, it means the chain is not stable enough for the logic
 			// to generate a valid confirmation list
-			// therefore, we report a fork with no confirmations
+			// throw an error to the caller
 			return nil, i18n.NewError(ctx, msgs.MsgFailedToBuildConfirmationQueue)
 		}
 
@@ -197,6 +197,7 @@ func (s *splice) fillOneGap(ctx context.Context, blockListener *blockListener) e
 	// Validate parent-child relationship
 	if !fetchedBlock.IsParentOf(s.lateList[0]) {
 		// most likely explanation of this is an unstable chain
+		// throw an error to the caller
 		return i18n.NewError(ctx, msgs.MsgFailedToBuildConfirmationQueue)
 	}
 
