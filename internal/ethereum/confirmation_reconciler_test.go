@@ -477,6 +477,35 @@ func TestBuildConfirmationQueueUsingInMemoryPartialChain_EmptyCanonicalChain(t *
 	mRPC.AssertExpectations(t)
 }
 
+func TestHandleZeroTargetConfirmationCount_EmptyCanonicalChain(t *testing.T) {
+	// Setup - create a blockListener with an empty canonical chain
+	mRPC := &rpcbackendmocks.Backend{}
+	bl := &blockListener{
+		canonicalChain: list.New(), // Empty canonical chain
+		backend:        mRPC,
+	}
+	bl.blockCache, _ = lru.New(100)
+
+	ctx := context.Background()
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(txBlockNumber)
+
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(txBlockNumber - 1),
+	}
+
+	// Execute - should return error when canonical chain is empty
+	result, err := bl.handleZeroTargetConfirmationCount(ctx, txBlockInfo)
+
+	// Assert - expect error with code FF23062 for empty canonical chain
+	assert.Error(t, err)
+	assert.Regexp(t, "FF23062", err.Error())
+	assert.Nil(t, result)
+	mRPC.AssertExpectations(t)
+}
+
 func TestBuildConfirmationList_ChainTooShort(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 99, []uint64{})
