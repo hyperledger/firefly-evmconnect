@@ -277,133 +277,150 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 	mRPC.AssertExpectations(t)
 }
 
-func TestBuildConfirmationList_GapInExistingConfirmationsError(t *testing.T) {
+func TestBuildConfirmationList_GapInExistingConfirmationsShouldBeFilledIn(t *testing.T) {
 	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-
-	txHash := generateTestHash(100)
-	// Mock for TransactionReceipt call - return error to simulate RPC call error
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
-		err := json.Unmarshal([]byte("null"), args[1])
-		assert.NoError(t, err)
-	})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
+	defer done()
 	ctx := context.Background()
+
+	// Create corrupted confirmation (gap in the existing confirmations list)
 	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		// gap in the existing confirmations list
 		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
 	}
-
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(99),
+	}
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
-	assert.Error(t, err)
-	assert.Nil(t, confirmationUpdateResult)
-	assert.Regexp(t, "FF23063", err.Error())
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
+
+	// Assert
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 
 }
 
-func TestBuildConfirmationList_MismatchConfirmationBlockError(t *testing.T) {
+func TestBuildConfirmationList_MismatchConfirmationBlockShouldBeReplaced(t *testing.T) {
 	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-
-	txHash := generateTestHash(100)
-	// Mock for TransactionReceipt call - return error to simulate RPC call error
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
-		err := json.Unmarshal([]byte("null"), args[1])
-		assert.NoError(t, err)
-	})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
+	defer done()
 	ctx := context.Background()
+
+	// Create corrupted confirmation (gap in the existing confirmations list)
 	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)}, // wrong hash
+		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)}, // wrong hash and is a fork
 		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
 		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
 	}
-
-	targetConfirmationCount := uint64(5)
-
-	// Execute
-	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
-	assert.Error(t, err)
-	assert.Nil(t, confirmationUpdateResult)
-	assert.Regexp(t, "FF23063", err.Error())
-}
-func TestBuildConfirmationList_ExistingConfirmationLaterThanCurrentBlockError(t *testing.T) {
-	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-
-	txHash := generateTestHash(100)
-	// Mock for TransactionReceipt call - return error to simulate RPC call error
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
-		err := json.Unmarshal([]byte("null"), args[1])
-		assert.NoError(t, err)
-	})
-	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(99),
 	}
-
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
-	assert.Error(t, err)
-	assert.Nil(t, confirmationUpdateResult)
-	assert.Regexp(t, "FF23063", err.Error())
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
+
+	// Assert
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestBuildConfirmationList_ExistingTxBockInfoIsWrongError(t *testing.T) {
+func TestBuildConfirmationList_ExistingTxBockInfoIsWrongShouldBeIgnored(t *testing.T) {
 	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-
-	txHash := generateTestHash(100)
-	// Mock for TransactionReceipt call - return error to simulate RPC call error
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
-		err := json.Unmarshal([]byte("null"), args[1])
-		assert.NoError(t, err)
-	})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
+	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
 
+	// Create corrupted confirmation (gap in the existing confirmations list)
+	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)}, // incorrect block number
 		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
 	}
-
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(99),
+	}
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
-	assert.Error(t, err)
-	assert.Nil(t, confirmationUpdateResult)
-	assert.Regexp(t, "FF23063", err.Error())
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
+	// Assert
+	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
-func TestReconcileConfirmationsForTransaction_ExistingConfirmationsWithLowerBlockNumberError(t *testing.T) {
+func TestReconcileConfirmationsForTransaction_ExistingConfirmationsWithLowerBlockNumberShouldBeIgnored(t *testing.T) {
 	// Setup
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-
-	txHash := generateTestHash(100)
-	// Mock for TransactionReceipt call - return error to simulate RPC call error
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
-		err := json.Unmarshal([]byte("null"), args[1])
-		assert.NoError(t, err)
-	})
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
+	defer done()
 	ctx := context.Background()
+
+	// Create corrupted confirmation (gap in the existing confirmations list)
 	existingQueue := []*ffcapi.MinimalBlockInfo{
 		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
 		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(99), ParentHash: generateTestHash(100)}, // somehow there is a lower block number
 	}
-
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(99),
+	}
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	confirmationUpdateResult, err := c.ReconcileConfirmationsForTransaction(ctx, txHash, existingQueue, targetConfirmationCount)
-	assert.Error(t, err)
-	assert.Nil(t, confirmationUpdateResult)
-	assert.Regexp(t, "FF23063", err.Error())
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
+	// Assert
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
 }
 
 // Tests of the buildConfirmationList function
@@ -651,7 +668,7 @@ func TestBuildConfirmationList_CorruptedExistingConfirmationDoNotAffectConfirmat
 	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
 	assert.NoError(t, err)
 	// Assert
-	assert.True(t, confirmationUpdateResult.NewFork)
+	assert.False(t, confirmationUpdateResult.NewFork)
 	assert.True(t, confirmationUpdateResult.Confirmed)
 	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
 	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
@@ -1123,51 +1140,6 @@ func TestBuildConfirmationList_ReachTargetConfirmation(t *testing.T) {
 	assert.True(t, confirmationUpdateResult.Confirmed)
 	// The code builds a full confirmation queue from the canonical chain
 	assert.GreaterOrEqual(t, len(confirmationUpdateResult.Confirmations), 4) // tx block + 3 confirmations
-}
-
-func TestValidateExistingConfirmations_LowerBlockNumber(t *testing.T) {
-
-	ctx := context.Background()
-	// Create confirmations with a lower block number
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(99), ParentHash: generateTestHash(101)}, // somehow there is a lower block number
-	}
-
-	// Execute
-	err := validateExistingConfirmations(ctx, existingQueue)
-	assert.Error(t, err)
-}
-
-func TestValidateExistingConfirmations_Gap(t *testing.T) {
-
-	ctx := context.Background()
-	// Create confirmations with a lower block number
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-	}
-
-	// Execute
-	err := validateExistingConfirmations(ctx, existingQueue)
-	assert.Error(t, err)
-}
-
-func TestValidateExistingConfirmations_BrokenHash(t *testing.T) {
-
-	ctx := context.Background()
-	// Create confirmations with a lower block number
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: "broken"},
-	}
-
-	// Execute
-	err := validateExistingConfirmations(ctx, existingQueue)
-	assert.Error(t, err)
 }
 
 // Helper functions
