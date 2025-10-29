@@ -61,7 +61,12 @@ type ethConnector struct {
 
 type Connector interface {
 	ffcapi.API
+
+	// RPC returns the http JSON/RPC client
 	RPC() rpcbackend.RPC
+
+	// WSRPC returns the websocket JSON/RPC client
+	// NOTE: websocket client will be nil if websockets are not enabled
 	WSRPC() rpcbackend.WebSocketRPCClient
 }
 
