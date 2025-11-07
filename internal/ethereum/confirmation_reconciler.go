@@ -37,7 +37,7 @@ func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context,
 func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 
 	// Fetch the block containing the transaction first so that we can use it to build the confirmation list
-	txBlockInfo, err := bl.getBlockInfoContainsTxHash(ctx, txHash)
+	txBlockInfo, txReceipt, err := bl.getBlockInfoContainsTxHash(ctx, txHash)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to fetch block info using tx hash %s: %v", txHash, err)
 		return nil, err
@@ -47,7 +47,11 @@ func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Contex
 		log.L(ctx).Debugf("Transaction %s not found in any block", txHash)
 		return nil, i18n.NewError(ctx, msgs.MsgTransactionNotFound, txHash)
 	}
-	return bl.buildConfirmationList(ctx, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	if confirmationUpdateResult != nil {
+		confirmationUpdateResult.Receipt = txReceipt
+	}
+	return confirmationUpdateResult, err
 }
 
 func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {

@@ -181,6 +181,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	assert.False(t, result.NewFork)
 	assert.False(t, result.Confirmed)
 	assert.Len(t, result.Confirmations, 2)
+	assert.NotNil(t, result.Receipt)
 	mRPC.AssertExpectations(t)
 }
 
@@ -225,6 +226,7 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
 	}, result.Confirmations)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
+	assert.NotNil(t, result.Receipt)
 
 	mRPC.AssertExpectations(t)
 }
@@ -273,7 +275,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
 	}, result.Confirmations)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-
+	assert.NotNil(t, result.Receipt)
 	mRPC.AssertExpectations(t)
 }
 
