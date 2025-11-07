@@ -27,7 +27,6 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
-	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -69,11 +68,12 @@ type blockListener struct {
 	canonicalChain     *list.List
 }
 
-func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section, wsConf *wsclient.WSConfig) (bl *blockListener, err error) {
+func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) (bl *blockListener, err error) {
 	bl = &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
 		c:                          c,
 		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
+		wsBackend:                  c.wsBackend,
 		isStarted:                  false,
 		startDone:                  make(chan struct{}),
 		initialBlockHeightObtained: make(chan struct{}),
@@ -86,9 +86,7 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section,
 		unstableHeadLength:         int(c.checkpointBlockGap),
 		hederaCompatibilityMode:    conf.GetBool(HederaCompatibilityMode),
 	}
-	if wsConf != nil {
-		bl.wsBackend = rpcbackend.NewWSRPCClient(wsConf)
-	}
+
 	bl.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")

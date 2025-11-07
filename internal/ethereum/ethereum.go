@@ -40,6 +40,7 @@ import (
 
 type ethConnector struct {
 	backend                    rpcbackend.Backend
+	wsBackend                  rpcbackend.WebSocketRPCClient
 	serializer                 *abi.Serializer
 	gasEstimationFactor        *big.Float
 	catchupPageSize            int64
@@ -60,7 +61,13 @@ type ethConnector struct {
 
 type Connector interface {
 	ffcapi.API
+
+	// RPC returns the http JSON/RPC client
 	RPC() rpcbackend.RPC
+
+	// WSRPC returns the websocket JSON/RPC client
+	// NOTE: websocket client will be nil if websockets are not enabled
+	WSRPC() rpcbackend.WebSocketRPCClient
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
@@ -117,6 +124,10 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		MaxConcurrentRequest: conf.GetInt64(MaxConcurrentRequests),
 	})
 
+	if wsConf != nil {
+		c.wsBackend = rpcbackend.NewWSRPCClient(wsConf)
+	}
+
 	c.serializer = abi.NewSerializer().SetByteSerializer(abi.HexByteSerializer0xPrefix)
 	switch conf.Get(ConfigDataFormat) {
 	case "map":
@@ -136,7 +147,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		return name
 	})
 
-	if c.blockListener, err = newBlockListener(ctx, c, conf, wsConf); err != nil {
+	if c.blockListener, err = newBlockListener(ctx, c, conf); err != nil {
 		return nil, err
 	}
 
@@ -145,6 +156,10 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 
 func (c *ethConnector) RPC() rpcbackend.RPC {
 	return c.backend
+}
+
+func (c *ethConnector) WSRPC() rpcbackend.WebSocketRPCClient {
+	return c.wsBackend
 }
 
 // WaitClosed can be called after cancelling all the contexts, to wait for everything to close down
