@@ -1110,6 +1110,47 @@ func TestBuildConfirmationList_HasSufficientConfirmationsButNoOverlapWithCanonic
 
 }
 
+func TestBuildConfirmationList_ConfirmableWithLateList(t *testing.T) {
+	// Setup
+	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, nil)
+	defer done()
+	ctx := context.Background()
+	// Create confirmations that already meet the target
+	// and it connects to the canonical chain to validate they are still valid
+	existingQueue := []*ffcapi.MinimalBlockInfo{
+		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
+		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
+		{BlockHash: generateTestHash(104), BlockNumber: fftypes.FFuint64(104), ParentHash: generateTestHash(103)},
+	}
+
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(txBlockNumber),
+		BlockHash:   txBlockHash,
+		ParentHash:  generateTestHash(99),
+	}
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.NoError(t, err)
+	// Assert
+	// Because the existing confirmations do not have overlap with the canonical chain,
+	// the confirmation queue should return the tx block and the first block of the canonical chain
+	assert.True(t, confirmationUpdateResult.Confirmed)
+	assert.False(t, confirmationUpdateResult.NewFork)
+	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
+	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	assert.Equal(t, txBlockNumber+1, uint64(confirmationUpdateResult.Confirmations[1].BlockNumber))
+	assert.Equal(t, txBlockNumber+2, uint64(confirmationUpdateResult.Confirmations[2].BlockNumber))
+	assert.Equal(t, txBlockNumber+3, uint64(confirmationUpdateResult.Confirmations[3].BlockNumber))
+	assert.Equal(t, txBlockNumber+4, uint64(confirmationUpdateResult.Confirmations[4].BlockNumber))
+	assert.Equal(t, txBlockNumber+5, uint64(confirmationUpdateResult.Confirmations[5].BlockNumber))
+}
+
 func TestBuildConfirmationList_ValidExistingConfirmations(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})

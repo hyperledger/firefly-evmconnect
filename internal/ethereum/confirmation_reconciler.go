@@ -81,7 +81,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 	earlyList := createEarlyList(existingConfirmations, txBlockInfo, reconcileResult)
 
 	// if early list is sufficient to meet the target confirmation count, we handle this as a special case as well
-	if len(earlyList) > 0 && earlyList[len(earlyList)-1].BlockNumber.Uint64()+1 >= txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount {
+	if len(earlyList) > 0 && earlyList[len(earlyList)-1].BlockNumber.Uint64() >= txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount {
 		reconcileResult := bl.handleTargetCountMetWithEarlyList(earlyList, txBlockInfo, targetConfirmationCount)
 		if reconcileResult != nil {
 			return reconcileResult, nil
@@ -373,26 +373,9 @@ func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations
 
 	if nextInMemoryBlockInfo != nil && lastExistingConfirmation.IsParentOf(nextInMemoryBlockInfo) {
 		// the existing confirmation are connected to the in memory partial chain so we can return them without fetching any more blocks
-		if targetConfirmationCount < uint64(len(existingConfirmations)) {
-			return &ffcapi.ConfirmationUpdateResult{
-				Confirmed:     true,
-				Confirmations: existingConfirmations[:targetConfirmationCount+1],
-			}
-		}
-		// only the existing confirmations are not enough, need to fetch more blocks from the in memory partial chain
-		newList := existingConfirmations
-		targetBlockNumber := txBlockInfo.BlockNumber.Uint64() + targetConfirmationCount
-
-		for nextInMemoryBlock := bl.canonicalChain.Front(); nextInMemoryBlock != nil && nextInMemoryBlock.Value != nil; nextInMemoryBlock = nextInMemoryBlock.Next() {
-			nextInMemoryBlockInfo := nextInMemoryBlock.Value.(*ffcapi.MinimalBlockInfo)
-			if nextInMemoryBlockInfo.BlockNumber.Uint64() > targetBlockNumber {
-				break
-			}
-			newList = append(newList, nextInMemoryBlockInfo)
-		}
 		return &ffcapi.ConfirmationUpdateResult{
-			Confirmed:     uint64(len(newList)) > targetConfirmationCount,
-			Confirmations: newList,
+			Confirmed:     true,
+			Confirmations: existingConfirmations[:targetConfirmationCount+1],
 		}
 	}
 	return nil
