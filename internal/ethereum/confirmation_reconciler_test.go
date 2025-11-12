@@ -181,6 +181,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	assert.False(t, result.NewFork)
 	assert.False(t, result.Confirmed)
 	assert.Len(t, result.Confirmations, 2)
+	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
 	assert.NotNil(t, result.Receipt)
 	mRPC.AssertExpectations(t)
 }

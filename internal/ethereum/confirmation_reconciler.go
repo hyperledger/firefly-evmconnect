@@ -49,6 +49,7 @@ func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Contex
 	}
 	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingConfirmations, txBlockInfo, targetConfirmationCount)
 	if confirmationUpdateResult != nil {
+		confirmationUpdateResult.TargetConfirmationCount = targetConfirmationCount
 		confirmationUpdateResult.Receipt = txReceipt
 	}
 	return confirmationUpdateResult, err
@@ -67,9 +68,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 	}
 
 	// Initialize the result with the target confirmation count
-	reconcileResult := &ffcapi.ConfirmationUpdateResult{
-		TargetConfirmationCount: targetConfirmationCount,
-	}
+	reconcileResult := &ffcapi.ConfirmationUpdateResult{}
 
 	// We start by constructing 2 lists of blocks:
 	// - The `earlyList`.  This is the set of earliest blocks we are interested in.  At the least, it starts with the transaction block
