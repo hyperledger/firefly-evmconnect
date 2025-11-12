@@ -82,7 +82,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 
 	// if early list is sufficient to meet the target confirmation count, we handle this as a special case as well
 	if len(earlyList) > 0 && earlyList[len(earlyList)-1].BlockNumber.Uint64() >= txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount {
-		reconcileResult := bl.handleTargetCountMetWithEarlyList(earlyList, txBlockInfo, targetConfirmationCount)
+		reconcileResult := bl.handleTargetCountMetWithEarlyList(earlyList, targetConfirmationCount)
 		if reconcileResult != nil {
 			return reconcileResult, nil
 		}
@@ -356,7 +356,7 @@ func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, 
 
 }
 
-func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations []*ffcapi.MinimalBlockInfo, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) *ffcapi.ConfirmationUpdateResult {
+func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) *ffcapi.ConfirmationUpdateResult {
 	bl.mux.RLock()
 	defer bl.mux.RUnlock()
 	nextInMemoryBlock := bl.canonicalChain.Front()
