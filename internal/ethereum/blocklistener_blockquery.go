@@ -53,30 +53,56 @@ func (bl *blockListener) addToBlockCache(blockInfo *blockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
 
-func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber int64, allowCache bool, expectedHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
+func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, *ffcapi.TransactionReceiptResponse, error) {
+
+	// Query the chain to find the transaction block
+	res, reason, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
+		TransactionHash: txHash,
+	})
+	if receiptErr != nil && reason != ffcapi.ErrorReasonNotFound {
+		return nil, nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
+	}
+	if res == nil {
+		return nil, nil, nil
+	}
+	txBlockHash := res.BlockHash
+	txBlockNumber := res.BlockNumber.Uint64()
+	// get the parent hash of the transaction block
+	bi, reason, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash)
+	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
+		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
+	}
+	if bi == nil {
+		return nil, nil, nil
+	}
+
+	return &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
+		BlockHash:   bi.Hash.String(),
+		ParentHash:  bi.ParentHash.String(),
+	}, res, nil
+}
+
+func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
 	var blockInfo *blockInfoJSONRPC
 	if allowCache {
-		cached, ok := bl.blockCache.Get(strconv.FormatInt(blockNumber, 10))
+		cached, ok := bl.blockCache.Get(strconv.FormatUint(blockNumber, 10))
 		if ok {
 			blockInfo = cached.(*blockInfoJSONRPC)
-			if expectedHashStr != "" && blockInfo.ParentHash.String() != expectedHashStr {
-				log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedHashStr, blockInfo.ParentHash)
+			if (expectedParentHashStr != "" && blockInfo.ParentHash.String() != expectedParentHashStr) || (expectedBlockHashStr != "" && blockInfo.Hash.String() != expectedBlockHashStr) {
+				log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedParentHashStr, blockInfo.ParentHash)
 				blockInfo = nil
 			}
 		}
 	}
 
 	if blockInfo == nil {
-		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexInteger64(blockNumber), false /* only the txn hashes */)
+		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexIntegerU64(blockNumber), false /* only the txn hashes */)
 		if rpcErr != nil {
-			if mapError(blockRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
-				log.L(ctx).Debugf("Received error signifying 'block not found': '%s'", rpcErr.Message)
-				return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
-			}
 			return nil, ffcapi.ErrorReason(""), rpcErr.Error()
 		}
 		if blockInfo == nil {
-			return nil, ffcapi.ErrorReason(""), nil
+			return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 		}
 		bl.addToBlockCache(blockInfo)
 	}

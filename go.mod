@@ -5,9 +5,9 @@ go 1.23.0
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/golang-lru v1.0.2
-	github.com/hyperledger/firefly-common v1.5.6-0.20250630201730-e234335c0381
+	github.com/hyperledger/firefly-common v1.5.9
 	github.com/hyperledger/firefly-signer v1.1.21
-	github.com/hyperledger/firefly-transaction-manager v1.4.0
+	github.com/hyperledger/firefly-transaction-manager v1.4.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0

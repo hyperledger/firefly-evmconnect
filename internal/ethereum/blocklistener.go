@@ -55,20 +55,17 @@ type blockListener struct {
 	initialBlockHeightObtained chan struct{}
 	newHeadsTap                chan struct{}
 	newHeadsSub                rpcbackend.Subscription
-	highestBlock               int64
-	mux                        sync.Mutex
+	highestBlockSet            bool
+	highestBlock               uint64
+	mux                        sync.RWMutex
 	consumers                  map[fftypes.UUID]*blockUpdateConsumer
 	blockPollingInterval       time.Duration
-	unstableHeadLength         int
-	canonicalChain             *list.List
 	hederaCompatibilityMode    bool
 	blockCache                 *lru.Cache
-}
 
-type minimalBlockInfo struct {
-	number     int64
-	hash       string
-	parentHash string
+	//  canonical chain
+	unstableHeadLength int
+	canonicalChain     *list.List
 }
 
 func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section) (bl *blockListener, err error) {
@@ -81,7 +78,8 @@ func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section)
 		startDone:                  make(chan struct{}),
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}),
-		highestBlock:               -1,
+		highestBlockSet:            false,
+		highestBlock:               0,
 		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
 		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
 		canonicalChain:             list.New(),
@@ -163,10 +161,7 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 			return true, rpcErr.Error()
 		}
 
-		bl.mux.Lock()
-		bl.highestBlock = hexBlockHeight.BigInt().Int64()
-		bl.mux.Unlock()
-
+		bl.setHighestBlock(hexBlockHeight.BigInt().Uint64())
 		return false, nil
 	})
 }
@@ -258,7 +253,7 @@ func (bl *blockListener) listenLoop() {
 			default:
 				candidate := bl.reconcileCanonicalChain(bi)
 				// Check this is the lowest position to notify from
-				if candidate != nil && (notifyPos == nil || candidate.Value.(*minimalBlockInfo).number <= notifyPos.Value.(*minimalBlockInfo).number) {
+				if candidate != nil && (notifyPos == nil || candidate.Value.(*ffcapi.MinimalBlockInfo).BlockNumber <= notifyPos.Value.(*ffcapi.MinimalBlockInfo).BlockNumber) {
 					notifyPos = candidate
 				}
 			}
@@ -266,7 +261,7 @@ func (bl *blockListener) listenLoop() {
 		if notifyPos != nil {
 			// We notify for all hashes from the point of change in the chain onwards
 			for notifyPos != nil {
-				update.BlockHashes = append(update.BlockHashes, notifyPos.Value.(*minimalBlockInfo).hash)
+				update.BlockHashes = append(update.BlockHashes, notifyPos.Value.(*ffcapi.MinimalBlockInfo).BlockHash)
 				notifyPos = notifyPos.Next()
 			}
 
@@ -293,16 +288,12 @@ func (bl *blockListener) listenLoop() {
 // head of the canonical chain we have. If these blocks do not just fit onto the end of the chain, then we
 // work backwards building a new view and notify about all blocks that are changed in that process.
 func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Element {
-	mbi := &minimalBlockInfo{
-		number:     bi.Number.BigInt().Int64(),
-		hash:       bi.Hash.String(),
-		parentHash: bi.ParentHash.String(),
+	mbi := &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
+		BlockHash:   bi.Hash.String(),
+		ParentHash:  bi.ParentHash.String(),
 	}
-	bl.mux.Lock()
-	if mbi.number > bl.highestBlock {
-		bl.highestBlock = mbi.number
-	}
-	bl.mux.Unlock()
+	bl.checkAndSetHighestBlock(mbi.BlockNumber.Uint64())
 
 	// Find the position of this block in the block sequence
 	pos := bl.canonicalChain.Back()
@@ -311,15 +302,15 @@ func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Ele
 			// We've eliminated all the existing chain (if there was any)
 			return bl.handleNewBlock(mbi, nil)
 		}
-		posBlock := pos.Value.(*minimalBlockInfo)
+		posBlock := pos.Value.(*ffcapi.MinimalBlockInfo)
 		switch {
-		case posBlock.number == mbi.number && posBlock.hash == mbi.hash && posBlock.parentHash == mbi.parentHash:
+		case posBlock.Equal(mbi):
 			// This is a duplicate - no need to notify of anything
 			return nil
-		case posBlock.number == mbi.number:
+		case posBlock.BlockNumber.Uint64() == mbi.BlockNumber.Uint64():
 			// We are replacing a block in the chain
 			return bl.handleNewBlock(mbi, pos.Prev())
-		case posBlock.number < mbi.number:
+		case posBlock.BlockNumber.Uint64() < mbi.BlockNumber.Uint64():
 			// We have a position where this block goes
 			return bl.handleNewBlock(mbi, pos)
 		default:
@@ -331,14 +322,14 @@ func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Ele
 
 // handleNewBlock rebuilds the canonical chain around a new block, checking if we need to rebuild our
 // view of the canonical chain behind it, or trimming anything after it that is invalidated by a new fork.
-func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.Element) *list.Element {
+func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *list.Element) *list.Element {
 	// If we have an existing canonical chain before this point, then we need to check we've not
 	// invalidated that with this block. If we have, then we have to re-verify our whole canonical
 	// chain from the first block. Then notify from the earliest point where it has diverged.
 	if addAfter != nil {
-		prevBlock := addAfter.Value.(*minimalBlockInfo)
-		if prevBlock.number != (mbi.number-1) || prevBlock.hash != mbi.parentHash {
-			log.L(bl.ctx).Infof("Notified of block %d / %s that does not fit after block %d / %s (expected parent: %s)", mbi.number, mbi.hash, prevBlock.number, prevBlock.hash, mbi.parentHash)
+		prevBlock := addAfter.Value.(*ffcapi.MinimalBlockInfo)
+		if prevBlock.BlockNumber.Uint64() != (mbi.BlockNumber.Uint64()-1) || prevBlock.BlockHash != mbi.ParentHash {
+			log.L(bl.ctx).Infof("Notified of block %d / %s that does not fit after block %d / %s (expected parent: %s)", mbi.BlockNumber.Uint64(), mbi.BlockHash, prevBlock.BlockNumber.Uint64(), prevBlock.BlockHash, mbi.ParentHash)
 			return bl.rebuildCanonicalChain()
 		}
 	}
@@ -366,7 +357,7 @@ func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.El
 		_ = bl.canonicalChain.Remove(bl.canonicalChain.Front())
 	}
 
-	log.L(bl.ctx).Debugf("Added block %d / %s parent=%s to in-memory canonical chain (new length=%d)", mbi.number, mbi.hash, mbi.parentHash, bl.canonicalChain.Len())
+	log.L(bl.ctx).Debugf("Added block %d / %s parent=%s to in-memory canonical chain (new length=%d)", mbi.BlockNumber.Uint64(), mbi.BlockHash, mbi.ParentHash, bl.canonicalChain.Len())
 
 	return newElem
 }
@@ -377,18 +368,18 @@ func (bl *blockListener) handleNewBlock(mbi *minimalBlockInfo, addAfter *list.El
 func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	// If none of our blocks were valid, start from the first block number we've notified about previously
 	lastValidBlock := bl.trimToLastValidBlock()
-	var nextBlockNumber int64
+	var nextBlockNumber uint64
 	var expectedParentHash string
 	if lastValidBlock != nil {
-		nextBlockNumber = lastValidBlock.number + 1
+		nextBlockNumber = lastValidBlock.BlockNumber.Uint64() + 1
 		log.L(bl.ctx).Infof("Canonical chain partially rebuilding from block %d", nextBlockNumber)
-		expectedParentHash = lastValidBlock.hash
+		expectedParentHash = lastValidBlock.BlockHash
 	} else {
 		firstBlock := bl.canonicalChain.Front()
 		if firstBlock == nil || firstBlock.Value == nil {
 			return nil
 		}
-		nextBlockNumber = firstBlock.Value.(*minimalBlockInfo).number
+		nextBlockNumber = firstBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64()
 		log.L(bl.ctx).Warnf("Canonical chain re-initialized at block %d", nextBlockNumber)
 		// Clear out the whole chain
 		bl.canonicalChain = bl.canonicalChain.Init()
@@ -398,7 +389,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 		var bi *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
-			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "")
+			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "", "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -410,19 +401,19 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 			log.L(bl.ctx).Infof("Canonical chain rebuilt the chain to the head block %d", nextBlockNumber-1)
 			break
 		}
-		mbi := &minimalBlockInfo{
-			number:     bi.Number.BigInt().Int64(),
-			hash:       bi.Hash.String(),
-			parentHash: bi.ParentHash.String(),
+		mbi := &ffcapi.MinimalBlockInfo{
+			BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
+			BlockHash:   bi.Hash.String(),
+			ParentHash:  bi.ParentHash.String(),
 		}
 
 		// It's possible the chain will change while we're doing this, and we fall back to the next block notification
 		// to sort that out.
-		if expectedParentHash != "" && mbi.parentHash != expectedParentHash {
-			log.L(bl.ctx).Infof("Canonical chain rebuilding stopped at block: %d due to mismatch hash for parent block (%d): %s (expected: %s)", nextBlockNumber, nextBlockNumber-1, mbi.parentHash, expectedParentHash)
+		if expectedParentHash != "" && mbi.ParentHash != expectedParentHash {
+			log.L(bl.ctx).Infof("Canonical chain rebuilding stopped at block: %d due to mismatch hash for parent block (%d): %s (expected: %s)", nextBlockNumber, nextBlockNumber-1, mbi.ParentHash, expectedParentHash)
 			break
 		}
-		expectedParentHash = mbi.hash
+		expectedParentHash = mbi.BlockHash
 		nextBlockNumber++
 
 		// Note we do not trim to a length here, as we need to notify for every block we haven't notified for.
@@ -432,33 +423,30 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 			notifyPos = newElem
 		}
 
-		bl.mux.Lock()
-		if mbi.number > bl.highestBlock {
-			bl.highestBlock = mbi.number
-		}
-		bl.mux.Unlock()
+		bl.checkAndSetHighestBlock(mbi.BlockNumber.Uint64())
 
 	}
 	return notifyPos
 }
 
-func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInfo) {
+func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalBlockInfo) {
 	// First remove from the end until we get a block that matches the current un-cached query view from the chain
 	lastElem := bl.canonicalChain.Back()
-	var startingNumber *int64
+	var startingNumber *uint64
 	for lastElem != nil && lastElem.Value != nil {
 
 		// Query the block that is no at this blockNumber
-		currentViewBlock := lastElem.Value.(*minimalBlockInfo)
+		currentViewBlock := lastElem.Value.(*ffcapi.MinimalBlockInfo)
 		if startingNumber == nil {
-			startingNumber = &currentViewBlock.number
+			currentNumber := currentViewBlock.BlockNumber.Uint64()
+			startingNumber = &currentNumber
 			log.L(bl.ctx).Debugf("Canonical chain checking from last block: %d", startingNumber)
 		}
 		var freshBlockInfo *blockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
-			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.number)
-			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.number, false, "")
+			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.BlockNumber.Uint64())
+			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -467,8 +455,8 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 			}
 		}
 
-		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.hash {
-			log.L(bl.ctx).Debugf("Canonical chain found last valid block %d", currentViewBlock.number)
+		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.BlockHash {
+			log.L(bl.ctx).Debugf("Canonical chain found last valid block %d", currentViewBlock.BlockNumber.Uint64())
 			lastValidBlock = currentViewBlock
 			// Trim everything after this point, as it's invalidated
 			nextElem := lastElem.Next()
@@ -482,8 +470,8 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *minimalBlockInf
 		lastElem = lastElem.Prev()
 	}
 
-	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.number {
-		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.number, bl.unstableHeadLength)
+	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.BlockNumber.Uint64() {
+		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.BlockNumber.Uint64(), bl.unstableHeadLength)
 	}
 	return lastValidBlock
 }
@@ -520,27 +508,43 @@ func (bl *blockListener) addConsumer(ctx context.Context, c *blockUpdateConsumer
 	bl.consumers[*c.id] = c
 }
 
-func (bl *blockListener) getHighestBlock(ctx context.Context) (int64, bool) {
+func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, bool) {
 	bl.checkAndStartListenerLoop()
 	// block height will be established as the first step of listener startup process
 	// so we don't need to wait for the entire startup process to finish to return the result
 	bl.mux.Lock()
-	highestBlock := bl.highestBlock
+	highestBlockSet := bl.highestBlockSet
 	bl.mux.Unlock()
 	// if not yet initialized, wait to be initialized
-	if highestBlock < 0 {
+	if !highestBlockSet {
 		select {
 		case <-bl.initialBlockHeightObtained:
 		case <-ctx.Done():
 			// Inform caller we timed out, or were closed
-			return -1, false
+			return 0, false
 		}
 	}
 	bl.mux.Lock()
-	highestBlock = bl.highestBlock
+	highestBlock := bl.highestBlock
 	bl.mux.Unlock()
 	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
 	return highestBlock, true
+}
+
+func (bl *blockListener) setHighestBlock(block uint64) {
+	bl.mux.Lock()
+	defer bl.mux.Unlock()
+	bl.highestBlock = block
+	bl.highestBlockSet = true
+}
+
+func (bl *blockListener) checkAndSetHighestBlock(block uint64) {
+	bl.mux.Lock()
+	defer bl.mux.Unlock()
+	if block > bl.highestBlock {
+		bl.highestBlock = block
+		bl.highestBlockSet = true
+	}
 }
 
 func (bl *blockListener) waitClosed() {
