@@ -165,11 +165,13 @@ func (l *listener) getHWMCheckpoint() *listenerCheckpoint {
 }
 
 func (l *listener) moveHWM(hwmBlock int64) {
+	log.L(l.es.ctx).Tracef("[moveHWM] Listener '%s' Moving HWM to: %d", l.id, hwmBlock)
 	l.hwmMux.Lock()
 	defer l.hwmMux.Unlock()
 	if hwmBlock > l.hwmBlock {
 		l.hwmBlock = hwmBlock
 	}
+	log.L(l.es.ctx).Tracef("[moveHWM] Listener '%s' HWM moved to: %d", l.id, l.hwmBlock)
 }
 
 // listenerCatchupLoop reads pages of blocks at a time, until it gets within the configured catchup-threshold
@@ -182,23 +184,23 @@ func (l *listener) listenerCatchupLoop() {
 	// Only filtering on a single listener
 	ctx := log.WithLogField(l.es.ctx, "listener", l.id.String())
 	al := l.es.buildAggregatedListener([]*listener{l})
-
+	log.L(ctx).Tracef("[listenerCatchupLoop] Listener '%s' Built aggregated listener: %+v", l.id, al)
 	failCount := 0
 	for {
 		if l.c.doFailureDelay(ctx, failCount) {
-			log.L(ctx).Debugf("Listener catchup loop loop exiting")
+			log.L(ctx).Debugf("[listenerCatchupLoop] Listener '%s' Exiting loop", l.id)
 			return
 		}
 
 		readyForLead, removed := l.checkReadyForLeadPackOrRemoved(ctx)
 		if removed {
-			log.L(ctx).Infof("Listener removed during catchup")
+			log.L(ctx).Infof("[listenerCatchupLoop] Listener '%s' Removed during catchup", l.id)
 			return
 		}
 		if readyForLead {
 			// We're done with catchup for this listener - it can join the main group
 			l.es.rejoinLeadGroup(l)
-			log.L(ctx).Infof("Listener completed catchup, and rejoined lead group")
+			log.L(ctx).Infof("[listenerCatchupLoop] Listener '%s' Completed catchup, and rejoined lead group", l.id)
 			return
 		}
 
@@ -207,28 +209,28 @@ func (l *listener) listenerCatchupLoop() {
 		events, err := l.es.getBlockRangeEvents(ctx, al, fromBlock, toBlock)
 		if err != nil {
 			if l.c.catchupDownscaleRegex.String() != "" && l.c.catchupDownscaleRegex.MatchString(err.Error()) {
-				log.L(ctx).Warnf("Failed to query block range fromBlock=%d toBlock=%d. Error %s matches configured downscale regex, catchup page size will automatically be reduced", fromBlock, toBlock, err.Error())
+				log.L(ctx).Warnf("[listenerCatchupLoop] Listener '%s' Failed to query block range fromBlock=%d toBlock=%d. Error %s matches configured downscale regex, catchup page size will automatically be reduced", l.id, fromBlock, toBlock, err.Error())
 				if l.c.catchupPageSize > 1 {
 					l.c.catchupPageSize /= 2
 
 					if l.c.catchupPageSize < 20 {
-						log.L(ctx).Warnf("Catchup page size auto-reduced to extremely low value %d. The connector may never catch up with the head of the chain.", l.c.catchupPageSize)
+						log.L(ctx).Warnf("[listenerCatchupLoop] Listener '%s' Catchup page size auto-reduced to extremely low value %d. The connector may never catch up with the head of the chain.", l.id, l.c.catchupPageSize)
 					}
 				}
 			} else {
-				log.L(ctx).Errorf("Failed to query block range fromBlock=%d toBlock=%d: %s", fromBlock, toBlock, err)
+				log.L(ctx).Errorf("[listenerCatchupLoop] Listener '%s' Failed to query block range fromBlock=%d toBlock=%d: %s", l.id, fromBlock, toBlock, err)
 				failCount++
 			}
 			continue
 		}
-		log.L(ctx).Infof("Listener catchup fromBlock=%d toBlock=%d events=%d", fromBlock, toBlock, len(events))
+		log.L(ctx).Infof("[listenerCatchupLoop] Listener '%s' Catchup fromBlock=%d toBlock=%d events=%d", l.id, fromBlock, toBlock, len(events))
 
 		for _, event := range events {
-			log.L(ctx).Debugf("Detected event %s (listener catchup)", event.Event)
+			log.L(ctx).Debugf("[listenerCatchupLoop] Listener '%s' Detected event %s (listener catchup)", l.id, event.Event)
 			select {
 			case l.es.events <- event:
 			case <-l.es.ctx.Done():
-				log.L(ctx).Infof("Listener catchup loop exiting as stream is stopping")
+				log.L(ctx).Infof("[listenerCatchupLoop] Listener '%s' Catchup loop exiting as stream is stopping", l.id)
 				return
 			}
 		}

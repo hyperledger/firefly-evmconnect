@@ -217,7 +217,7 @@ func (es *eventStream) buildReuseLeadGroupListener(lastUpdate *int, ag **aggrega
 // chain and if it's a way behind then we catch up all this head group as one set (rather than with individual
 // catchup routines as is the case if one listener starts a way behind the pack)
 func (es *eventStream) leadGroupCatchup() bool {
-
+	log.L(es.ctx).Tracef("[leadGroupCatchup] Stream '%s' Starting catchup loop", es.id)
 	// For API status, we keep a track of whether we're in catchup mode or not
 	es.catchup = true
 	defer func() { es.catchup = false }()
@@ -227,13 +227,13 @@ func (es *eventStream) leadGroupCatchup() bool {
 	failCount := 0
 	for {
 		if es.c.doFailureDelay(es.ctx, failCount) {
-			log.L(es.ctx).Debugf("Stream catchup loop exiting")
+			log.L(es.ctx).Debugf("[leadGroupCatchup] Stream '%s' Exiting loop", es.id)
 			return true
 		}
 
 		chainHeadBlock, ok := es.c.blockListener.getHighestBlock(es.ctx)
 		if !ok {
-			log.L(es.ctx).Debugf("Stream catchup exiting (closed checking block height)")
+			log.L(es.ctx).Debugf("[leadGroupCatchup] Stream '%s' Exiting loop (closed checking block height)", es.id)
 			return true
 		}
 
@@ -241,7 +241,7 @@ func (es *eventStream) leadGroupCatchup() bool {
 		_ = es.buildReuseLeadGroupListener(&lastUpdate, &ag)
 
 		if len(ag.listeners) == 0 {
-			log.L(es.ctx).Infof("Lead group is currently empty")
+			log.L(es.ctx).Infof("[leadGroupCatchup] Stream '%s' Lead group is currently empty", es.id)
 			return false
 		}
 
@@ -255,8 +255,10 @@ func (es *eventStream) leadGroupCatchup() bool {
 
 		// Check if we're ready to exit catchup mode
 		headGap := (int64(chainHeadBlock) - fromBlock) //nolint:gosec // convert to int64 to match the type of headGap
+		log.L(es.ctx).Tracef("[leadGroupCatchup] Stream '%s' Head gap: %d From block: %d (threshold: %d)", es.id, headGap, fromBlock, es.c.catchupThreshold)
+
 		if headGap < es.c.catchupThreshold {
-			log.L(es.ctx).Infof("Stream head is up to date with chain fromBlock=%d chainHead=%d headGap=%d", fromBlock, chainHeadBlock, headGap)
+			log.L(es.ctx).Infof("[leadGroupCatchup] Stream '%s' Head is up to date with chain fromBlock=%d chainHead=%d headGap=%d", es.id, fromBlock, chainHeadBlock, headGap)
 			return false
 		}
 
@@ -264,15 +266,15 @@ func (es *eventStream) leadGroupCatchup() bool {
 		toBlock := fromBlock + es.c.catchupPageSize - 1
 		events, err := es.getBlockRangeEvents(es.ctx, ag, fromBlock, toBlock)
 		if err != nil {
-			log.L(es.ctx).Errorf("Failed to query block range fromBlock=%d toBlock=%d headBlock=%d: %s", fromBlock, toBlock, chainHeadBlock, err)
+			log.L(es.ctx).Errorf("[leadGroupCatchup] Stream '%s' Failed to query block range fromBlock=%d toBlock=%d headBlock=%d: %s", es.id, fromBlock, toBlock, chainHeadBlock, err)
 			failCount++
 			continue
 		}
-		log.L(es.ctx).Infof("Stream catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
+		log.L(es.ctx).Infof("[leadGroupCatchup] Stream '%s' Catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", es.id, fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
 
 		// Dispatch the events
 		if es.dispatchSetHWMCheckExit(ag, events, toBlock+1 /* hwm is the next block after our poll */) {
-			log.L(es.ctx).Debugf("Stream catchup loop exiting")
+			log.L(es.ctx).Debugf("[leadGroupCatchup] Stream '%s' Exiting loop", es.id)
 			return true
 		}
 
@@ -297,6 +299,7 @@ func (es *eventStream) uninstallFilter(filter *string) {
 func (es *eventStream) leadGroupSteadyState() bool {
 	var filter string
 	defer es.uninstallFilter(&filter)
+	log.L(es.ctx).Tracef("[leadGroupSteadyState] Stream '%s' Starting steady state loop", es.id)
 
 	// Then we move into the head mode, where we establish a long-lived filter, and keep polling for changes on it.
 	var ag *aggregatedListener
@@ -306,7 +309,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	filterRPCMethodToUse := ""
 	for {
 		if es.c.doFailureDelay(es.ctx, failCount) {
-			log.L(es.ctx).Debugf("Stream loop exiting")
+			log.L(es.ctx).Debugf("[leadGroupSteadyState] Stream '%s' Exiting loop", es.id)
 			return true
 		}
 
@@ -344,7 +347,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				chainHeadBlock, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
 				blockGapEstimate := (int64(chainHeadBlock) - fromBlock)         //nolint:gosec // convert to int64 to match the type of blockGapEstimate
 				if blockGapEstimate > es.c.catchupThreshold {
-					log.L(es.ctx).Warnf("Block gap estimate reached %d (above threshold of %d) - reverting to catchup mode", blockGapEstimate, es.c.catchupThreshold)
+					log.L(es.ctx).Warnf("[leadGroupSteadyState] Stream '%s' Block gap estimate reached %d (above threshold of %d) - reverting to catchup mode", es.id, blockGapEstimate, es.c.catchupThreshold)
 					return false
 				}
 
@@ -389,7 +392,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 
 			// Dispatch the events
 			if es.dispatchSetHWMCheckExit(ag, events, hwmBlock) {
-				log.L(es.ctx).Debugf("Stream loop exiting")
+				log.L(es.ctx).Debugf("[leadGroupSteadyState] Stream '%s' Exiting loop", es.id)
 				return true
 			}
 
@@ -406,7 +409,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 		select {
 		case <-time.After(es.c.eventFilterPollingInterval):
 		case <-es.ctx.Done():
-			log.L(es.ctx).Debugf("Stream loop stopping")
+			log.L(es.ctx).Debugf("[leadGroupSteadyState] Stream '%s' Exiting loop", es.id)
 			return true
 		}
 	}
@@ -442,6 +445,7 @@ func (es *eventStream) streamLoop() {
 	es.preStartProcessing()
 
 	for {
+		log.L(es.ctx).Tracef("[streamLoop] Stream '%s' Starting loop", es.id)
 		// When we first start, we might find our leading pack of listeners are all way behind
 		// the head of the chain. So we run a catchup mode loop to ensure we don't ask the blockchain
 		// node to process an excessive amount of logs
@@ -454,35 +458,40 @@ func (es *eventStream) streamLoop() {
 		if es.leadGroupSteadyState() {
 			return
 		}
+		log.L(es.ctx).Tracef("[streamLoop] Stream '%s' Exiting loop", es.id)
 	}
 
 }
 
 func (es *eventStream) dispatchSetHWMCheckExit(ag *aggregatedListener, events ffcapi.ListenerEvents, hwm int64) (exiting bool) {
-
+	log.L(es.ctx).Tracef("[dispatchSetHWMCheckExit] Stream '%s' Dispatching events: %d HWM: %d", es.id, len(events), hwm)
 	// Dispatch the events, updating the in-memory checkpoint for all listeners.
 	if len(events) == 0 {
 		select {
 		case <-es.ctx.Done():
+			log.L(es.ctx).Tracef("[dispatchSetHWMCheckExit] Stream '%s' Context cancelled", es.id)
 			return true
 		default:
 		}
 	} else {
 		for _, event := range events {
-			log.L(es.ctx).Debugf("Detected event %s", event.Event)
+			log.L(es.ctx).Debugf("[dispatchSetHWMCheckExit] Stream '%s' Detected event %s", es.id, event.Event)
 			select {
 			case es.events <- event:
 			case <-es.ctx.Done():
+				log.L(es.ctx).Tracef("[dispatchSetHWMCheckExit] Stream '%s' Context cancelled", es.id)
 				return true
 			}
 		}
 	}
 
 	// Move the HWM on all each listener forwards, if they are behind the base HWM for the event stream itself
+	log.L(es.ctx).Tracef("[dispatchSetHWMCheckExit] Stream '%s' Moving HWM for %d listeners", es.id, len(ag.listeners))
 	for _, l := range ag.listeners {
 		l.moveHWM(hwm)
 	}
 
+	log.L(es.ctx).Tracef("[dispatchSetHWMCheckExit] Stream '%s' Exiting", es.id)
 	return false
 
 }
@@ -502,6 +511,7 @@ func (es *eventStream) buildAggregatedListener(listeners []*listener) *aggregate
 			ag.listenersByTopic0[sigStr] = append(topicListeners, l)
 		}
 	}
+	log.L(es.ctx).Tracef("[buildAggregatedListener] Stream '%s' Listener set: %+v", es.id, ag)
 	return ag
 }
 
@@ -558,6 +568,7 @@ func (es *eventStream) getListenerHWM(ctx context.Context, listenerID *fftypes.U
 	if l == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgListenerNotStarted, listenerID, es.id)
 	}
+	log.L(ctx).Tracef("[getListenerHWM] Stream '%s' Listener '%s' HWM: %d Catchup: %t", es.id, listenerID, l.getHWMCheckpoint(), l.catchup || es.catchup)
 	return &ffcapi.EventListenerHWMResponse{
 		Checkpoint: l.getHWMCheckpoint(),
 		Catchup:    l.catchup || es.catchup, // dirty read of whether the listener is in catchup, or the head group of the stream is in catchup
