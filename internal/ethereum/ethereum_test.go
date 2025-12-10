@@ -18,6 +18,8 @@ package ethereum
 
 import (
 	"context"
+	"net"
+	"net/http"
 	"testing"
 	"time"
 
@@ -217,4 +219,41 @@ func TestWithDeprecatedConfFallback(t *testing.T) {
 	conf.Set("newKey", 2222)
 	require.Equal(t, 2222, withDeprecatedConfFallback(conf, conf.GetInt, "deprecatedKey", "newKey"))
 
+}
+
+func TestRetryDefaultsFor429(t *testing.T) {
+	config.RootConfigReset()
+	conf := config.RootSection("unittest")
+	InitConfig(conf)
+
+	const serverAddress = "127.0.0.1:8545"
+	conf.Set(ffresty.HTTPConfigURL, "http://"+serverAddress)
+	conf.Set(BlockPollingInterval, "1h") // Disable for tests that are not using it
+	logrus.SetLevel(logrus.DebugLevel)
+	ctx, done := context.WithCancel(context.Background())
+	cc, err := NewEthereumConnector(ctx, conf)
+	assert.NoError(t, err)
+	assert.NotNil(t, cc.RPC())
+	defer done()
+
+	// Start a simple HTTP server that always replies with 429 Too Many Requests
+	listener, err := net.Listen("tcp", serverAddress)
+	require.NoError(t, err)
+
+	count := 0
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			count++
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"jsonrpc":"2.0","error":{"code":429,"message":"429 Too Many Requests"},"id":1}`))
+		}),
+	}
+	go server.Serve(listener)
+	t.Cleanup(func() { server.Close() })
+
+	rpcErr := cc.RPC().CallRPC(context.Background(), nil, "myMethod")
+	assert.Regexp(t, "429 Too Many Requests", rpcErr.Message)
+	// Default retry count is 5 + 1 for the initial call
+	assert.Equal(t, 6, count)
 }

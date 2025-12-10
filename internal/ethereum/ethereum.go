@@ -115,9 +115,19 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 	}
 	if err == nil {
 		httpConf, err = ffresty.GenerateConfig(ctx, conf)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
+		// Set retry defaults for 429 responses if not already configured
+		if !httpConf.Retry {
+			httpConf.Retry = true
+		}
+
+		if httpConf.RetryErrorStatusCodeRegex == "" && !conf.IsSet(ffresty.HTTPConfigRetryErrorStatusCodeRegex) {
+			const defaultRetryErrorStatusCodeRegex = "(?:429)"
+			httpConf.RetryErrorStatusCodeRegex = defaultRetryErrorStatusCodeRegex
+		}
 	}
 	httpClient := ffresty.NewWithConfig(ctx, *httpConf)
 	c.backend = rpcbackend.NewRPCClientWithOption(httpClient, rpcbackend.RPCClientOptions{
