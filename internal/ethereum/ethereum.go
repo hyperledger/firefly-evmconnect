@@ -122,12 +122,14 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		// Set retry defaults for 429 responses if not already configured
 		if !httpConf.Retry {
 			httpConf.Retry = true
+			// We only set the default if the regex is not already set, to avoid overriding a user-provided regex.
+			// and changing the existing behavior of retrying everything if retry.enabled is true by the user
+			if httpConf.RetryErrorStatusCodeRegex == "" && !conf.IsSet(ffresty.HTTPConfigRetryErrorStatusCodeRegex) {
+				defaultRetryErrorStatusCodeRegex := "(?:429)"
+				httpConf.RetryErrorStatusCodeRegex = defaultRetryErrorStatusCodeRegex
+			}
 		}
 
-		if httpConf.RetryErrorStatusCodeRegex == "" && !conf.IsSet(ffresty.HTTPConfigRetryErrorStatusCodeRegex) {
-			const defaultRetryErrorStatusCodeRegex = "(?:429)"
-			httpConf.RetryErrorStatusCodeRegex = defaultRetryErrorStatusCodeRegex
-		}
 	}
 	httpClient := ffresty.NewWithConfig(ctx, *httpConf)
 	c.backend = rpcbackend.NewRPCClientWithOption(httpClient, rpcbackend.RPCClientOptions{
