@@ -40,7 +40,6 @@ const (
 	DeprecatedRetryMaxDelay  = "retry.maxDelay"
 	DeprecatedRetryFactor    = "retry.factor"
 
-	// Open retry enabled
 	RetryEnabled = "retry.enabled"
 
 	MaxConcurrentRequests   = "maxConcurrentRequests"
