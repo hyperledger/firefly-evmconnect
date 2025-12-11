@@ -122,7 +122,7 @@
 |Key|Description|Type|Default Value|
 |---|-----------|----|-------------|
 |count|The maximum number of times to retry|`int`|`5`
-|enabled|Enables retries|`boolean`|`false`
+|enabled|Enables retries|`boolean`|`true`
 |errorStatusCodeRegex|The regex that the error response status code must match to trigger retry|`string`|`<nil>`
 |factor|(Deprecated) Please refer to `connector.queryLoopRetry.factor` to understand its original purpose and use that instead|`float32`|`2`
 |initWaitTime|The initial retry delay|[`time.Duration`](https://pkg.go.dev/time#Duration)|`250ms`

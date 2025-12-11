@@ -122,9 +122,9 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		return nil, err
 	}
 
-	// Set retry defaults for 429 responses if not already configured
-	if !httpConf.Retry {
-		httpConf.Retry = true
+	// Only enable retry for 429 responses if the user has not xplicitly enabled it
+	// As this regressions the default behavior of what to retry
+	if !conf.IsSet(RetryEnabled) {
 		// We only set the default if the regex is not already set, to avoid overriding a user-provided regex.
 		// and changing the existing behavior of retrying everything if retry.enabled is true by the user
 		if httpConf.RetryErrorStatusCodeRegex == "" && !conf.IsSet(ffresty.HTTPConfigRetryErrorStatusCodeRegex) {
