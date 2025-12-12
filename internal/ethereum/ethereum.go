@@ -113,12 +113,15 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		// not as a full replacement for HTTP.
 		wsConf, err = wsclient.GenerateConfig(ctx, conf)
 	}
+
 	if err == nil {
 		httpConf, err = ffresty.GenerateConfig(ctx, conf)
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	httpClient := ffresty.NewWithConfig(ctx, *httpConf)
 	c.backend = rpcbackend.NewRPCClientWithOption(httpClient, rpcbackend.RPCClientOptions{
 		MaxConcurrentRequest: conf.GetInt64(MaxConcurrentRequests),
