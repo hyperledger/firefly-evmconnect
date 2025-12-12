@@ -108,16 +108,13 @@ func TestBlockListenerOKSequential(t *testing.T) {
 		hbh := args[1].(*string)
 		*hbh = testBlockFilterID1
 	})
-	conditionalMockOnce(
-		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil),
-		func() bool { return len(bl.consumers) > 0 },
-		func(args mock.Arguments) {
-			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
-			*hbh = []ethtypes.HexBytes0xPrefix{
-				block1001Hash,
-				block1002Hash,
-			}
-		})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+		*hbh = []ethtypes.HexBytes0xPrefix{
+			block1001Hash,
+			block1002Hash,
+		}
+	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 		*hbh = []ethtypes.HexBytes0xPrefix{
