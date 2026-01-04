@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package ethblocklistener
 
 import (
 	"container/list"
@@ -27,6 +27,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -161,7 +162,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == "1977"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(fakeParentHash),
@@ -205,7 +206,7 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == "1977"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
@@ -250,7 +251,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == "1977"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
@@ -762,7 +763,7 @@ func TestBuildConfirmationList_NilBlockInfo(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == strconv.FormatUint(105, 10)
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = nil
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = nil
 	})
 
 	ctx := context.Background()
@@ -1185,7 +1186,7 @@ func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, sta
 			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 				return bn.BigInt().String() == strconv.FormatUint(blockNumber, 10)
 			}), false).Return(nil).Run(func(args mock.Arguments) {
-				*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+				*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 					Number:     ethtypes.NewHexInteger64(int64(blockNumber)),
 					Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber)),
 					ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber - 1)),

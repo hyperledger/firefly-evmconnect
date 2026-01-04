@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -34,7 +35,7 @@ func (c *ethConnector) IsReady(ctx context.Context) (*ffcapi.ReadyResponse, ffca
 	if err != nil {
 		return &ffcapi.ReadyResponse{
 			Ready: false,
-		}, mapError(netVersionRPCMethods, err.Error()), err.Error()
+		}, etherrors.MapError(etherrors.NetVersionRPCMethods, err.Error()), err.Error()
 	}
 
 	details := &fftypes.JSONObject{

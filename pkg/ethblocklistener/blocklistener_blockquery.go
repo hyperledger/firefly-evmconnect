@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package ethblocklistener
 
 import (
 	"context"
@@ -24,31 +24,13 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-// blockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
-type blockInfoJSONRPC struct {
-	Number       *ethtypes.HexInteger        `json:"number"`
-	Hash         ethtypes.HexBytes0xPrefix   `json:"hash"`
-	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash"`
-	Timestamp    *ethtypes.HexInteger        `json:"timestamp"`
-	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
-}
-
-func transformBlockInfo(bi *blockInfoJSONRPC, t *ffcapi.BlockInfo) {
-	t.BlockNumber = (*fftypes.FFBigInt)(bi.Number)
-	t.BlockHash = bi.Hash.String()
-	t.ParentHash = bi.ParentHash.String()
-	stringHashes := make([]string, len(bi.Transactions))
-	for i, th := range bi.Transactions {
-		stringHashes[i] = th.String()
-	}
-	t.TransactionHashes = stringHashes
-}
-
-func (bl *blockListener) addToBlockCache(blockInfo *blockInfoJSONRPC) {
+func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Hash.String(), blockInfo)
 	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
@@ -56,19 +38,17 @@ func (bl *blockListener) addToBlockCache(blockInfo *blockInfoJSONRPC) {
 func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, error) {
 
 	// Query the chain to find the transaction block
-	res, reason, receiptErr := bl.c.TransactionReceipt(ctx, &ffcapi.TransactionReceiptRequest{
-		TransactionHash: txHash,
-	})
-	if receiptErr != nil && reason != ffcapi.ErrorReasonNotFound {
-		return nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
+	receipt, receiptErr := bl.getTransactionReceipt(ctx, txHash)
+	if receiptErr != nil {
+		return nil, receiptErr.Error()
 	}
-	if res == nil {
+	if receipt == nil {
 		return nil, nil
 	}
-	txBlockHash := res.BlockHash
-	txBlockNumber := res.BlockNumber.Uint64()
+	txBlockHash := receipt.BlockHash
+	txBlockNumber := receipt.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
-	bi, reason, err := bl.getBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash)
+	bi, reason, err := bl.GetBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash.String())
 	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
 		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
 	}
@@ -83,12 +63,18 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	}, nil
 }
 
-func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*blockInfoJSONRPC, ffcapi.ErrorReason, error) {
-	var blockInfo *blockInfoJSONRPC
+func (bl *blockListener) getTransactionReceipt(ctx context.Context, txHash string) (ethReceipt *ethrpc.TxReceiptJSONRPC, rpcErr *rpcbackend.RPCError) {
+	// Get the receipt in the back-end JSON/RPC format
+	rpcErr = bl.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", txHash)
+	return
+}
+
+func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, ffcapi.ErrorReason, error) {
+	var blockInfo *ethrpc.BlockInfoJSONRPC
 	if allowCache {
 		cached, ok := bl.blockCache.Get(strconv.FormatUint(blockNumber, 10))
 		if ok {
-			blockInfo = cached.(*blockInfoJSONRPC)
+			blockInfo = cached.(*ethrpc.BlockInfoJSONRPC)
 			if (expectedParentHashStr != "" && blockInfo.ParentHash.String() != expectedParentHashStr) || (expectedBlockHashStr != "" && blockInfo.Hash.String() != expectedBlockHashStr) {
 				log.L(ctx).Debugf("Block cache miss for block %d due to mismatched parent hash expected=%s found=%s", blockNumber, expectedParentHashStr, blockInfo.ParentHash)
 				blockInfo = nil
@@ -110,11 +96,11 @@ func (bl *blockListener) getBlockInfoByNumber(ctx context.Context, blockNumber u
 	return blockInfo, "", nil
 }
 
-func (bl *blockListener) getBlockInfoByHash(ctx context.Context, hash0xString string) (*blockInfoJSONRPC, error) {
-	var blockInfo *blockInfoJSONRPC
+func (bl *blockListener) GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error) {
+	var blockInfo *ethrpc.BlockInfoJSONRPC
 	cached, ok := bl.blockCache.Get(hash0xString)
 	if ok {
-		blockInfo = cached.(*blockInfoJSONRPC)
+		blockInfo = cached.(*ethrpc.BlockInfoJSONRPC)
 	}
 
 	if blockInfo == nil {

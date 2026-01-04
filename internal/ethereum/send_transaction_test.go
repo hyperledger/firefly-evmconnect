@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -334,15 +335,15 @@ func TestSendTransactionFail(t *testing.T) {
 }
 
 func TestSendErrorMapping(t *testing.T) {
-	assert.Equal(t, ffcapi.ErrorReasonNonceTooLow, mapError(sendRPCMethods, fmt.Errorf("nonce too low")))
-	assert.Equal(t, ffcapi.ErrorReasonInsufficientFunds, mapError(sendRPCMethods, fmt.Errorf("insufficient funds")))
-	assert.Equal(t, ffcapi.ErrorReasonTransactionUnderpriced, mapError(sendRPCMethods, fmt.Errorf("transaction underpriced")))
-	assert.Equal(t, ffcapi.ErrorKnownTransaction, mapError(sendRPCMethods, fmt.Errorf("known transaction")))
-	assert.Equal(t, ffcapi.ErrorKnownTransaction, mapError(sendRPCMethods, fmt.Errorf("already known")))
+	assert.Equal(t, ffcapi.ErrorReasonNonceTooLow, etherrors.MapError(etherrors.SendRPCMethods, fmt.Errorf("nonce too low")))
+	assert.Equal(t, ffcapi.ErrorReasonInsufficientFunds, etherrors.MapError(etherrors.SendRPCMethods, fmt.Errorf("insufficient funds")))
+	assert.Equal(t, ffcapi.ErrorReasonTransactionUnderpriced, etherrors.MapError(etherrors.SendRPCMethods, fmt.Errorf("transaction underpriced")))
+	assert.Equal(t, ffcapi.ErrorKnownTransaction, etherrors.MapError(etherrors.SendRPCMethods, fmt.Errorf("known transaction")))
+	assert.Equal(t, ffcapi.ErrorKnownTransaction, etherrors.MapError(etherrors.SendRPCMethods, fmt.Errorf("already known")))
 }
 
 func TestCallErrorMapping(t *testing.T) {
-	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, mapError(callRPCMethods, fmt.Errorf("execution reverted")))
+	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, etherrors.MapError(etherrors.CallRPCMethods, fmt.Errorf("execution reverted")))
 }
 
 func TestSendTransactionBadFrom(t *testing.T) {

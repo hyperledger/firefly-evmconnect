@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inl.c.
+// Copyright © 2026 Kaleido, Inl.c.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -26,8 +26,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -67,25 +67,6 @@ type listener struct {
 	catchupLoopDone chan struct{}
 }
 
-type logFilterJSONRPC struct {
-	FromBlock *ethtypes.HexInteger          `json:"fromBlock,omitempty"`
-	ToBlock   *ethtypes.HexInteger          `json:"toBlock,omitempty"`
-	Address   *ethtypes.Address0xHex        `json:"address,omitempty"`
-	Topics    [][]ethtypes.HexBytes0xPrefix `json:"topics,omitempty"`
-}
-
-type logJSONRPC struct {
-	Removed          bool                        `json:"removed"`
-	LogIndex         *ethtypes.HexInteger        `json:"logIndex"`
-	TransactionIndex *ethtypes.HexInteger        `json:"transactionIndex"`
-	BlockNumber      *ethtypes.HexInteger        `json:"blockNumber"`
-	TransactionHash  ethtypes.HexBytes0xPrefix   `json:"transactionHash"`
-	BlockHash        ethtypes.HexBytes0xPrefix   `json:"blockHash"`
-	Address          *ethtypes.Address0xHex      `json:"address"`
-	Data             ethtypes.HexBytes0xPrefix   `json:"data"`
-	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
-}
-
 func (cp *listenerCheckpoint) LessThan(b ffcapi.EventListenerCheckpoint) bool {
 	bcp := b.(*listenerCheckpoint)
 	return cp.Block < bcp.Block ||
@@ -97,7 +78,7 @@ func (cp *listenerCheckpoint) LessThan(b ffcapi.EventListenerCheckpoint) bool {
 func (l *listener) getInitialBlock(ctx context.Context, fromBlockInstruction string) (uint64, error) {
 	if fromBlockInstruction == ffcapi.FromBlockLatest || fromBlockInstruction == "" {
 		// Get the latest block number of the chain
-		chainHead, ok := l.c.blockListener.getHighestBlock(ctx)
+		chainHead, ok := l.c.blockListener.GetHighestBlock(ctx)
 		if !ok {
 			return 0, i18n.NewError(ctx, msgs.MsgTimedOutQueryingChainHead)
 		}
@@ -185,7 +166,7 @@ func (l *listener) listenerCatchupLoop() {
 
 	failCount := 0
 	for {
-		if l.c.doFailureDelay(ctx, failCount) {
+		if l.c.retry.DoFailureDelay(ctx, failCount) {
 			log.L(ctx).Debugf("Listener catchup loop loop exiting")
 			return
 		}
@@ -239,7 +220,7 @@ func (l *listener) listenerCatchupLoop() {
 	}
 }
 
-func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *logJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
+func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *ethrpc.LogJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()

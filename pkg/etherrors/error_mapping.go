@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package etherrors
 
 import (
 	"strings"
@@ -22,17 +22,17 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-type ethRPCMethodCategory int
+type RPCMethodCategory int
 
 const (
-	filterRPCMethods ethRPCMethodCategory = iota
-	sendRPCMethods
-	callRPCMethods
-	blockRPCMethods
-	netVersionRPCMethods
+	FilterRPCMethods RPCMethodCategory = iota
+	SendRPCMethods
+	CallRPCMethods
+	BlockRPCMethods
+	NetVersionRPCMethods
 )
 
-// mapErrorToReason provides a common place for mapping Ethereum client
+// etherrors.MapErrorToReason provides a common place for mapping Ethereum client
 // error strings, to a more consistent set of cross-client (and
 // cross blockchain) reasons for errors defined by FFCPI for use by
 // FireFly Transaction Manager.
@@ -40,16 +40,16 @@ const (
 // Sadly there is no place in Ethereum JSON/RPC where these are
 // formally defined. So this logic may get complex over time to
 // deal with the differences between client implementations.
-func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
+func MapError(methodType RPCMethodCategory, err error) ffcapi.ErrorReason {
 
 	errString := strings.ToLower(err.Error())
 
 	switch methodType {
-	case filterRPCMethods:
+	case FilterRPCMethods:
 		if strings.Contains(errString, "filter not found") {
 			return ffcapi.ErrorReasonNotFound
 		}
-	case sendRPCMethods:
+	case SendRPCMethods:
 		switch {
 		case strings.Contains(errString, "nonce too low"):
 			return ffcapi.ErrorReasonNonceTooLow
@@ -62,16 +62,16 @@ func mapError(methodType ethRPCMethodCategory, err error) ffcapi.ErrorReason {
 		case strings.Contains(errString, "already known"):
 			return ffcapi.ErrorKnownTransaction
 		}
-	case callRPCMethods:
+	case CallRPCMethods:
 		if strings.Contains(errString, "execution reverted") {
 			return ffcapi.ErrorReasonTransactionReverted
 		}
-	case blockRPCMethods:
+	case BlockRPCMethods:
 		// https://docs.avax.network/quickstart/integrate-exchange-with-avalanche#determining-finality
 		if strings.Contains(errString, "cannot query unfinalized data") {
 			return ffcapi.ErrorReasonNotFound
 		}
-	case netVersionRPCMethods:
+	case NetVersionRPCMethods:
 		if strings.Contains(errString, "the method net_version does not exist/is not available") {
 			return ffcapi.ErrorReasonNotFound
 		}

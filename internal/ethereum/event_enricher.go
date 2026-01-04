@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inl.c.
+// Copyright © 2026 Kaleido, Inl.c.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -34,7 +35,7 @@ type eventEnricher struct {
 	extractSigner bool
 }
 
-func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *logJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
+func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *ethrpc.LogJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := ethLog.BlockNumber.BigInt().Int64()
@@ -68,13 +69,13 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	}
 
 	info := eventInfo{
-		logJSONRPC: *ethLog,
+		LogJSONRPC: *ethLog,
 		ChainID:    ee.connector.chainID,
 	}
 
 	var timestamp *fftypes.FFTime
 	if ee.connector.eventBlockTimestamps {
-		bi, err := ee.connector.blockListener.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
+		bi, err := ee.connector.blockListener.GetBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
 			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
@@ -137,7 +138,7 @@ func (ee *eventEnricher) decodeLogData(ctx context.Context, event *abi.Entry, to
 	return fftypes.JSONAnyPtrBytes(b), true
 }
 
-func (ee *eventEnricher) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *txInfoJSONRPC, info *eventInfo) {
+func (ee *eventEnricher) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *ethrpc.TxInfoJSONRPC, info *eventInfo) {
 	if len(txInfo.Input) < 4 {
 		log.L(ctx).Debugf("No function selector available for TX '%s'", txInfo.Hash)
 		return

@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package ethblocklistener
 
 import (
 	"container/list"
@@ -23,21 +23,42 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/hyperledger/firefly-common/pkg/config"
+	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/internal/retryutil"
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-type blockUpdateConsumer struct {
-	id      *fftypes.UUID // could be an event stream ID for example - must be unique
-	ctx     context.Context
-	updates chan<- *ffcapi.BlockHashEvent
+type BlockListenerConfig struct {
+	UnstableHeadLength      int           `json:"unstableHeadLength"`
+	BlockPollingInterval    time.Duration `json:"blockPollingInterval"`
+	HederaCompatibilityMode bool          `json:"hederaCompatibilityMode"`
+	BlockCacheSize          int           `json:"blockCacheSize"`
+}
+
+type BlockListener interface {
+	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error)
+	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
+	GetHighestBlock(ctx context.Context) (uint64, bool)
+	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, ffcapi.ErrorReason, error)
+	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
+	WaitClosed()
+	UTSetBackend(rpcbackend.RPC)
+}
+
+type BlockUpdateConsumer struct {
+	ID      *fftypes.UUID // could be an event stream ID for example - must be unique
+	Ctx     context.Context
+	Updates chan<- *ffcapi.BlockHashEvent
 }
 
 // blockListener has two functions:
@@ -45,7 +66,7 @@ type blockUpdateConsumer struct {
 // 2) To feed new block information to any registered consumers
 type blockListener struct {
 	ctx            context.Context
-	c              *ethConnector
+	retry          *retryutil.RetryWrapper
 	backend        rpcbackend.RPC
 	wsBackend      rpcbackend.WebSocketRPCClient // if configured the getting the blockheight will not complete until WS connects, overrides backend once connected
 	listenLoopDone chan struct{}
@@ -59,41 +80,49 @@ type blockListener struct {
 	highestBlockSet            bool
 	highestBlock               uint64
 	mux                        sync.RWMutex
-	consumers                  map[fftypes.UUID]*blockUpdateConsumer
-	blockPollingInterval       time.Duration
-	hederaCompatibilityMode    bool
+	consumers                  map[fftypes.UUID]*BlockUpdateConsumer
 	blockCache                 *lru.Cache
+	BlockListenerConfig
 
 	//  canonical chain
 	unstableHeadLength int
 	canonicalChain     *list.List
 }
 
-func newBlockListener(ctx context.Context, c *ethConnector, conf config.Section, wsConf *wsclient.WSConfig) (bl *blockListener, err error) {
-	bl = &blockListener{
+func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListenerConfig, httpConf *ffresty.Config, wsConf *wsclient.WSConfig) (bl BlockListener, err error) {
+	httpClient := ffresty.NewWithConfig(ctx, *httpConf)
+	var wsBackend rpcbackend.WebSocketRPCClient
+	if wsConf != nil {
+		wsBackend = rpcbackend.NewWSRPCClient(wsConf)
+	}
+	return NewBlockListenerSupplyBackend(ctx, retry, conf, rpcbackend.NewRPCClient(httpClient), wsBackend)
+}
+
+func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf *BlockListenerConfig, httpBackend rpcbackend.RPC, wsBackend rpcbackend.WebSocketRPCClient) (_ BlockListener, err error) {
+	bl := &blockListener{
 		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
-		c:                          c,
-		backend:                    c.backend, // use the HTTP backend - might get overwritten by a connected websocket later
+		retry:                      &retryutil.RetryWrapper{Retry: retry},
+		backend:                    httpBackend, // use the HTTP backend - might get overwritten by a connected websocket later
+		wsBackend:                  wsBackend,
 		isStarted:                  false,
 		startDone:                  make(chan struct{}),
 		initialBlockHeightObtained: make(chan struct{}),
 		newHeadsTap:                make(chan struct{}),
 		highestBlockSet:            false,
 		highestBlock:               0,
-		consumers:                  make(map[fftypes.UUID]*blockUpdateConsumer),
-		blockPollingInterval:       conf.GetDuration(BlockPollingInterval),
+		consumers:                  make(map[fftypes.UUID]*BlockUpdateConsumer),
 		canonicalChain:             list.New(),
-		unstableHeadLength:         int(c.checkpointBlockGap),
-		hederaCompatibilityMode:    conf.GetBool(HederaCompatibilityMode),
+		BlockListenerConfig:        *conf,
 	}
-	if wsConf != nil {
-		bl.wsBackend = rpcbackend.NewWSRPCClient(wsConf)
-	}
-	bl.blockCache, err = lru.New(conf.GetInt(BlockCacheSize))
+	bl.blockCache, err = lru.New(conf.BlockCacheSize)
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
 	}
 	return bl, nil
+}
+
+func (bl *blockListener) UTSetBackend(backend rpcbackend.RPC) {
+	bl.backend = backend
 }
 
 // setting block filter status updates that new block filter has been created
@@ -126,7 +155,7 @@ func (bl *blockListener) newHeadsSubListener() {
 // getBlockHeightWithRetry keeps retrying attempting to get the initial block height until successful
 func (bl *blockListener) establishBlockHeightWithRetry() error {
 	wsConnected := false
-	return bl.c.retry.Do(bl.ctx, "get initial block height", func(_ int) (retry bool, err error) {
+	return bl.retry.Do(bl.ctx, "get initial block height", func(_ int) (retry bool, err error) {
 		// If we have a WebSocket backend, then we connect it and switch over to using it
 		// (we accept an un-locked update here to backend, as the most important routine that's
 		// querying block state is the one we're called on)
@@ -183,7 +212,7 @@ func (bl *blockListener) listenLoop() {
 	firstIteration := true
 	for {
 		if failCount > 0 {
-			if bl.c.doFailureDelay(bl.ctx, failCount) {
+			if bl.retry.DoFailureDelay(bl.ctx, failCount) {
 				log.L(bl.ctx).Debugf("Block listener loop exiting")
 				return
 			}
@@ -194,7 +223,7 @@ func (bl *blockListener) listenLoop() {
 				case <-bl.ctx.Done():
 					log.L(bl.ctx).Debugf("Block listener loop stopping")
 					return
-				case <-time.After(bl.blockPollingInterval):
+				case <-time.After(bl.BlockPollingInterval):
 				case <-bl.newHeadsTap:
 				}
 			} else {
@@ -215,7 +244,7 @@ func (bl *blockListener) listenLoop() {
 		var blockHashes []ethtypes.HexBytes0xPrefix
 		rpcErr := bl.backend.CallRPC(bl.ctx, &blockHashes, "eth_getFilterChanges", filter)
 		if rpcErr != nil {
-			if mapError(filterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
+			if etherrors.MapError(etherrors.FilterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
 				log.L(bl.ctx).Warnf("Block filter '%v' no longer valid. Recreating filter: %s", filter, rpcErr.Message)
 				filter = ""
 				gapPotential = true
@@ -230,7 +259,7 @@ func (bl *blockListener) listenLoop() {
 		var notifyPos *list.Element
 		for _, h := range blockHashes {
 			if len(h) != 32 {
-				if !bl.hederaCompatibilityMode {
+				if !bl.HederaCompatibilityMode {
 					log.L(bl.ctx).Errorf("Attempted to index block header with non-standard length: %d", len(h))
 					failCount++
 					continue
@@ -246,7 +275,7 @@ func (bl *blockListener) listenLoop() {
 			}
 
 			// Do a lookup of the block (which will then go into our cache).
-			bi, err := bl.getBlockInfoByHash(bl.ctx, h.String())
+			bi, err := bl.GetBlockInfoByHash(bl.ctx, h.String())
 			switch {
 			case err != nil:
 				log.L(bl.ctx).Debugf("Failed to query block '%s': %s", h, err)
@@ -269,7 +298,7 @@ func (bl *blockListener) listenLoop() {
 
 			// Take a copy of the consumers in the lock
 			bl.mux.Lock()
-			consumers := make([]*blockUpdateConsumer, 0, len(bl.consumers))
+			consumers := make([]*BlockUpdateConsumer, 0, len(bl.consumers))
 			for _, c := range bl.consumers {
 				consumers = append(consumers, c)
 			}
@@ -289,7 +318,7 @@ func (bl *blockListener) listenLoop() {
 // reconcileCanonicalChain takes an update on a block, and reconciles it against the in-memory view of the
 // head of the canonical chain we have. If these blocks do not just fit onto the end of the chain, then we
 // work backwards building a new view and notify about all blocks that are changed in that process.
-func (bl *blockListener) reconcileCanonicalChain(bi *blockInfoJSONRPC) *list.Element {
+func (bl *blockListener) reconcileCanonicalChain(bi *ethrpc.BlockInfoJSONRPC) *list.Element {
 	mbi := &ffcapi.MinimalBlockInfo{
 		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
 		BlockHash:   bi.Hash.String(),
@@ -388,10 +417,10 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	}
 	var notifyPos *list.Element
 	for {
-		var bi *blockInfoJSONRPC
+		var bi *ethrpc.BlockInfoJSONRPC
 		var reason ffcapi.ErrorReason
-		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
-			bi, reason, err = bl.getBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "", "")
+		err := bl.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
+			bi, reason, err = bl.GetBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "", "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -444,11 +473,11 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 			startingNumber = &currentNumber
 			log.L(bl.ctx).Debugf("Canonical chain checking from last block: %d", startingNumber)
 		}
-		var freshBlockInfo *blockInfoJSONRPC
+		var freshBlockInfo *ethrpc.BlockInfoJSONRPC
 		var reason ffcapi.ErrorReason
-		err := bl.c.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
+		err := bl.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
 			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.BlockNumber.Uint64())
-			freshBlockInfo, reason, err = bl.getBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
+			freshBlockInfo, reason, err = bl.GetBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
 			return reason != ffcapi.ErrorReasonNotFound, err
 		})
 		if err != nil {
@@ -478,16 +507,16 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 	return lastValidBlock
 }
 
-func (bl *blockListener) dispatchToConsumers(consumers []*blockUpdateConsumer, update *ffcapi.BlockHashEvent) {
+func (bl *blockListener) dispatchToConsumers(consumers []*BlockUpdateConsumer, update *ffcapi.BlockHashEvent) {
 	for _, c := range consumers {
-		log.L(bl.ctx).Tracef("Notifying consumer %s of blocks %v (gap=%t)", c.id, update.BlockHashes, update.GapPotential)
+		log.L(bl.ctx).Tracef("Notifying consumer %s of blocks %v (gap=%t)", c.ID, update.BlockHashes, update.GapPotential)
 		select {
-		case c.updates <- update:
+		case c.Updates <- update:
 		case <-bl.ctx.Done(): // loop, we're stopping and will exit on next loop
-		case <-c.ctx.Done():
-			log.L(bl.ctx).Debugf("Block update consumer %s closed", c.id)
+		case <-c.Ctx.Done():
+			log.L(bl.ctx).Debugf("Block update consumer %s closed", c.ID)
 			bl.mux.Lock()
-			delete(bl.consumers, *c.id)
+			delete(bl.consumers, *c.ID)
 			bl.mux.Unlock()
 		}
 	}
@@ -502,15 +531,15 @@ func (bl *blockListener) checkAndStartListenerLoop() {
 	}
 }
 
-func (bl *blockListener) addConsumer(ctx context.Context, c *blockUpdateConsumer) {
+func (bl *blockListener) AddConsumer(ctx context.Context, c *BlockUpdateConsumer) {
 	bl.checkAndStartListenerLoop()
 	bl.waitUntilStarted(ctx) // need to make sure the listener is started before adding any consumers
 	bl.mux.Lock()
 	defer bl.mux.Unlock()
-	bl.consumers[*c.id] = c
+	bl.consumers[*c.ID] = c
 }
 
-func (bl *blockListener) getHighestBlock(ctx context.Context) (uint64, bool) {
+func (bl *blockListener) GetHighestBlock(ctx context.Context) (uint64, bool) {
 	bl.checkAndStartListenerLoop()
 	// block height will be established as the first step of listener startup process
 	// so we don't need to wait for the entire startup process to finish to return the result
@@ -549,7 +578,7 @@ func (bl *blockListener) checkAndSetHighestBlock(block uint64) {
 	}
 }
 
-func (bl *blockListener) waitClosed() {
+func (bl *blockListener) WaitClosed() {
 	bl.mux.Lock()
 	listenLoopDone := bl.listenLoopDone
 	bl.mux.Unlock()

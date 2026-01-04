@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -28,26 +28,11 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
-
-// txReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
-type txReceiptJSONRPC struct {
-	BlockHash         ethtypes.HexBytes0xPrefix  `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
-	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
-	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
-	From              *ethtypes.Address0xHex     `json:"from"`
-	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
-	Logs              []*logJSONRPC              `json:"logs"`
-	Status            *ethtypes.HexInteger       `json:"status"`
-	To                *ethtypes.Address0xHex     `json:"to"`
-	TransactionHash   ethtypes.HexBytes0xPrefix  `json:"transactionHash"`
-	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
-	RevertReason      *ethtypes.HexBytes0xPrefix `json:"revertReason"`
-}
 
 // receiptExtraInfo is the version of the receipt we store under the TX.
 // - We omit the full logs from the JSON/RPC
@@ -62,23 +47,6 @@ type receiptExtraInfo struct {
 	Status            *fftypes.FFBigInt      `json:"status"`
 	ErrorMessage      *string                `json:"errorMessage"`
 	ReturnValue       *string                `json:"returnValue,omitempty"`
-}
-
-// txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
-type txInfoJSONRPC struct {
-	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
-	BlockNumber      *ethtypes.HexInteger      `json:"blockNumber"` // null if pending
-	From             *ethtypes.Address0xHex    `json:"from"`
-	Gas              *ethtypes.HexInteger      `json:"gas"`
-	GasPrice         *ethtypes.HexInteger      `json:"gasPrice"`
-	Hash             ethtypes.HexBytes0xPrefix `json:"hash"`
-	Input            ethtypes.HexBytes0xPrefix `json:"input"`
-	R                *ethtypes.HexInteger      `json:"r"`
-	S                *ethtypes.HexInteger      `json:"s"`
-	To               *ethtypes.Address0xHex    `json:"to"`
-	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
-	V                *ethtypes.HexInteger      `json:"v"`
-	Value            *ethtypes.HexInteger      `json:"value"`
 }
 
 type StructLog struct {
@@ -98,11 +66,11 @@ type txDebugTrace struct {
 	StructLogs  []StructLog       `json:"structLogs"`
 }
 
-func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*txInfoJSONRPC, error) {
-	var txInfo *txInfoJSONRPC
+func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*ethrpc.TxInfoJSONRPC, error) {
+	var txInfo *ethrpc.TxInfoJSONRPC
 	cached, ok := c.txCache.Get(hash.String())
 	if ok {
-		return cached.(*txInfoJSONRPC), nil
+		return cached.(*ethrpc.TxInfoJSONRPC), nil
 	}
 
 	rpcErr := c.backend.CallRPC(ctx, &txInfo, "eth_getTransactionByHash", hash)
@@ -206,7 +174,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	}
 
 	// Get the receipt in the back-end JSON/RPC format
-	var ethReceipt *txReceiptJSONRPC
+	var ethReceipt *ethrpc.TxReceiptJSONRPC
 	rpcErr := c.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
 	if rpcErr != nil {
 		return nil, "", rpcErr.Error()

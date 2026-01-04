@@ -64,24 +64,12 @@ func newTestConnectorWithNoBlockerFilterDefaultMocks(t *testing.T, confSetup ...
 
 	c := cc.(*ethConnector)
 	c.backend = mRPC
-	c.blockListener.backend = mRPC
+	c.blockListener.UTSetBackend(mRPC)
 	return ctx, c, mRPC, func() {
 		done()
 		mRPC.AssertExpectations(t)
 		c.WaitClosed()
 	}
-}
-
-func conditionalMockOnce(call *mock.Call, predicate func() bool, thenRun func(args mock.Arguments)) {
-	call.Run(func(args mock.Arguments) {
-		if predicate() {
-			thenRun(args)
-		} else {
-			call.Run(func(args mock.Arguments) {
-				thenRun(args)
-			}).Once()
-		}
-	}).Once()
 }
 
 func TestConnectorInit(t *testing.T) {

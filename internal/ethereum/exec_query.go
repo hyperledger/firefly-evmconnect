@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -113,7 +114,7 @@ func (c *ethConnector) callTransaction(ctx context.Context, tx *ethsigner.Transa
 			return nil, reason, revertErr
 		}
 
-		reason := mapError(callRPCMethods, rpcErr.Error())
+		reason := etherrors.MapError(etherrors.CallRPCMethods, rpcErr.Error())
 		err := rpcErr.Error()
 		if reason == ffcapi.ErrorReasonTransactionReverted {
 			err = i18n.NewError(ctx, msgs.MsgReverted, rpcErr.Error())

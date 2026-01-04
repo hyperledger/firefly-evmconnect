@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/stretchr/testify/assert"
@@ -34,16 +35,16 @@ func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
 		*args[1].(*string) = "1"
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &txInfoJSONRPC{
+		bi := &ethrpc.TxInfoJSONRPC{
 			BlockNumber: ethtypes.NewHexInteger64(100),
 		}
-		*args[1].(**txInfoJSONRPC) = bi
+		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &blockInfoJSONRPC{
+		bi := &ethrpc.BlockInfoJSONRPC{
 			Number: ethtypes.NewHexInteger64(100),
 		}
-		*args[1].(**blockInfoJSONRPC) = bi
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = bi
 	}).Maybe()
 
 	ee := &eventEnricher{
@@ -76,7 +77,7 @@ func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
 	}
 
 	// Prepare a log that matches the filter
-	log := &logJSONRPC{
+	log := &ethrpc.LogJSONRPC{
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
@@ -129,7 +130,7 @@ func TestEventEnricher_FilterEnrichEthLog_TopicNoMatch(t *testing.T) {
 	copy(otherTopic, topic0)
 	otherTopic[0] ^= 0xFF // change first byte
 
-	log := &logJSONRPC{
+	log := &ethrpc.LogJSONRPC{
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{otherTopic},
 		Data:             []byte{},
@@ -180,7 +181,7 @@ func TestEventEnricher_FilterEnrichEthLog_AddressNoMatch(t *testing.T) {
 	// Prepare a log with a different address
 	otherAddr := ethtypes.MustNewAddress("0x99887766554433221100ffeeddccbbaa99887766")
 
-	log := &logJSONRPC{
+	log := &ethrpc.LogJSONRPC{
 		Address:          otherAddr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
@@ -206,16 +207,16 @@ func TestEventEnricher_FilterEnrichEthLog_NoAddressFilter(t *testing.T) {
 		*args[1].(*string) = "1"
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &txInfoJSONRPC{
+		bi := &ethrpc.TxInfoJSONRPC{
 			BlockNumber: ethtypes.NewHexInteger64(100),
 		}
-		*args[1].(**txInfoJSONRPC) = bi
+		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &blockInfoJSONRPC{
+		bi := &ethrpc.BlockInfoJSONRPC{
 			Number: ethtypes.NewHexInteger64(100),
 		}
-		*args[1].(**blockInfoJSONRPC) = bi
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = bi
 	}).Maybe()
 
 	ee := &eventEnricher{
@@ -247,7 +248,7 @@ func TestEventEnricher_FilterEnrichEthLog_NoAddressFilter(t *testing.T) {
 
 	addr := ethtypes.MustNewAddress("0x112233445566778899aabbccddeeff0011223344")
 
-	log := &logJSONRPC{
+	log := &ethrpc.LogJSONRPC{
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
@@ -272,16 +273,16 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 		*args[1].(*string) = "1"
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &txInfoJSONRPC{
+		bi := &ethrpc.TxInfoJSONRPC{
 			BlockNumber: ethtypes.NewHexInteger64(100),
 		}
-		*args[1].(**txInfoJSONRPC) = bi
+		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &blockInfoJSONRPC{
+		bi := &ethrpc.BlockInfoJSONRPC{
 			Number: ethtypes.NewHexInteger64(100),
 		}
-		*args[1].(**blockInfoJSONRPC) = bi
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = bi
 	}).Maybe()
 
 	// Unset chainID to force IsReady call
@@ -313,7 +314,7 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 		Event:   eventABI,
 	}
 
-	log := &logJSONRPC{
+	log := &ethrpc.LogJSONRPC{
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},

@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package ethblocklistener
 
 import (
 	"context"
@@ -26,15 +26,8 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-// ReconcileConfirmationsForTransaction is the public API for reconciling transaction confirmations.
-// It delegates to the blockListener's internal reconciliation logic.
-func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
-	// Now we can start the reconciliation process
-	return c.blockListener.reconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
-}
-
 // reconcileConfirmationsForTransaction reconciles the confirmation queue for a transaction
-func (bl *blockListener) reconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
+func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 
 	// Fetch the block containing the transaction first so that we can use it to build the confirmation list
 	txBlockInfo, err := bl.getBlockInfoContainsTxHash(ctx, txHash)
@@ -183,7 +176,7 @@ func (s *splice) fillOneGap(ctx context.Context, blockListener *blockListener) e
 	// always fill from the end of the gap ( i.e. the block before the start of the late list) because
 	// the late list is our best view of the current canonical chain so working backwards from there will increase the number of blocks that we have a high confidence in
 
-	freshBlockInfo, _, err := blockListener.getBlockInfoByNumber(ctx, s.lateList[0].BlockNumber.Uint64()-1, false, "", "")
+	freshBlockInfo, _, err := blockListener.GetBlockInfoByNumber(ctx, s.lateList[0].BlockNumber.Uint64()-1, false, "", "")
 	if err != nil {
 		return err
 	}
@@ -259,7 +252,7 @@ func createLateList(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, t
 	// If the late list is empty, it may be because the chain has moved on so far and the transaction is so old that
 	// we no longer have the target block in memory. Lets try to grab the target block from the blockchain and work backwards from there.
 	if len(lateList) == 0 {
-		targetBlockInfo, _, err := blockListener.getBlockInfoByNumber(ctx, txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount, false, "", "")
+		targetBlockInfo, _, err := blockListener.GetBlockInfoByNumber(ctx, txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount, false, "", "")
 		if err != nil {
 			return nil, err
 		}

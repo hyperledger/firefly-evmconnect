@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -19,14 +19,16 @@ package ethereum
 import (
 	"context"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, reason, err := c.blockListener.getBlockInfoByNumber(ctx, req.BlockNumber.Uint64(), req.AllowCache, req.ExpectedParentHash, "")
+	blockInfo, reason, err := c.blockListener.GetBlockInfoByNumber(ctx, req.BlockNumber.Uint64(), req.AllowCache, req.ExpectedParentHash, "")
 	if err != nil {
 		return nil, reason, err
 	}
@@ -41,7 +43,7 @@ func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockI
 
 func (c *ethConnector) BlockInfoByHash(ctx context.Context, req *ffcapi.BlockInfoByHashRequest) (*ffcapi.BlockInfoByHashResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, err := c.blockListener.getBlockInfoByHash(ctx, req.BlockHash)
+	blockInfo, err := c.blockListener.GetBlockInfoByHash(ctx, req.BlockHash)
 	if err != nil {
 		return nil, ffcapi.ErrorReason(""), err
 	}
@@ -53,4 +55,15 @@ func (c *ethConnector) BlockInfoByHash(ctx context.Context, req *ffcapi.BlockInf
 	transformBlockInfo(blockInfo, &res.BlockInfo)
 	return res, "", nil
 
+}
+
+func transformBlockInfo(bi *ethrpc.BlockInfoJSONRPC, t *ffcapi.BlockInfo) {
+	t.BlockNumber = (*fftypes.FFBigInt)(bi.Number)
+	t.BlockHash = bi.Hash.String()
+	t.ParentHash = bi.ParentHash.String()
+	stringHashes := make([]string, len(bi.Transactions))
+	for i, th := range bi.Transactions {
+		stringHashes[i] = th.String()
+	}
+	t.TransactionHashes = stringHashes
 }
