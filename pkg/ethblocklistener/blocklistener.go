@@ -46,7 +46,7 @@ type BlockListenerConfig struct {
 }
 
 type BlockListener interface {
-	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error)
+	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
 	GetHighestBlock(ctx context.Context) (uint64, bool)
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, ffcapi.ErrorReason, error)

@@ -39,8 +39,6 @@ import (
 
 const testBlockFilterID1 = "block_filter_1"
 const testBlockFilterID2 = "block_filter_2"
-const testLogsFilterID1 = "log_filter_1"
-const testLogsFilterID2 = "log_filter_2"
 
 func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerConfig)) (context.Context, *blockListener, *rpcbackendmocks.Backend, func()) {
 	mRPC := &rpcbackendmocks.Backend{}
@@ -1633,11 +1631,7 @@ func TestBlockListenerWillNotCloseBlockFilterSignalChannelMoreThanOnce(t *testin
 	}
 
 	resultCount := 0
-	for {
-		select {
-		case <-loopDone:
-			resultCount++
-		}
+	for range loopDone {
 		if resultCount == loopCount {
 			break
 		}

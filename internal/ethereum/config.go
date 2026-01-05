@@ -40,6 +40,8 @@ const (
 	DeprecatedRetryMaxDelay  = "retry.maxDelay"
 	DeprecatedRetryFactor    = "retry.factor"
 
+	RetryEnabled = "retry.enabled"
+
 	MaxConcurrentRequests   = "maxConcurrentRequests"
 	TxCacheSize             = "txCacheSize"
 	HederaCompatibilityMode = "hederaCompatibilityMode"
@@ -84,4 +86,8 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(TxCacheSize, 250)
 	conf.AddKnownKey(HederaCompatibilityMode, false)
 	conf.AddKnownKey(TraceTXForRevertReason, false)
+
+	// FireFly Common default for retry enabled is false,
+	// but we want to enable it by default
+	conf.SetDefault(RetryEnabled, true)
 }

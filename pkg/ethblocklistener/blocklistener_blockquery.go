@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -35,32 +35,32 @@ func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
 
-func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, error) {
+func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, *ethrpc.TxReceiptJSONRPC, error) {
 
 	// Query the chain to find the transaction block
 	receipt, receiptErr := bl.getTransactionReceipt(ctx, txHash)
 	if receiptErr != nil {
-		return nil, receiptErr.Error()
+		return nil, nil, i18n.WrapError(ctx, receiptErr.Error(), msgs.MsgFailedToQueryReceipt, txHash)
 	}
 	if receipt == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	txBlockHash := receipt.BlockHash
 	txBlockNumber := receipt.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
 	bi, reason, err := bl.GetBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash.String())
 	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
-		return nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
+		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
 	}
 	if bi == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	return &ffcapi.MinimalBlockInfo{
 		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
 		BlockHash:   bi.Hash.String(),
 		ParentHash:  bi.ParentHash.String(),
-	}, nil
+	}, receipt, nil
 }
 
 func (bl *blockListener) getTransactionReceipt(ctx context.Context, txHash string) (ethReceipt *ethrpc.TxReceiptJSONRPC, rpcErr *rpcbackend.RPCError) {

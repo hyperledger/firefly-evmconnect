@@ -182,13 +182,54 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	if ethReceipt == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgReceiptNotAvailable, req.TransactionHash)
 	}
+
+	// Enrich the receipt with error information and build it up into the FFTM object
+	receiptResponse := c.enrichTransactionReceipt(ctx, ethReceipt)
+
+	// Try to decode the events etc. if we have filters supplied
+	if len(filters) > 0 {
+		ee := &eventEnricher{
+			connector:     c,
+			extractSigner: req.ExtractSigner,
+		}
+		for _, ethLog := range ethReceipt.Logs {
+			var bestMatch *ffcapi.Event
+			for _, f := range filters {
+				event, matches, decoded, err := ee.filterEnrichEthLog(ctx, f, methods, ethLog)
+				// If we matched and decoded, this is our best match (overriding any earlier)
+				// If we only matched, then don't override a match+decode.
+				// Example: ERC-20 & ERC-721 ABIs - both match, but only one decodes
+				if (matches && err == nil) && (decoded || bestMatch == nil) {
+					bestMatch = event
+				}
+			}
+			if bestMatch != nil {
+				receiptResponse.Events = append(receiptResponse.Events, bestMatch)
+			}
+		}
+	}
+
+	if req.IncludeLogs {
+		receiptResponse.Logs = make([]fftypes.JSONAny, len(ethReceipt.Logs))
+		for i, l := range ethReceipt.Logs {
+			b, _ := json.Marshal(l) // no error injectable here as we unmarshalled to a struct we control
+			receiptResponse.Logs[i] = *fftypes.JSONAnyPtrBytes(b)
+		}
+	}
+
+	return receiptResponse, "", nil
+}
+
+// enrichTransactionReceipt tries to get the error information
+func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt *ethrpc.TxReceiptJSONRPC) *ffcapi.TransactionReceiptResponse {
+
 	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
 
 	var returnDataString *string
 	var transactionErrorMessage *string
 
 	if !isSuccess {
-		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, req.TransactionHash, ethReceipt.RevertReason)
+		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, ethReceipt.TransactionHash.String(), ethReceipt.RevertReason)
 	}
 
 	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
@@ -217,42 +258,13 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 			ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
 		},
 	}
-	if req.IncludeLogs {
-		receiptResponse.Logs = make([]fftypes.JSONAny, len(ethReceipt.Logs))
-		for i, l := range ethReceipt.Logs {
-			b, _ := json.Marshal(l) // no error injectable here as we unmarshalled to a struct we control
-			receiptResponse.Logs[i] = *fftypes.JSONAnyPtrBytes(b)
-		}
-	}
-	// Try to decode the events etc. if we have filters supplied
-	if len(filters) > 0 {
-		ee := &eventEnricher{
-			connector:     c,
-			extractSigner: req.ExtractSigner,
-		}
-		for _, ethLog := range ethReceipt.Logs {
-			var bestMatch *ffcapi.Event
-			for _, f := range filters {
-				event, matches, decoded, err := ee.filterEnrichEthLog(ctx, f, methods, ethLog)
-				// If we matched and decoded, this is our best match (overriding any earlier)
-				// If we only matched, then don't override a match+decode.
-				// Example: ERC-20 & ERC-721 ABIs - both match, but only one decodes
-				if (matches && err == nil) && (decoded || bestMatch == nil) {
-					bestMatch = event
-				}
-			}
-			if bestMatch != nil {
-				receiptResponse.Events = append(receiptResponse.Events, bestMatch)
-			}
-		}
 
-	}
 	if ethReceipt.ContractAddress != nil {
 		location, _ := json.Marshal(map[string]string{
 			"address": ethReceipt.ContractAddress.String(),
 		})
 		receiptResponse.ContractLocation = fftypes.JSONAnyPtrBytes(location)
 	}
-	return receiptResponse, "", nil
+	return receiptResponse
 
 }

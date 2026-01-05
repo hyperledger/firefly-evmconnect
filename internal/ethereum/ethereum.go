@@ -63,7 +63,13 @@ type ethConnector struct {
 
 type Connector interface {
 	ffcapi.API
+
+	// RPC returns the http JSON/RPC client
 	RPC() rpcbackend.RPC
+
+	// WSRPC returns the websocket JSON/RPC client
+	// NOTE: websocket client will be nil if websockets are not enabled
+	WSRPC() rpcbackend.WebSocketRPCClient
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
@@ -109,12 +115,15 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		// not as a full replacement for HTTP.
 		wsConf, err = wsclient.GenerateConfig(ctx, conf)
 	}
+
 	if err == nil {
 		httpConf, err = ffresty.GenerateConfig(ctx, conf)
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	httpClient := ffresty.NewWithConfig(ctx, *httpConf)
 	c.backend = rpcbackend.NewRPCClientWithOption(httpClient, rpcbackend.RPCClientOptions{
 		MaxConcurrentRequest: conf.GetInt64(MaxConcurrentRequests),
@@ -159,6 +168,10 @@ func (c *ethConnector) RPC() rpcbackend.RPC {
 	return c.backend
 }
 
+func (c *ethConnector) WSRPC() rpcbackend.WebSocketRPCClient {
+	return c.wsBackend
+}
+
 // WaitClosed can be called after cancelling all the contexts, to wait for everything to close down
 func (c *ethConnector) WaitClosed() {
 	if c.blockListener != nil {
@@ -180,5 +193,10 @@ func withDeprecatedConfFallback[T any](conf config.Section, getter func(string) 
 // It delegates to the blockListener's internal reconciliation logic.
 func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
 	// Now we can start the reconciliation process
-	return c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
+	res, ethReceipt, err := c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
+	if err == nil && res != nil && ethReceipt != nil {
+		// We enrich the
+		res.Receipt = c.enrichTransactionReceipt(ctx, ethReceipt)
+	}
+	return res, err
 }
