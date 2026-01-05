@@ -1,5 +1,5 @@
 VGO=go
-GOFILES := $(shell find cmd internal -name '*.go' -print)
+GOFILES := $(shell find cmd pkg internal -name '*.go' -print)
 GOBIN := $(shell $(VGO) env GOPATH)/bin
 LINT := $(GOBIN)/golangci-lint
 MOCKERY := $(GOBIN)/mockery
@@ -12,7 +12,7 @@ GOGC=30
 
 all: build test go-mod-tidy
 test: deps lint
-		$(VGO) test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s
+		$(VGO) test ./pkg/... ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s
 coverage.html:
 		$(VGO) tool cover -html=coverage.txt
 coverage: test coverage.html

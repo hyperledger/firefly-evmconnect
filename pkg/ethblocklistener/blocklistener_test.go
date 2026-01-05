@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,6 +43,8 @@ import (
 const testBlockFilterID1 = "block_filter_1"
 const testBlockFilterID2 = "block_filter_2"
 
+const shortDelay = 10 * time.Millisecond
+
 func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc)) (context.Context, *blockListener, *rpcbackendmocks.Backend, func()) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
@@ -57,7 +60,7 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 		fn(conf, mRPC, cancelCtx)
 	}
 	ibl, err := NewBlockListenerSupplyBackend(ctx, &retry.Retry{
-		InitialDelay: 1 * time.Microsecond,
+		InitialDelay: shortDelay,
 		MaximumDelay: 50 * time.Millisecond,
 		Factor:       2.0,
 	}, conf, mRPC, nil)
@@ -70,8 +73,11 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 	}
 }
 
+// Simple util to allow a routine to block until another routine reaches a given point
 type testLatch struct {
-	c chan struct{}
+	mux    sync.Mutex
+	closed bool
+	c      chan struct{}
 }
 
 func newTestLatch() *testLatch {
@@ -79,9 +85,11 @@ func newTestLatch() *testLatch {
 }
 
 func (tl *testLatch) complete() {
-	select {
-	case tl.c <- struct{}{}:
-	default:
+	tl.mux.Lock()
+	defer tl.mux.Unlock()
+	if !tl.closed {
+		tl.closed = true
+		close(tl.c)
 	}
 }
 
@@ -150,8 +158,9 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 		conf.UnstableHeadLength = 2 // check wrapping
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
@@ -163,6 +172,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -212,6 +222,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -331,8 +342,9 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -343,6 +355,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -401,6 +414,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	require.Equal(t, []string{
@@ -429,8 +443,9 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -442,6 +457,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001HashA,
@@ -497,6 +513,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -521,8 +538,9 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -533,6 +551,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001HashB, // valid hash is in the front of the array, so will need to re-build the chain
@@ -613,6 +632,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -637,8 +657,9 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 	block1002HashA := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -649,6 +670,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -705,6 +727,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -729,9 +752,10 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 	block1002Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
 
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -742,6 +766,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -799,6 +824,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -823,8 +849,9 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -835,6 +862,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -899,6 +927,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -940,8 +969,9 @@ func TestBlockListenerGap(t *testing.T) {
 	block1004Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1005Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -952,6 +982,7 @@ func TestBlockListenerGap(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -1049,6 +1080,7 @@ func TestBlockListenerGap(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -1082,8 +1114,9 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 	block1003HashA := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -1094,6 +1127,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1001Hash,
@@ -1160,6 +1194,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -1187,8 +1222,9 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 	block1002HashB := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	block1003HashB := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
+	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -1199,6 +1235,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 			*hbh = testBlockFilterID1
 		})
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			startLatch.waitComplete()
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = []ethtypes.HexBytes0xPrefix{
 				block1002HashA,
@@ -1269,6 +1306,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	bu := <-updates
 	assert.Equal(t, []string{
@@ -1298,7 +1336,7 @@ func TestBlockListenerClosed(t *testing.T) {
 
 	waitCalled := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -1351,7 +1389,7 @@ func TestBlockListenerBlockNotFound(t *testing.T) {
 
 	waitCalled := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 		block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
@@ -1393,7 +1431,7 @@ func TestBlockListenerBlockHashFailed(t *testing.T) {
 
 	waitCalled := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 		block1003Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
@@ -1435,7 +1473,7 @@ func TestBlockListenerProcessNonStandardHashRejectedWhenNotInHederaCompatibility
 
 	waitCalled := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 		conf.HederaCompatibilityMode = false
 
 		block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93f1fae0eb6d4b24ca30aee13f29c83cc9")
@@ -1475,7 +1513,7 @@ func TestBlockListenerProcessNonStandardHashRejectedWhenWrongSizeForHedera(t *te
 
 	waitCalled := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 		conf.HederaCompatibilityMode = true
 
 		block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef")
@@ -1515,7 +1553,7 @@ func TestBlockListenerProcessNonStandardHashAcceptedWhenInHederaCompatbilityMode
 
 	waitCalled := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
-		conf.BlockPollingInterval = 1 * time.Microsecond
+		conf.BlockPollingInterval = shortDelay
 		conf.HederaCompatibilityMode = true
 
 		block1003Hash := ethtypes.MustNewHexBytes0xPrefix("0xef177df3b87beed681b1557e8ba7c3ecbd7e4db83d87b66c1e86aa484937ab93f1fae0eb6d4b24ca30aee13f29c83cc9")
@@ -1559,7 +1597,7 @@ func TestBlockListenerProcessNonStandardHashAcceptedWhenInHederaCompatbilityMode
 func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 
 	_, bl, mRPC, done := newTestBlockListener(t)
-	bl.BlockPollingInterval = 1 * time.Microsecond
+	bl.BlockPollingInterval = shortDelay
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -1588,7 +1626,7 @@ func TestBlockListenerReestablishBlockFilter(t *testing.T) {
 
 func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
-	bl.BlockPollingInterval = 1 * time.Microsecond
+	bl.BlockPollingInterval = shortDelay
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -1608,7 +1646,7 @@ func TestBlockListenerReestablishBlockFilterFail(t *testing.T) {
 
 func TestBlockListenerWaitUntilStartedOnlyReturnsAfterEstablishingBlockFilter(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
-	bl.BlockPollingInterval = 1 * time.Microsecond
+	bl.BlockPollingInterval = shortDelay
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
