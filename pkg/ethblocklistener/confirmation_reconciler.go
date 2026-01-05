@@ -181,7 +181,7 @@ func (s *splice) fillOneGap(ctx context.Context, blockListener *blockListener) e
 	// always fill from the end of the gap ( i.e. the block before the start of the late list) because
 	// the late list is our best view of the current canonical chain so working backwards from there will increase the number of blocks that we have a high confidence in
 
-	freshBlockInfo, _, err := blockListener.GetBlockInfoByNumber(ctx, s.lateList[0].BlockNumber.Uint64()-1, false, "", "")
+	freshBlockInfo, err := blockListener.GetBlockInfoByNumber(ctx, s.lateList[0].BlockNumber.Uint64()-1, false, "", "")
 	if err != nil {
 		return err
 	}
@@ -258,13 +258,16 @@ func createLateList(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, t
 	// If the late list is empty, it may be because the chain has moved on so far and the transaction is so old that
 	// we no longer have the target block in memory. Lets try to grab the target block from the blockchain and work backwards from there.
 	if len(lateList) == 0 {
-		targetBlockInfo, _, err := blockListener.GetBlockInfoByNumber(ctx, txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount, false, "", "")
+		targetBlockInfo, err := blockListener.GetBlockInfoByNumber(ctx, txBlockInfo.BlockNumber.Uint64()+targetConfirmationCount, false, "", "")
 		if err != nil {
 			return nil, err
 		}
+		if targetBlockInfo == nil {
+			return nil, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
+		}
 		lateList = []*ffcapi.MinimalBlockInfo{
 			{
-				BlockNumber: fftypes.FFuint64(targetBlockInfo.Number.BigInt().Uint64()),
+				BlockNumber: fftypes.FFuint64(targetBlockInfo.Number.Uint64()),
 				BlockHash:   targetBlockInfo.Hash.String(),
 				ParentHash:  targetBlockInfo.ParentHash.String(),
 			},

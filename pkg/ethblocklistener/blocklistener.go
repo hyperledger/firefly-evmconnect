@@ -49,7 +49,7 @@ type BlockListener interface {
 	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
 	GetHighestBlock(ctx context.Context) (uint64, bool)
-	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, ffcapi.ErrorReason, error)
+	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
 	WaitClosed()
 	UTSetBackend(rpcbackend.RPC)
@@ -426,8 +426,8 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 		var bi *ethrpc.BlockInfoJSONRPC
 		var reason ffcapi.ErrorReason
 		err := bl.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
-			bi, reason, err = bl.GetBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "", "")
-			return reason != ffcapi.ErrorReasonNotFound, err
+			bi, err = bl.GetBlockInfoByNumber(bl.ctx, nextBlockNumber, false, "", "")
+			return true, err
 		})
 		if err != nil {
 			if reason != ffcapi.ErrorReasonNotFound {
@@ -480,16 +480,13 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 			log.L(bl.ctx).Debugf("Canonical chain checking from last block: %d", startingNumber)
 		}
 		var freshBlockInfo *ethrpc.BlockInfoJSONRPC
-		var reason ffcapi.ErrorReason
 		err := bl.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
 			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.BlockNumber.Uint64())
-			freshBlockInfo, reason, err = bl.GetBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
-			return reason != ffcapi.ErrorReasonNotFound, err
+			freshBlockInfo, err = bl.GetBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
+			return true, err
 		})
 		if err != nil {
-			if reason != ffcapi.ErrorReasonNotFound {
-				return nil // Context must have been cancelled
-			}
+			return nil // Context must have been cancelled
 		}
 
 		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.BlockHash {

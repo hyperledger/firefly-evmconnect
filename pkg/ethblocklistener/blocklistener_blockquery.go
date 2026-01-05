@@ -48,11 +48,12 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	txBlockHash := receipt.BlockHash
 	txBlockNumber := receipt.BlockNumber.Uint64()
 	// get the parent hash of the transaction block
-	bi, reason, err := bl.GetBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash.String())
-	if err != nil && reason != ffcapi.ErrorReasonNotFound { // if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
+	bi, err := bl.GetBlockInfoByNumber(ctx, txBlockNumber, true, "", txBlockHash.String())
+	if err != nil {
 		return nil, nil, i18n.WrapError(ctx, err, msgs.MsgFailedToQueryBlockInfo, txHash)
 	}
 	if bi == nil {
+		// if the block info is not found, then there could be a fork, twe don't throw error in this case and treating it as block not found
 		return nil, nil, nil
 	}
 
@@ -69,7 +70,7 @@ func (bl *blockListener) getTransactionReceipt(ctx context.Context, txHash strin
 	return
 }
 
-func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, ffcapi.ErrorReason, error) {
+func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error) {
 	var blockInfo *ethrpc.BlockInfoJSONRPC
 	if allowCache {
 		cached, ok := bl.blockCache.Get(strconv.FormatUint(blockNumber, 10))
@@ -85,15 +86,15 @@ func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber u
 	if blockInfo == nil {
 		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexIntegerU64(blockNumber), false /* only the txn hashes */)
 		if rpcErr != nil {
-			return nil, ffcapi.ErrorReason(""), rpcErr.Error()
+			return nil, rpcErr.Error()
 		}
 		if blockInfo == nil {
-			return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
+			return nil, nil
 		}
 		bl.addToBlockCache(blockInfo)
 	}
 
-	return blockInfo, "", nil
+	return blockInfo, nil
 }
 
 func (bl *blockListener) GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error) {

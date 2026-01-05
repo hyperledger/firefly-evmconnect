@@ -17,6 +17,8 @@
 package msgs
 
 import (
+	"net/http"
+
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"golang.org/x/text/language"
 )
@@ -79,4 +81,5 @@ var (
 	MsgTransactionNotFound                      = ffe("FF23061", "Transaction not found: %s")
 	MsgInMemoryPartialChainNotCaughtUp          = ffe("FF23062", "In-memory partial chain is waiting for the transaction block %d (%s) to be indexed")
 	MsgFailedToBuildExistingConfirmationInvalid = ffe("FF23063", "Failed to build confirmations, existing confirmations are not valid")
+	MsgFromBlockInvalid                         = ffe("FF23064", "From block invalid. Must be 'earliest', 'latest' or a decimal: %s", http.StatusBadRequest)
 )

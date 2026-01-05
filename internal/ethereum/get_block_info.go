@@ -28,9 +28,9 @@ import (
 
 func (c *ethConnector) BlockInfoByNumber(ctx context.Context, req *ffcapi.BlockInfoByNumberRequest) (*ffcapi.BlockInfoByNumberResponse, ffcapi.ErrorReason, error) {
 
-	blockInfo, reason, err := c.blockListener.GetBlockInfoByNumber(ctx, req.BlockNumber.Uint64(), req.AllowCache, req.ExpectedParentHash, "")
+	blockInfo, err := c.blockListener.GetBlockInfoByNumber(ctx, req.BlockNumber.Uint64(), req.AllowCache, req.ExpectedParentHash, "")
 	if err != nil {
-		return nil, reason, err
+		return nil, "", err
 	}
 	if blockInfo == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
