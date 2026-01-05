@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package ethblocklistener
 
 import (
 	"container/list"
@@ -27,6 +27,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -34,11 +35,45 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const sampleJSONRPCReceipt = `{
+	"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+	"blockNumber": "0x7b9",
+	"contractAddress": "0x87ae94ab290932c4e6269648bb47c86978af4436",
+	"cumulativeGasUsed": "0x8414",
+	"effectiveGasPrice": "0x0",
+	"from": "0x2b1c769ef5ad304a4889f2a07a6617cd935849ae",
+	"gasUsed": "0x8414",
+	"logs": [
+	{
+		"address": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
+		"topics": [
+			"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+			"0x0000000000000000000000000000000000000000000000000000000000000000",
+			"0x0000000000000000000000005dae1910885cde875de559333d12722357e69c42"
+		],
+		"data": "0x000000000000000000000000000000000000000000000000016345785d8a0000",
+		"blockNumber": "0x5",
+		"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+		"transactionIndex": "0x0",
+		"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+		"logIndex": "0x0",
+		"removed": false
+	}
+	],
+	"logsBloom": "0x00000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000100000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000",
+	"status": "0x1",
+	"to": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
+	"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+	"transactionIndex": "0x1e",
+	"type": "0x0"
+}`
+
 // Tests of the reconcileConfirmationsForTransaction function
 
 func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	// Mock for TransactionReceipt call - return nil to simulate transaction not found
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", generateTestHash(100)).Return(nil).Run(func(args mock.Arguments) {
@@ -47,7 +82,7 @@ func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) 
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100), nil, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100), nil, 5)
 
 	// Assertions - expect an error when transaction doesn't exist
 	assert.Error(t, err)
@@ -59,7 +94,8 @@ func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) 
 
 func TestReconcileConfirmationsForTransaction_ReceiptRPCCallError(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	// Mock for TransactionReceipt call - return error to simulate RPC call error
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", generateTestHash(100)).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
@@ -68,7 +104,7 @@ func TestReconcileConfirmationsForTransaction_ReceiptRPCCallError(t *testing.T) 
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100), []*ffcapi.MinimalBlockInfo{}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100), []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect an error when RPC call fails
 	assert.Error(t, err)
@@ -77,7 +113,8 @@ func TestReconcileConfirmationsForTransaction_ReceiptRPCCallError(t *testing.T) 
 
 func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	// Mock for TransactionReceipt call
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
@@ -99,7 +136,7 @@ func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
 		{BlockNumber: fftypes.FFuint64(1977), BlockHash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
 	}, 5)
 
@@ -113,7 +150,8 @@ func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 
 func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
 		mock.MatchedBy(func(txHash string) bool {
@@ -131,7 +169,7 @@ func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect an error when RPC call fails
 	assert.Error(t, err)
@@ -140,8 +178,8 @@ func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 
 func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	bl := c.blockListener
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
@@ -161,7 +199,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == "1977"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(fakeParentHash),
@@ -169,7 +207,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect the transaction block to be returned
 	// we trust the block retrieve by getBlockInfoContainsTxHash function more than the canonical chain
@@ -182,14 +220,14 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	assert.False(t, result.Confirmed)
 	assert.Len(t, result.Confirmations, 2)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-	assert.NotNil(t, result.Receipt)
+	assert.NotNil(t, receipt)
 	mRPC.AssertExpectations(t)
 }
 
 func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	bl := c.blockListener
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
@@ -207,7 +245,7 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == "1977"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
@@ -215,7 +253,7 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect the existing confirmation queue to be returned because the tx block doesn't match the same block number in the canonical chain
 	assert.NoError(t, err)
@@ -227,15 +265,15 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
 	}, result.Confirmations)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-	assert.NotNil(t, result.Receipt)
+	assert.NotNil(t, receipt)
 
 	mRPC.AssertExpectations(t)
 }
 
 func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	bl := c.blockListener
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
@@ -253,7 +291,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == "1977"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
@@ -261,7 +299,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
 		{BlockNumber: fftypes.FFuint64(1979), BlockHash: generateTestHash(1979), ParentHash: generateTestHash(1978)},
 		{BlockNumber: fftypes.FFuint64(1980), BlockHash: generateTestHash(1980), ParentHash: generateTestHash(1979)},
 	}, 5)
@@ -276,7 +314,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
 	}, result.Confirmations)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-	assert.NotNil(t, result.Receipt)
+	assert.NotNil(t, receipt)
 	mRPC.AssertExpectations(t)
 }
 
@@ -823,7 +861,7 @@ func TestBuildConfirmationList_NilBlockInfo(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 		return bn.BigInt().String() == strconv.FormatUint(105, 10)
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = nil
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = nil
 	})
 
 	ctx := context.Background()
@@ -1287,7 +1325,7 @@ func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, sta
 			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
 				return bn.BigInt().String() == strconv.FormatUint(blockNumber, 10)
 			}), false).Return(nil).Run(func(args mock.Arguments) {
-				*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
+				*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
 					Number:     ethtypes.NewHexInteger64(int64(blockNumber)),
 					Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber)),
 					ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber - 1)),
