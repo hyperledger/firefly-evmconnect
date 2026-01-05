@@ -85,8 +85,7 @@ type blockListener struct {
 	BlockListenerConfig
 
 	//  canonical chain
-	unstableHeadLength int
-	canonicalChain     *list.List
+	canonicalChain *list.List
 }
 
 func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListenerConfig, httpConf *ffresty.Config, wsConf *wsclient.WSConfig) (bl BlockListener, err error) {
@@ -197,6 +196,16 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 	})
 }
 
+func (bl *blockListener) waitNextIteration() bool {
+	select {
+	case <-bl.ctx.Done():
+		return false
+	case <-time.After(bl.BlockPollingInterval):
+	case <-bl.newHeadsTap:
+	}
+	return true
+}
+
 func (bl *blockListener) listenLoop() {
 	defer close(bl.listenLoopDone)
 
@@ -219,12 +228,9 @@ func (bl *blockListener) listenLoop() {
 		} else {
 			// Sleep for the polling interval, or until we're shoulder tapped by the newHeads listener
 			if !firstIteration {
-				select {
-				case <-bl.ctx.Done():
+				if !bl.waitNextIteration() {
 					log.L(bl.ctx).Debugf("Block listener loop stopping")
 					return
-				case <-time.After(bl.BlockPollingInterval):
-				case <-bl.newHeadsTap:
 				}
 			} else {
 				firstIteration = false
@@ -384,7 +390,7 @@ func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *
 	}
 
 	// Trim the amount of history we keep based on the configured amount of instability at the front of the chain
-	for bl.canonicalChain.Len() > bl.unstableHeadLength {
+	for bl.canonicalChain.Len() > bl.UnstableHeadLength {
 		_ = bl.canonicalChain.Remove(bl.canonicalChain.Front())
 	}
 
@@ -502,7 +508,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 	}
 
 	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.BlockNumber.Uint64() {
-		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.BlockNumber.Uint64(), bl.unstableHeadLength)
+		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.BlockNumber.Uint64(), bl.UnstableHeadLength)
 	}
 	return lastValidBlock
 }
