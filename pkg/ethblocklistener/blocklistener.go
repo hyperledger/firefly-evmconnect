@@ -47,6 +47,7 @@ type BlockListenerConfig struct {
 
 type BlockListener interface {
 	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
+	ConfiguredUnstableHeadLength() int // provides a getter on the configuration for unstable head length - as this information is important to consumers (might be multiple from this block listener)
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
 	GetHighestBlock(ctx context.Context) (uint64, bool)
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
@@ -122,6 +123,10 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 
 func (bl *blockListener) UTSetBackend(backend rpcbackend.RPC) {
 	bl.backend = backend
+}
+
+func (bl *blockListener) ConfiguredUnstableHeadLength() int {
+	return bl.BlockListenerConfig.UnstableHeadLength
 }
 
 // setting block filter status updates that new block filter has been created

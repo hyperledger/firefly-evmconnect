@@ -66,6 +66,8 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 	}, conf, mRPC, nil)
 	assert.NoError(t, err)
 
+	require.Equal(t, conf.UnstableHeadLength, ibl.ConfiguredUnstableHeadLength())
+
 	return ctx, ibl.(*blockListener), mRPC, func() {
 		cancelCtx()
 		mRPC.AssertExpectations(t)
