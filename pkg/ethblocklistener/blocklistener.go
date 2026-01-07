@@ -43,7 +43,7 @@ type BlockListenerConfig struct {
 	BlockPollingInterval    time.Duration `json:"blockPollingInterval"`
 	HederaCompatibilityMode bool          `json:"hederaCompatibilityMode"`
 	BlockCacheSize          int           `json:"blockCacheSize"`
-	CacheLogsBloom          bool          `json:"cacheLogsBloom"`
+	IncludeLogsBloom        bool          `json:"includeLogsBloom"`
 }
 
 type BlockListener interface {

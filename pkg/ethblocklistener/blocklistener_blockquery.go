@@ -31,9 +31,6 @@ import (
 )
 
 func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
-	if !bl.CacheLogsBloom {
-		blockInfo.LogsBloom = nil
-	}
 	bl.blockCache.Add(blockInfo.Hash.String(), blockInfo)
 	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }
@@ -94,6 +91,9 @@ func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber u
 		if blockInfo == nil {
 			return nil, nil
 		}
+		if !bl.IncludeLogsBloom {
+			blockInfo.LogsBloom = nil
+		}
 		bl.addToBlockCache(blockInfo)
 	}
 
@@ -115,6 +115,9 @@ func (bl *blockListener) GetBlockInfoByHash(ctx context.Context, hash0xString st
 				err = rpcErr.Error()
 			}
 			return nil, err
+		}
+		if !bl.IncludeLogsBloom {
+			blockInfo.LogsBloom = nil
 		}
 		bl.addToBlockCache(blockInfo)
 	}
