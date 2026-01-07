@@ -31,6 +31,9 @@ import (
 )
 
 func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
+	if !bl.CacheLogsBloom {
+		blockInfo.LogsBloom = nil
+	}
 	bl.blockCache.Add(blockInfo.Hash.String(), blockInfo)
 	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
 }

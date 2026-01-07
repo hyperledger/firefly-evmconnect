@@ -76,5 +76,6 @@ type BlockInfoJSONRPC struct {
 	Hash         ethtypes.HexBytes0xPrefix   `json:"hash"`
 	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash"`
 	Timestamp    *ethtypes.HexInteger        `json:"timestamp"`
+	LogsBloom    ethtypes.HexBytes0xPrefix   `json:"logsBloom"`
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
 }
