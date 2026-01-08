@@ -17,7 +17,6 @@
 package ethrpc
 
 import (
-	"context"
 	"encoding/json"
 	"math/big"
 
@@ -43,15 +42,15 @@ type TxReceiptJSONRPC struct {
 	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason"`
 }
 
-func (txr *TxReceiptJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (jb []byte, err error) {
+func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb []byte, err error) {
 	logsArray := make([]json.RawMessage, len(txr.Logs))
 	for i, l := range txr.Logs {
 		if err == nil {
-			logsArray[i], err = l.MarshalFormat(ctx, format, opts...)
+			logsArray[i], err = l.MarshalFormat(jss, opts...)
 		}
 	}
 	if err == nil {
-		jb, err = format.MarshalFormattedMap(ctx, map[string]any{
+		jb, err = jss.MarshalFormattedMap(map[string]any{
 			"transactionHash":   ([]byte)(txr.TransactionHash),
 			"transactionIndex":  (*big.Int)(txr.TransactionIndex),
 			"blockHash":         ([]byte)(txr.BlockHash),
@@ -94,8 +93,8 @@ type TxInfoJSONRPC struct {
 	S                *ethtypes.HexInteger      `json:"s"`
 }
 
-func (txi *TxInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (_ []byte, err error) {
-	return format.MarshalFormattedMap(ctx, map[string]any{
+func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ []byte, err error) {
+	return jss.MarshalFormattedMap(map[string]any{
 		"blockHash":        ([]byte)(txi.BlockHash),
 		"blockNumber":      (*big.Int)(txi.BlockNumber),
 		"chainId":          (*big.Int)(txi.ChainID),
@@ -134,12 +133,12 @@ type LogJSONRPC struct {
 	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
 }
 
-func (l *LogJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (_ []byte, err error) {
+func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ []byte, err error) {
 	topicsArray := make([]any, len(l.Topics))
 	for i, t := range l.Topics {
 		topicsArray[i] = ([]byte)(t)
 	}
-	return format.MarshalFormattedMap(ctx, map[string]any{
+	return jss.MarshalFormattedMap(map[string]any{
 		"removed":          l.Removed,
 		"logIndex":         (*big.Int)(l.LogIndex),
 		"transactionIndex": (*big.Int)(l.TransactionIndex),
@@ -162,12 +161,12 @@ type BlockInfoJSONRPC struct {
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
 }
 
-func (bi *BlockInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (_ []byte, err error) {
+func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ []byte, err error) {
 	txnArray := make([]any, len(bi.Transactions))
 	for i, t := range bi.Transactions {
 		txnArray[i] = ([]byte)(t)
 	}
-	return format.MarshalFormattedMap(ctx, map[string]any{
+	return jss.MarshalFormattedMap(map[string]any{
 		"number":       (*big.Int)(bi.Number),
 		"hash":         ([]byte)(bi.Hash),
 		"parentHash":   ([]byte)(bi.ParentHash),

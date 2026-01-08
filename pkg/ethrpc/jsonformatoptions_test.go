@@ -258,9 +258,9 @@ func TestJSONFormatOptionErrors(t *testing.T) {
 }
 
 func TestFormatStructVariation(t *testing.T) {
-	var jfo JSONFormatOptions = "pretty=true"
+	jss := testJSONSerializationSet(t, "pretty=true")
 
-	ethSerialized, err := jfo.MarshalFormattedMap(context.Background(), map[string]any{
+	ethSerialized, err := jss.MarshalFormattedMap(map[string]any{
 		"float1": big.NewFloat(123.456),
 		"nested": map[string]any{
 			"float2": big.NewFloat(234.567),
@@ -275,4 +275,10 @@ func TestFormatStructVariation(t *testing.T) {
 		}
 	}`, string(ethSerialized))
 
+}
+
+func testJSONSerializationSet(t *testing.T, jfo JSONFormatOptions) *JSONSerializerSet {
+	jss, err := jfo.GetSerializerSet(context.Background(), false)
+	require.NoError(t, err)
+	return jss
 }

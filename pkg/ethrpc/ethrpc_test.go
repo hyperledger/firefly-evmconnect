@@ -17,7 +17,6 @@
 package ethrpc
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -108,9 +107,9 @@ func TestFormatTransaction(t *testing.T) {
 	err := json.Unmarshal([]byte(sampleTransaction), &txInfo)
 	require.NoError(t, err)
 
-	var jfo JSONFormatOptions = "number=hex&pretty=true"
+	jss := testJSONSerializationSet(t, "number=hex&pretty=true")
 
-	ethSerialized, err := txInfo.MarshalFormat(context.Background(), jfo)
+	ethSerialized, err := txInfo.MarshalFormat(jss)
 	fmt.Println((string)(ethSerialized))
 	require.NoError(t, err)
 	require.JSONEq(t, sampleTransaction, string(ethSerialized))
@@ -121,9 +120,9 @@ func TestFormatReceipt(t *testing.T) {
 	err := json.Unmarshal([]byte(sampleReceipt), &receipt)
 	require.NoError(t, err)
 
-	var jfo JSONFormatOptions = "number=hex&pretty=true"
+	jss := testJSONSerializationSet(t, "number=hex&pretty=true")
 
-	ethSerialized, err := receipt.MarshalFormat(context.Background(), jfo)
+	ethSerialized, err := receipt.MarshalFormat(jss)
 	fmt.Println((string)(ethSerialized))
 	require.NoError(t, err)
 	require.JSONEq(t, sampleReceipt, string(ethSerialized))
@@ -139,9 +138,9 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 		LogsBloom:       ethtypes.MustNewHexBytes0xPrefix("0x000011112222"), // to be redacted
 	}
 
-	var jfo JSONFormatOptions = "number=json-number&bytes=base64&address=checksum"
+	jss := testJSONSerializationSet(t, "number=json-number&bytes=base64&address=checksum")
 
-	ethSerialized, err := receipt.MarshalFormat(context.Background(), jfo, MarshalOption{
+	ethSerialized, err := receipt.MarshalFormat(jss, MarshalOption{
 		RedactFields: []string{"logsBloom"},
 	})
 	fmt.Println((string)(ethSerialized))
@@ -170,9 +169,9 @@ func TestFormatBlock(t *testing.T) {
 	err := json.Unmarshal([]byte(sampleBlock), &blockInfo)
 	require.NoError(t, err)
 
-	var jfo JSONFormatOptions = "pretty=true"
+	jss := testJSONSerializationSet(t, "pretty=true")
 
-	ethSerialized, err := blockInfo.MarshalFormat(context.Background(), jfo, MarshalOption{
+	ethSerialized, err := blockInfo.MarshalFormat(jss, MarshalOption{
 		RedactFields: []string{"logsBloom"},
 	})
 	fmt.Println((string)(ethSerialized))

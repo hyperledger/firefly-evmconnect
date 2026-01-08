@@ -153,16 +153,11 @@ type MarshalOption struct {
 
 // MarshalFormattedMap takes a map that contains certain pre-selected types (see below switch) and does
 // JSON marshalling adhering to the request of the users.
-func (jfo JSONFormatOptions) MarshalFormattedMap(ctx context.Context, value map[string]any, opts ...MarshalOption) (data []byte, err error) {
-	ss, err := jfo.GetSerializerSet(ctx, false)
-	if err == nil {
-		if ss.Pretty {
-			data, err = json.MarshalIndent(ss.buildFormatMap(value, opts), "", "  ")
-		} else {
-			data, err = json.Marshal(ss.buildFormatMap(value, opts))
-		}
+func (ss *JSONSerializerSet) MarshalFormattedMap(value map[string]any, opts ...MarshalOption) (data []byte, err error) {
+	if ss.Pretty {
+		return json.MarshalIndent(ss.buildFormatMap(value, opts), "", "  ")
 	}
-	return data, err
+	return json.Marshal(ss.buildFormatMap(value, opts))
 }
 
 func (ss *JSONSerializerSet) buildFormatMap(valueMap map[string]any, opts []MarshalOption) map[string]any {
