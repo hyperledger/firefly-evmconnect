@@ -153,7 +153,7 @@ type MarshalOption struct {
 
 // MarshalFormattedMap takes a map that contains certain pre-selected types (see below switch) and does
 // JSON marshalling adhering to the request of the users.
-func (ss *JSONSerializerSet) MarshalFormattedMap(value map[string]any, opts ...MarshalOption) (data []byte, err error) {
+func (ss *JSONSerializerSet) MarshalFormattedMap(value map[string]any, opts ...MarshalOption) (data json.RawMessage, err error) {
 	if ss.Pretty {
 		return json.MarshalIndent(ss.buildFormatMap(value, opts), "", "  ")
 	}

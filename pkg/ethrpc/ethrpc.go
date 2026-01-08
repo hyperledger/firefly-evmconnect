@@ -42,7 +42,7 @@ type TxReceiptJSONRPC struct {
 	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason"`
 }
 
-func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb []byte, err error) {
+func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
 	logsArray := make([]json.RawMessage, len(txr.Logs))
 	for i, l := range txr.Logs {
 		if err == nil {
@@ -93,7 +93,7 @@ type TxInfoJSONRPC struct {
 	S                *ethtypes.HexInteger      `json:"s"`
 }
 
-func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ []byte, err error) {
+func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
 	return jss.MarshalFormattedMap(map[string]any{
 		"blockHash":        ([]byte)(txi.BlockHash),
 		"blockNumber":      (*big.Int)(txi.BlockNumber),
@@ -133,7 +133,7 @@ type LogJSONRPC struct {
 	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
 }
 
-func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ []byte, err error) {
+func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
 	topicsArray := make([]any, len(l.Topics))
 	for i, t := range l.Topics {
 		topicsArray[i] = ([]byte)(t)
@@ -161,7 +161,7 @@ type BlockInfoJSONRPC struct {
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
 }
 
-func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ []byte, err error) {
+func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
 	txnArray := make([]any, len(bi.Transactions))
 	for i, t := range bi.Transactions {
 		txnArray[i] = ([]byte)(t)
