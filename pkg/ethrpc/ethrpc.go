@@ -26,56 +26,59 @@ import (
 
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
 type TxReceiptJSONRPC struct {
-	TransactionHash   ethtypes.HexBytes0xPrefix  `json:"transactionHash"`
-	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
-	BlockHash         ethtypes.HexBytes0xPrefix  `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
-	From              *ethtypes.Address0xHex     `json:"from"`
-	To                *ethtypes.Address0xHex     `json:"to"`
-	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
-	EffectiveGasPrice *ethtypes.HexInteger       `json:"effectiveGasPrice"`
-	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
-	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
-	Logs              []*LogJSONRPC              `json:"logs"`
-	LogsBloom         ethtypes.HexBytes0xPrefix  `json:"logsBloom"`
-	Type              *ethtypes.HexInteger       `json:"type"`
-	Status            *ethtypes.HexInteger       `json:"status"`
-	RevertReason      *ethtypes.HexBytes0xPrefix `json:"revertReason"`
+	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
+	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
+	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash"`
+	BlockNumber       *ethtypes.HexInteger      `json:"blockNumber"`
+	From              *ethtypes.Address0xHex    `json:"from"`
+	To                *ethtypes.Address0xHex    `json:"to"`
+	CumulativeGasUsed *ethtypes.HexInteger      `json:"cumulativeGasUsed"`
+	EffectiveGasPrice *ethtypes.HexInteger      `json:"effectiveGasPrice"`
+	GasUsed           *ethtypes.HexInteger      `json:"gasUsed"`
+	ContractAddress   *ethtypes.Address0xHex    `json:"contractAddress"`
+	Logs              []*LogJSONRPC             `json:"logs"`
+	LogsBloom         ethtypes.HexBytes0xPrefix `json:"logsBloom"`
+	Type              *ethtypes.HexInteger      `json:"type"`
+	Status            *ethtypes.HexInteger      `json:"status"`
+	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason"`
 }
 
-func (txr *TxReceiptJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+func (txr *TxReceiptJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (jb []byte, err error) {
 	logsArray := make([]json.RawMessage, len(txr.Logs))
 	for i, l := range txr.Logs {
-		if logsArray[i], err = l.MarshalFormat(ctx, format); err != nil {
-			return nil, err
+		if err == nil {
+			logsArray[i], err = l.MarshalFormat(ctx, format, opts...)
 		}
 	}
-	formatMap := map[string]any{
-		"transactionHash":   ([]byte)(txr.TransactionHash),
-		"transactionIndex":  (*big.Int)(txr.TransactionIndex),
-		"blockHash":         ([]byte)(txr.BlockHash),
-		"blockNumber":       (*big.Int)(txr.BlockNumber),
-		"from":              (*[20]byte)(txr.From),
-		"to":                (*[20]byte)(txr.To),
-		"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
-		"effectiveGasPrice": (*big.Int)(txr.EffectiveGasPrice),
-		"gasUsed":           (*big.Int)(txr.GasUsed),
-		"contractAddress":   (*[20]byte)(txr.ContractAddress),
-		"logs":              logsArray,
-		"logsBloom":         ([]byte)(txr.LogsBloom),
-		"status":            (*big.Int)(txr.Status),
-		"type":              (*big.Int)(txr.Type),
+	if err == nil {
+		jb, err = format.MarshalFormattedMap(ctx, map[string]any{
+			"transactionHash":   ([]byte)(txr.TransactionHash),
+			"transactionIndex":  (*big.Int)(txr.TransactionIndex),
+			"blockHash":         ([]byte)(txr.BlockHash),
+			"blockNumber":       (*big.Int)(txr.BlockNumber),
+			"from":              (*[20]byte)(txr.From),
+			"to":                (*[20]byte)(txr.To),
+			"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
+			"effectiveGasPrice": (*big.Int)(txr.EffectiveGasPrice),
+			"gasUsed":           (*big.Int)(txr.GasUsed),
+			"contractAddress":   (*[20]byte)(txr.ContractAddress),
+			"logs":              logsArray,
+			"logsBloom":         ([]byte)(txr.LogsBloom),
+			"status":            (*big.Int)(txr.Status),
+			"type":              (*big.Int)(txr.Type),
+			"revertReason":      ([]byte)(txr.RevertReason),
+		}, append(opts, MarshalOption{
+			OmitNullFields: []string{"revertReason"},
+		})...)
 	}
-	if txr.RevertReason != nil {
-		formatMap["revertReason"] = ([]byte)(*txr.RevertReason)
-	}
-	return format.MarshalFormattedMap(ctx, formatMap)
+	return jb, err
 }
 
 // TxInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
 type TxInfoJSONRPC struct {
 	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
 	BlockNumber      *ethtypes.HexInteger      `json:"blockNumber"` // null if pending
+	ChainID          *ethtypes.HexInteger      `json:"chainId"`
 	From             *ethtypes.Address0xHex    `json:"from"`
 	Gas              *ethtypes.HexInteger      `json:"gas"`
 	GasPrice         *ethtypes.HexInteger      `json:"gasPrice"`
@@ -84,16 +87,18 @@ type TxInfoJSONRPC struct {
 	Nonce            *ethtypes.HexInteger      `json:"nonce"`
 	To               *ethtypes.Address0xHex    `json:"to"`
 	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
+	Type             *ethtypes.HexInteger      `json:"type"`
 	Value            *ethtypes.HexInteger      `json:"value"`
 	V                *ethtypes.HexInteger      `json:"v"`
 	R                *ethtypes.HexInteger      `json:"r"`
 	S                *ethtypes.HexInteger      `json:"s"`
 }
 
-func (txi *TxInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+func (txi *TxInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (_ []byte, err error) {
 	return format.MarshalFormattedMap(ctx, map[string]any{
 		"blockHash":        ([]byte)(txi.BlockHash),
 		"blockNumber":      (*big.Int)(txi.BlockNumber),
+		"chainId":          (*big.Int)(txi.ChainID),
 		"from":             (*[20]byte)(txi.From),
 		"gas":              (*big.Int)(txi.Gas),
 		"gasPrice":         (*big.Int)(txi.GasPrice),
@@ -102,11 +107,12 @@ func (txi *TxInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOp
 		"nonce":            (*big.Int)(txi.Nonce),
 		"to":               (*[20]byte)(txi.To),
 		"transactionIndex": (*big.Int)(txi.TransactionIndex),
+		"type":             (*big.Int)(txi.Type),
 		"value":            (*big.Int)(txi.Value),
 		"v":                (*big.Int)(txi.V),
 		"r":                (*big.Int)(txi.R),
 		"s":                (*big.Int)(txi.S),
-	})
+	}, opts...)
 }
 
 type LogFilterJSONRPC struct {
@@ -128,7 +134,7 @@ type LogJSONRPC struct {
 	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
 }
 
-func (l *LogJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+func (l *LogJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (_ []byte, err error) {
 	topicsArray := make([]any, len(l.Topics))
 	for i, t := range l.Topics {
 		topicsArray[i] = ([]byte)(t)
@@ -143,7 +149,7 @@ func (l *LogJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions
 		"address":          (*[20]byte)(l.Address),
 		"data":             ([]byte)(l.Data),
 		"topics":           topicsArray,
-	})
+	}, opts...)
 }
 
 // BlockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
@@ -156,7 +162,7 @@ type BlockInfoJSONRPC struct {
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
 }
 
-func (bi *BlockInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+func (bi *BlockInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions, opts ...MarshalOption) (_ []byte, err error) {
 	txnArray := make([]any, len(bi.Transactions))
 	for i, t := range bi.Transactions {
 		txnArray[i] = ([]byte)(t)
@@ -168,5 +174,5 @@ func (bi *BlockInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormat
 		"timestamp":    (*big.Int)(bi.Timestamp),
 		"logsBloom":    ([]byte)(bi.LogsBloom),
 		"transactions": txnArray,
-	})
+	}, opts...)
 }

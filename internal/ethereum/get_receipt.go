@@ -99,7 +99,7 @@ func padHexData(hexString string) string {
 	return hexString
 }
 
-func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt *ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
+func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
 
 	var revertReason string
 	if revertFromReceipt == nil {

@@ -51,6 +51,25 @@ const sampleBlock = `{
 	"transactions": ["0x6431a7fc56e24319bb431ed3040d77d1a7b54add9207266c19df6fc53961da99", "0xa4dd8fc1be327a13c8f5be7b74331351c419fa8b908ff7277786270ebdf2a875"]
 }`
 
+const sampleTransaction = `{
+	"blockHash": "0xd33367228e0a0e3667c910c7d92d3f6e724e2b6e2f671b28823a22f82597d023",
+	"blockNumber": "0xe5f2",
+	"chainId": "0x3accd8b",
+	"from": "0x03a85df677b2aa0f7cccc942242ee900de505ce8",
+	"gas": "0x131dc",
+	"gasPrice": "0x0",
+	"hash": "0x6431a7fc56e24319bb431ed3040d77d1a7b54add9207266c19df6fc53961da99",
+	"input": "0xa9059cbb000000000000000000000000af5ce0b6c5745e49b4292794496bf2a08b97608b00000000000000000000000000000000000000000000000246ddf97976680000",
+	"nonce": "0x2",
+	"to": "0xaa75b5001274491c0985ba1012b09dfc02d9675d",
+	"transactionIndex": "0x0",
+	"type": "0x0",
+	"value": "0x0",
+	"v": "0x7599b39",
+	"r": "0xc98b60f2aac8ed46f7c0ae9c0f80a9aa2aac1567f19fc535326cd71ae818c825",
+	"s": "0x749f803a174f2aaedd44299ad24c92a5842219ea44724928af486bdd6c6c3cc3"
+}`
+
 const sampleReceipt = `{
 	"blockHash": "0xd33367228e0a0e3667c910c7d92d3f6e724e2b6e2f671b28823a22f82597d023",
 	"blockNumber": "0xe5f2",
@@ -84,6 +103,19 @@ const sampleReceipt = `{
 	"type": "0x0"
 }`
 
+func TestFormatTransaction(t *testing.T) {
+	var txInfo TxInfoJSONRPC
+	err := json.Unmarshal([]byte(sampleTransaction), &txInfo)
+	require.NoError(t, err)
+
+	var jfo JSONFormatOptions = "number=hex&pretty=true"
+
+	ethSerialized, err := txInfo.MarshalFormat(context.Background(), jfo)
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+	require.JSONEq(t, sampleTransaction, string(ethSerialized))
+}
+
 func TestFormatReceipt(t *testing.T) {
 	var receipt TxReceiptJSONRPC
 	err := json.Unmarshal([]byte(sampleReceipt), &receipt)
@@ -98,18 +130,20 @@ func TestFormatReceipt(t *testing.T) {
 }
 
 func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
-	revertReason := ethtypes.MustNewHexBytes0xPrefix("0xfeedbeef")
 	largeInt, _ := new(big.Int).SetString("12300000000000000000000", 10)
 	receipt := &TxReceiptJSONRPC{
 		BlockHash:       ethtypes.MustNewHexBytes0xPrefix("0x3ef1ef8a761284b782eb1e7db3e42bbba3fe2626e5faaadb8ae94dfda8d2f4ca"),
 		BlockNumber:     ethtypes.NewHexInteger(largeInt),
 		ContractAddress: ethtypes.MustNewAddress("0x4a77dbf4e2ebec9d7dbb6e44fec7b5857128969c"),
-		RevertReason:    &revertReason,
+		RevertReason:    ethtypes.MustNewHexBytes0xPrefix("0xfeedbeef"),
+		LogsBloom:       ethtypes.MustNewHexBytes0xPrefix("0x000011112222"), // to be redacted
 	}
 
-	var jfo JSONFormatOptions = "number=json-number&bytes=base64&address=checksum&pretty=true"
+	var jfo JSONFormatOptions = "number=json-number&bytes=base64&address=checksum"
 
-	ethSerialized, err := receipt.MarshalFormat(context.Background(), jfo)
+	ethSerialized, err := receipt.MarshalFormat(context.Background(), jfo, MarshalOption{
+		RedactFields: []string{"logsBloom"},
+	})
 	fmt.Println((string)(ethSerialized))
 	require.NoError(t, err)
 	require.JSONEq(t, `{
@@ -121,7 +155,6 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 		"from": null,
 		"gasUsed": null,
 		"logs": [],
-		"logsBloom": null,
 		"revertReason": "/u2+7w==",
 		"status": null,
 		"to": null,
@@ -130,4 +163,28 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 		"type": null
 	}`, string(ethSerialized))
 
+}
+
+func TestFormatBlock(t *testing.T) {
+	var blockInfo BlockInfoJSONRPC
+	err := json.Unmarshal([]byte(sampleBlock), &blockInfo)
+	require.NoError(t, err)
+
+	var jfo JSONFormatOptions = "pretty=true"
+
+	ethSerialized, err := blockInfo.MarshalFormat(context.Background(), jfo, MarshalOption{
+		RedactFields: []string{"logsBloom"},
+	})
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"hash": "0xd33367228e0a0e3667c910c7d92d3f6e724e2b6e2f671b28823a22f82597d023",
+		"number": "58866",
+		"parentHash": "0x78ec31452f053f75665033d4957b8b33283c55e1c7239dc5facbb684a866492e",
+		"timestamp": "1749678391",
+		"transactions": [
+			"0x6431a7fc56e24319bb431ed3040d77d1a7b54add9207266c19df6fc53961da99",
+			"0xa4dd8fc1be327a13c8f5be7b74331351c419fa8b908ff7277786270ebdf2a875"
+		]
+	}`, string(ethSerialized))
 }

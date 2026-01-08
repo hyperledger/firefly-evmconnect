@@ -19,6 +19,8 @@ package ethrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/hyperledger/firefly-signer/pkg/abi"
@@ -252,5 +254,25 @@ func TestJSONFormatOptionErrors(t *testing.T) {
 
 	s := JSONFormatOptions("this;is;ignored").GetABISerializerIgnoreErrors(ctx)
 	assert.NotNil(t, s)
+
+}
+
+func TestFormatStructVariation(t *testing.T) {
+	var jfo JSONFormatOptions = "pretty=true"
+
+	ethSerialized, err := jfo.MarshalFormattedMap(context.Background(), map[string]any{
+		"float1": big.NewFloat(123.456),
+		"nested": map[string]any{
+			"float2": big.NewFloat(234.567),
+		},
+	})
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"float1": "123.456",
+		"nested": {
+			"float2": "234.567"
+		}
+	}`, string(ethSerialized))
 
 }

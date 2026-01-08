@@ -144,60 +144,96 @@ func (jfo JSONFormatOptions) GetSerializerSet(ctx context.Context, skipErrors bo
 	return ss, nil
 }
 
+// Marshalling options specific to the structure that is being marshalled,
+// rather than JSONFormatOptions which are specific to the way to represent data in JSON
+type MarshalOption struct {
+	RedactFields   []string // helpful when you want to trim large fields
+	OmitNullFields []string // a simplified approach to "omitempty" on JSON struct formatting tags
+}
+
 // MarshalFormattedMap takes a map that contains certain pre-selected types (see below switch) and does
 // JSON marshalling adhering to the request of the users.
-func (jfo JSONFormatOptions) MarshalFormattedMap(ctx context.Context, value map[string]any) (data []byte, err error) {
+func (jfo JSONFormatOptions) MarshalFormattedMap(ctx context.Context, value map[string]any, opts ...MarshalOption) (data []byte, err error) {
 	ss, err := jfo.GetSerializerSet(ctx, false)
 	if err == nil {
 		if ss.Pretty {
-			data, err = json.MarshalIndent(ss.buildFormatMap(value), "", "  ")
+			data, err = json.MarshalIndent(ss.buildFormatMap(value, opts), "", "  ")
 		} else {
-			data, err = json.Marshal(ss.buildFormatMap(value))
+			data, err = json.Marshal(ss.buildFormatMap(value, opts))
 		}
 	}
 	return data, err
 }
 
-func (ss *JSONSerializerSet) buildFormatMap(valueMap map[string]any) map[string]any {
+func (ss *JSONSerializerSet) buildFormatMap(valueMap map[string]any, opts []MarshalOption) map[string]any {
 	formatMap := make(map[string]any)
 	for k, v := range valueMap {
-		formatMap[k] = ss.buildFormatElem(v)
+		redact := false
+		for _, opt := range opts {
+			for _, f := range opt.RedactFields {
+				if k == f {
+					redact = true
+				}
+			}
+		}
+		if !redact {
+			fmtValue, isNil := ss.buildFormatElem(v, opts)
+			redactNil := false
+			if isNil {
+				for _, opt := range opts {
+					for _, f := range opt.OmitNullFields {
+						if k == f {
+							redactNil = true
+						}
+					}
+				}
+			}
+			if !redactNil {
+				formatMap[k] = fmtValue
+			}
+		}
 	}
 	return formatMap
 }
 
-func (ss *JSONSerializerSet) buildFormatElem(value any) any {
+func (ss *JSONSerializerSet) buildFormatElem(value any, opts []MarshalOption) (_ any, isNil bool) {
 	switch vt := value.(type) {
 	case *big.Int:
-		if vt != nil {
-			return ss.Integer(vt)
+		isNil = (vt == nil)
+		if !isNil {
+			return ss.Integer(vt), false
 		}
 	case *big.Float:
-		if vt != nil {
-			return ss.Float(vt)
+		isNil = (vt == nil)
+		if !isNil {
+			return ss.Float(vt), false
 		}
 	case []byte:
-		if vt != nil {
-			return ss.Bytes(vt)
+		isNil = (vt == nil)
+		if !isNil {
+			return ss.Bytes(vt), false
 		}
 	case *[20]byte:
-		if vt != nil {
-			return ss.Address(*vt)
+		isNil = (vt == nil)
+		if !isNil {
+			return ss.Address(*vt), false
 		}
 	case []any:
-		if vt != nil {
+		isNil = (vt == nil)
+		if !isNil {
 			ret := make([]any, len(vt))
 			for i, av := range vt {
-				ret[i] = ss.buildFormatElem(av)
+				ret[i], _ = ss.buildFormatElem(av, opts)
 			}
-			return ret
+			return ret, false
 		}
 	case map[string]any:
-		if vt != nil {
-			return ss.buildFormatMap(vt)
+		isNil = (vt == nil)
+		if !isNil {
+			return ss.buildFormatMap(vt, opts), false
 		}
 	}
-	return value
+	return value, isNil
 }
 
 func StandardSerializerSet() *JSONSerializerSet {
