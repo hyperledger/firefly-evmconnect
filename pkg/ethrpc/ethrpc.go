@@ -16,22 +16,60 @@
 
 package ethrpc
 
-import "github.com/hyperledger/firefly-signer/pkg/ethtypes"
+import (
+	"context"
+	"encoding/json"
+	"math/big"
+
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+)
 
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
 type TxReceiptJSONRPC struct {
-	BlockHash         ethtypes.HexBytes0xPrefix  `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
-	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
-	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
-	From              *ethtypes.Address0xHex     `json:"from"`
-	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
-	Logs              []*LogJSONRPC              `json:"logs"`
-	Status            *ethtypes.HexInteger       `json:"status"`
-	To                *ethtypes.Address0xHex     `json:"to"`
 	TransactionHash   ethtypes.HexBytes0xPrefix  `json:"transactionHash"`
 	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
+	BlockHash         ethtypes.HexBytes0xPrefix  `json:"blockHash"`
+	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
+	From              *ethtypes.Address0xHex     `json:"from"`
+	To                *ethtypes.Address0xHex     `json:"to"`
+	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
+	EffectiveGasPrice *ethtypes.HexInteger       `json:"effectiveGasPrice"`
+	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
+	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
+	Logs              []*LogJSONRPC              `json:"logs"`
+	LogsBloom         ethtypes.HexBytes0xPrefix  `json:"logsBloom"`
+	Type              *ethtypes.HexInteger       `json:"type"`
+	Status            *ethtypes.HexInteger       `json:"status"`
 	RevertReason      *ethtypes.HexBytes0xPrefix `json:"revertReason"`
+}
+
+func (txr *TxReceiptJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+	logsArray := make([]json.RawMessage, len(txr.Logs))
+	for i, l := range txr.Logs {
+		if logsArray[i], err = l.MarshalFormat(ctx, format); err != nil {
+			return nil, err
+		}
+	}
+	formatMap := map[string]any{
+		"transactionHash":   ([]byte)(txr.TransactionHash),
+		"transactionIndex":  (*big.Int)(txr.TransactionIndex),
+		"blockHash":         ([]byte)(txr.BlockHash),
+		"blockNumber":       (*big.Int)(txr.BlockNumber),
+		"from":              (*[20]byte)(txr.From),
+		"to":                (*[20]byte)(txr.To),
+		"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
+		"effectiveGasPrice": (*big.Int)(txr.EffectiveGasPrice),
+		"gasUsed":           (*big.Int)(txr.GasUsed),
+		"contractAddress":   (*[20]byte)(txr.ContractAddress),
+		"logs":              logsArray,
+		"logsBloom":         ([]byte)(txr.LogsBloom),
+		"status":            (*big.Int)(txr.Status),
+		"type":              (*big.Int)(txr.Type),
+	}
+	if txr.RevertReason != nil {
+		formatMap["revertReason"] = ([]byte)(*txr.RevertReason)
+	}
+	return format.MarshalFormattedMap(ctx, formatMap)
 }
 
 // TxInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
@@ -43,12 +81,32 @@ type TxInfoJSONRPC struct {
 	GasPrice         *ethtypes.HexInteger      `json:"gasPrice"`
 	Hash             ethtypes.HexBytes0xPrefix `json:"hash"`
 	Input            ethtypes.HexBytes0xPrefix `json:"input"`
-	R                *ethtypes.HexInteger      `json:"r"`
-	S                *ethtypes.HexInteger      `json:"s"`
+	Nonce            *ethtypes.HexInteger      `json:"nonce"`
 	To               *ethtypes.Address0xHex    `json:"to"`
 	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
-	V                *ethtypes.HexInteger      `json:"v"`
 	Value            *ethtypes.HexInteger      `json:"value"`
+	V                *ethtypes.HexInteger      `json:"v"`
+	R                *ethtypes.HexInteger      `json:"r"`
+	S                *ethtypes.HexInteger      `json:"s"`
+}
+
+func (txi *TxInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+	return format.MarshalFormattedMap(ctx, map[string]any{
+		"blockHash":        ([]byte)(txi.BlockHash),
+		"blockNumber":      (*big.Int)(txi.BlockNumber),
+		"from":             (*[20]byte)(txi.From),
+		"gas":              (*big.Int)(txi.Gas),
+		"gasPrice":         (*big.Int)(txi.GasPrice),
+		"hash":             ([]byte)(txi.Hash),
+		"input":            ([]byte)(txi.Input),
+		"nonce":            (*big.Int)(txi.Nonce),
+		"to":               (*[20]byte)(txi.To),
+		"transactionIndex": (*big.Int)(txi.TransactionIndex),
+		"value":            (*big.Int)(txi.Value),
+		"v":                (*big.Int)(txi.V),
+		"r":                (*big.Int)(txi.R),
+		"s":                (*big.Int)(txi.S),
+	})
 }
 
 type LogFilterJSONRPC struct {
@@ -70,6 +128,24 @@ type LogJSONRPC struct {
 	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
 }
 
+func (l *LogJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+	topicsArray := make([]any, len(l.Topics))
+	for i, t := range l.Topics {
+		topicsArray[i] = ([]byte)(t)
+	}
+	return format.MarshalFormattedMap(ctx, map[string]any{
+		"removed":          l.Removed,
+		"logIndex":         (*big.Int)(l.LogIndex),
+		"transactionIndex": (*big.Int)(l.TransactionIndex),
+		"blockNumber":      (*big.Int)(l.BlockNumber),
+		"transactionHash":  ([]byte)(l.TransactionHash),
+		"blockHash":        ([]byte)(l.BlockHash),
+		"address":          (*[20]byte)(l.Address),
+		"data":             ([]byte)(l.Data),
+		"topics":           topicsArray,
+	})
+}
+
 // BlockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
 type BlockInfoJSONRPC struct {
 	Number       *ethtypes.HexInteger        `json:"number"`
@@ -78,4 +154,19 @@ type BlockInfoJSONRPC struct {
 	Timestamp    *ethtypes.HexInteger        `json:"timestamp"`
 	LogsBloom    ethtypes.HexBytes0xPrefix   `json:"logsBloom"`
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
+}
+
+func (bi *BlockInfoJSONRPC) MarshalFormat(ctx context.Context, format JSONFormatOptions) (_ []byte, err error) {
+	txnArray := make([]any, len(bi.Transactions))
+	for i, t := range bi.Transactions {
+		txnArray[i] = ([]byte)(t)
+	}
+	return format.MarshalFormattedMap(ctx, map[string]any{
+		"number":       (*big.Int)(bi.Number),
+		"hash":         ([]byte)(bi.Hash),
+		"parentHash":   ([]byte)(bi.ParentHash),
+		"timestamp":    (*big.Int)(bi.Timestamp),
+		"logsBloom":    ([]byte)(bi.LogsBloom),
+		"transactions": txnArray,
+	})
 }
