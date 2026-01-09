@@ -114,10 +114,13 @@ func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalO
 	}, opts...)
 }
 
+// See https://ethereum.org/hr/developers/docs/apis/json-rpc/#eth_newfilter
+// The address, as well as the entries in the topic array, can be DATA|Array.
+// We just use array in all cases.
 type LogFilterJSONRPC struct {
 	FromBlock *ethtypes.HexInteger          `json:"fromBlock,omitempty"`
 	ToBlock   *ethtypes.HexInteger          `json:"toBlock,omitempty"`
-	Address   *ethtypes.Address0xHex        `json:"address,omitempty"`
+	Address   []*ethtypes.Address0xHex      `json:"address,omitempty"`
 	Topics    [][]ethtypes.HexBytes0xPrefix `json:"topics,omitempty"`
 }
 

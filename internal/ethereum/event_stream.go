@@ -543,7 +543,7 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 	}
 
 	if len(ag.listeners) == 1 && len(ag.listeners[0].config.filters) == 1 {
-		logFilterJSONRPCReq.Address = ag.listeners[0].config.filters[0].Address
+		logFilterJSONRPCReq.Address = []*ethtypes.Address0xHex{ag.listeners[0].config.filters[0].Address}
 	}
 
 	rpcErr := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", logFilterJSONRPCReq)
