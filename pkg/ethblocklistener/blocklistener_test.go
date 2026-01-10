@@ -55,6 +55,7 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 		UnstableHeadLength:      50,
 		HederaCompatibilityMode: false,
 		BlockCacheSize:          250,
+		ReceiptCacheSize:        10,
 	}
 	for _, fn := range confSetup {
 		fn(conf, mRPC, cancelCtx)
@@ -64,7 +65,7 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 		MaximumDelay: 50 * time.Millisecond,
 		Factor:       2.0,
 	}, conf, mRPC, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	require.Equal(t, conf.UnstableHeadLength, ibl.ConfiguredUnstableHeadLength())
 

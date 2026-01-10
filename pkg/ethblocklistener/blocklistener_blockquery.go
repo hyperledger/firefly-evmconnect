@@ -26,7 +26,6 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -38,9 +37,9 @@ func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
 func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, *ethrpc.TxReceiptJSONRPC, error) {
 
 	// Query the chain to find the transaction block
-	receipt, receiptErr := bl.getTransactionReceipt(ctx, txHash)
+	receipt, receiptErr := bl.GetTransactionReceipt(ctx, txHash)
 	if receiptErr != nil {
-		return nil, nil, i18n.WrapError(ctx, receiptErr.Error(), msgs.MsgFailedToQueryReceipt, txHash)
+		return nil, nil, i18n.WrapError(ctx, receiptErr, msgs.MsgFailedToQueryReceipt, txHash)
 	}
 	if receipt == nil {
 		return nil, nil, nil
@@ -64,10 +63,26 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	}, receipt, nil
 }
 
-func (bl *blockListener) getTransactionReceipt(ctx context.Context, txHash string) (ethReceipt *ethrpc.TxReceiptJSONRPC, rpcErr *rpcbackend.RPCError) {
-	// Get the receipt in the back-end JSON/RPC format
-	rpcErr = bl.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", txHash)
-	return
+func (bl *blockListener) GetTransactionReceipt(ctx context.Context, txHash string) (*ethrpc.TxReceiptJSONRPC, error) {
+	var ethReceipt *ethrpc.TxReceiptJSONRPC
+	cached, ok := bl.receiptCache.Get(txHash)
+	if ok {
+		ethReceipt = cached.(*ethrpc.TxReceiptJSONRPC)
+	}
+
+	if ethReceipt == nil {
+		rpcErr := bl.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", txHash)
+		if rpcErr != nil || ethReceipt == nil {
+			var err error
+			if rpcErr != nil {
+				err = rpcErr.Error()
+			}
+			return nil, err
+		}
+		bl.receiptCache.Add(txHash, ethReceipt)
+	}
+
+	return ethReceipt, nil
 }
 
 func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error) {

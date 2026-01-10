@@ -1,0 +1,91 @@
+// Copyright © 2026 Kaleido, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package ethblocklistener
+
+import (
+	"testing"
+
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+func TestBlockCache(t *testing.T) {
+	ctx, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
+
+	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	block1001AHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	block1001BHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, block1001AHash.String(), args[3].(string))
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1001),
+			Hash:       block1001AHash,
+			ParentHash: block1000Hash,
+		}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, (int64)(1001), args[3].(*ethtypes.HexInteger).Int64())
+		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+			Number:     ethtypes.NewHexInteger64(1001),
+			Hash:       block1001BHash,
+			ParentHash: block1000Hash,
+		}
+	}).Once()
+
+	block, err := bl.GetBlockInfoByHash(ctx, block1001AHash.String())
+	require.NoError(t, err)
+	require.Equal(t, block1001AHash, block.Hash)
+
+	// From cache (tested by Once() above)
+	block, err = bl.GetBlockInfoByHash(ctx, block1001AHash.String())
+	require.NoError(t, err)
+	require.Equal(t, block1001AHash, block.Hash)
+
+	// NOT from cache due to mismatch
+	block, err = bl.GetBlockInfoByNumber(ctx, 1001, true, block1000Hash.String(), block1001BHash.String())
+	require.NoError(t, err)
+	require.Equal(t, block1001BHash, block.Hash)
+
+}
+
+func TestReceiptCache(t *testing.T) {
+	ctx, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
+
+	txHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, txHash.String(), args[3].(string))
+		*args[1].(**ethrpc.TxReceiptJSONRPC) = &ethrpc.TxReceiptJSONRPC{
+			TransactionHash: txHash,
+		}
+	}).Once()
+
+	receipt, err := bl.GetTransactionReceipt(ctx, txHash.String())
+	require.NoError(t, err)
+	require.Equal(t, txHash, receipt.TransactionHash)
+
+	// From cache (tested by Once() above)
+	receipt, err = bl.GetTransactionReceipt(ctx, txHash.String())
+	require.NoError(t, err)
+	require.Equal(t, txHash, receipt.TransactionHash)
+
+}

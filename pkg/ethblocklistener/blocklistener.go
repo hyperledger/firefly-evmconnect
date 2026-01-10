@@ -43,6 +43,7 @@ type BlockListenerConfig struct {
 	BlockPollingInterval    time.Duration `json:"blockPollingInterval"`
 	HederaCompatibilityMode bool          `json:"hederaCompatibilityMode"`
 	BlockCacheSize          int           `json:"blockCacheSize"`
+	ReceiptCacheSize        int           `json:"receiptCacheSize"`
 	IncludeLogsBloom        bool          `json:"includeLogsBloom"`
 }
 
@@ -84,6 +85,7 @@ type blockListener struct {
 	mux                        sync.RWMutex
 	consumers                  map[fftypes.UUID]*BlockUpdateConsumer
 	blockCache                 *lru.Cache
+	receiptCache               *lru.Cache
 	BlockListenerConfig
 
 	//  canonical chain
@@ -116,6 +118,9 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 		BlockListenerConfig:        *conf,
 	}
 	bl.blockCache, err = lru.New(conf.BlockCacheSize)
+	if err == nil {
+		bl.receiptCache, err = lru.New(conf.ReceiptCacheSize)
+	}
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
 	}
