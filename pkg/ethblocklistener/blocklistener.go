@@ -39,7 +39,7 @@ import (
 )
 
 type BlockListenerConfig struct {
-	UnstableHeadLength      int           `json:"unstableHeadLength"`
+	MonitoredHeadLength     int           `json:"monitoredHeadLength"`
 	BlockPollingInterval    time.Duration `json:"blockPollingInterval"`
 	HederaCompatibilityMode bool          `json:"hederaCompatibilityMode"`
 	BlockCacheSize          int           `json:"blockCacheSize"`
@@ -49,7 +49,7 @@ type BlockListenerConfig struct {
 
 type BlockListener interface {
 	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
-	ConfiguredUnstableHeadLength() int // provides a getter on the configuration for unstable head length - as this information is important to consumers (might be multiple from this block listener)
+	GetMonitoredHeadLength() int // provides a getter on the configuration for unstable head length - as this information is important to consumers (might be multiple from this block listener)
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
 	GetHighestBlock(ctx context.Context) (uint64, bool)
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
@@ -131,8 +131,8 @@ func (bl *blockListener) UTSetBackend(backend rpcbackend.RPC) {
 	bl.backend = backend
 }
 
-func (bl *blockListener) ConfiguredUnstableHeadLength() int {
-	return bl.BlockListenerConfig.UnstableHeadLength
+func (bl *blockListener) GetMonitoredHeadLength() int {
+	return bl.BlockListenerConfig.MonitoredHeadLength
 }
 
 // setting block filter status updates that new block filter has been created
@@ -401,7 +401,7 @@ func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *
 	}
 
 	// Trim the amount of history we keep based on the configured amount of instability at the front of the chain
-	for bl.canonicalChain.Len() > bl.UnstableHeadLength {
+	for bl.canonicalChain.Len() > bl.MonitoredHeadLength {
 		_ = bl.canonicalChain.Remove(bl.canonicalChain.Front())
 	}
 
@@ -516,7 +516,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 	}
 
 	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.BlockNumber.Uint64() {
-		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.BlockNumber.Uint64(), bl.UnstableHeadLength)
+		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.BlockNumber.Uint64(), bl.MonitoredHeadLength)
 	}
 	return lastValidBlock
 }

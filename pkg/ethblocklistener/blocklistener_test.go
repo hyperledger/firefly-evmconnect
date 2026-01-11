@@ -52,7 +52,7 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 	logrus.SetLevel(logrus.DebugLevel)
 	conf := &BlockListenerConfig{
 		BlockPollingInterval:    1 * time.Hour,
-		UnstableHeadLength:      50,
+		MonitoredHeadLength:     50,
 		HederaCompatibilityMode: false,
 		BlockCacheSize:          250,
 		ReceiptCacheSize:        10,
@@ -67,7 +67,7 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 	}, conf, mRPC, nil)
 	require.NoError(t, err)
 
-	require.Equal(t, conf.UnstableHeadLength, ibl.ConfiguredUnstableHeadLength())
+	require.Equal(t, conf.MonitoredHeadLength, ibl.GetMonitoredHeadLength())
 
 	return ctx, ibl.(*blockListener), mRPC, func() {
 		cancelCtx()
@@ -164,7 +164,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	startLatch := newTestLatch()
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
 		conf.BlockPollingInterval = shortDelay
-		conf.UnstableHeadLength = 2 // check wrapping
+		conf.MonitoredHeadLength = 2 // check wrapping
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			hbh := args[1].(*ethtypes.HexInteger)
@@ -245,7 +245,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 
 	mRPC.AssertExpectations(t)
 
-	assert.Equal(t, bl.UnstableHeadLength, bl.canonicalChain.Len())
+	assert.Equal(t, bl.MonitoredHeadLength, bl.canonicalChain.Len())
 
 }
 
