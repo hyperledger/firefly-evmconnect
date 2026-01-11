@@ -117,20 +117,14 @@ func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 	defer done()
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
 		err := json.Unmarshal([]byte("null"), args[1])
 		assert.NoError(t, err)
 	})
@@ -153,20 +147,14 @@ func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t)
 	defer done()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	// Execute the reconcileConfirmationsForTransaction function
 	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
@@ -183,11 +171,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
@@ -196,14 +180,12 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 
 	fakeParentHash := fftypes.NewRandB32().String()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(fakeParentHash),
-		}
+		}}
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
@@ -231,25 +213,19 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
-		}
+		}}
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
@@ -277,25 +253,19 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     ethtypes.NewHexInteger64(1977),
 			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
-		}
+		}}
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
@@ -822,9 +792,7 @@ func TestBuildConfirmationList_FailedToFetchBlockInfo(t *testing.T) {
 	}
 	bl.blockCache, _ = lru.New(100)
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(105, 10)
-	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x69", false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	ctx := context.Background()
 	existingQueue := []*ffcapi.MinimalBlockInfo{
@@ -858,10 +826,8 @@ func TestBuildConfirmationList_NilBlockInfo(t *testing.T) {
 	}
 	bl.blockCache, _ = lru.New(100)
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(105, 10)
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.BlockInfoJSONRPC) = nil
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x"+strconv.FormatUint(105, 16), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = nil
 	})
 
 	ctx := context.Background()
@@ -1322,14 +1288,12 @@ func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, sta
 
 	if len(blocksToMock) > 0 {
 		for _, blockNumber := range blocksToMock {
-			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-				return bn.BigInt().String() == strconv.FormatUint(blockNumber, 10)
-			}), false).Return(nil).Run(func(args mock.Arguments) {
-				*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", ethtypes.NewHexIntegerU64(blockNumber).String(), false).Return(nil).Run(func(args mock.Arguments) {
+				*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 					Number:     ethtypes.NewHexInteger64(int64(blockNumber)),
 					Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber)),
 					ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber - 1)),
-				}
+				}}
 			})
 		}
 	}

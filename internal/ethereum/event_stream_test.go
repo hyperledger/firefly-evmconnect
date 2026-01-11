@@ -242,10 +242,10 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = ethLogs
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.NewHexInteger64(1024),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
-		}
+		}}
 	})
 	es, events, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 
@@ -418,10 +418,10 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.BlockInfoJSONRPC) = &ethrpc.BlockInfoJSONRPC{
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.NewHexInteger64(212122),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
-		}
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true

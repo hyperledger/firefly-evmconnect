@@ -99,43 +99,78 @@ func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber u
 	}
 
 	if blockInfo == nil {
-		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByNumber", ethtypes.NewHexIntegerU64(blockNumber), false /* only the txn hashes */)
-		if rpcErr != nil {
-			return nil, rpcErr.Error()
+		b, err := bl.GetFullBlockWithTxHashesByNumber(ctx, ethtypes.NewHexIntegerU64(blockNumber).String())
+		if err != nil {
+			return nil, err
 		}
-		if blockInfo == nil {
-			return nil, nil
-		}
-		if !bl.IncludeLogsBloom {
-			blockInfo.LogsBloom = nil
-		}
-		bl.addToBlockCache(blockInfo)
+		blockInfo = b.ToBlockInfo(bl.IncludeLogsBloom)
 	}
 
 	return blockInfo, nil
 }
 
 func (bl *blockListener) GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error) {
-	var blockInfo *ethrpc.BlockInfoJSONRPC
+	var blockInfo *ethrpc.BlockInfoJSONRPC // the minimal set we cache
 	cached, ok := bl.blockCache.Get(hash0xString)
 	if ok {
 		blockInfo = cached.(*ethrpc.BlockInfoJSONRPC)
 	}
 
 	if blockInfo == nil {
-		rpcErr := bl.backend.CallRPC(ctx, &blockInfo, "eth_getBlockByHash", hash0xString, false /* only the txn hashes */)
-		if rpcErr != nil || blockInfo == nil {
-			var err error
-			if rpcErr != nil {
-				err = rpcErr.Error()
-			}
+		b, err := bl.GetFullBlockWithTxHashesByHash(ctx, hash0xString)
+		if err != nil {
 			return nil, err
 		}
-		if !bl.IncludeLogsBloom {
-			blockInfo.LogsBloom = nil
-		}
-		bl.addToBlockCache(blockInfo)
+		blockInfo = b.ToBlockInfo(bl.IncludeLogsBloom)
 	}
 
 	return blockInfo, nil
+}
+
+// Does not use cache, but will add to cache
+func (bl *blockListener) GetFullBlockWithTxHashesByHash(ctx context.Context, hash0xString string) (b *ethrpc.FullBlockWithTxHashesJSONRPC, err error) {
+	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByHash", hash0xString, false /* only the txn hashes */)
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
+	}
+	if b != nil {
+		bl.addToBlockCache(b.ToBlockInfo(bl.IncludeLogsBloom))
+	}
+	return b, nil
+}
+
+// Does not use cache, but will add to cache
+func (bl *blockListener) GetFullBlockWithTransactionsByHash(ctx context.Context, hash0xString string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error) {
+	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByHash", hash0xString, true /* full blocks */)
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
+	}
+	if b != nil {
+		bl.addToBlockCache(b.ToBlockInfo(bl.IncludeLogsBloom))
+	}
+	return b, nil
+}
+
+// Does not use cache, but will add to cache
+func (bl *blockListener) GetFullBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTxHashesJSONRPC, err error) {
+	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByNumber", numberLookup, false /* only the txn hashes */)
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
+	}
+	if b != nil {
+		bl.addToBlockCache(b.ToBlockInfo(bl.IncludeLogsBloom))
+	}
+	return b, nil
+}
+
+// Does not use cache, but will add to cache
+func (bl *blockListener) GetFullBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error) {
+	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByNumber", numberLookup, true /* full blocks */)
+	if rpcErr != nil {
+		return nil, rpcErr.Error()
+	}
+	if b != nil {
+		bl.addToBlockCache(b.ToBlockInfo(bl.IncludeLogsBloom))
+	}
+	return b, nil
 }

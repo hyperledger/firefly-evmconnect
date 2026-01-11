@@ -178,3 +178,126 @@ func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsha
 		"transactions": txnArray,
 	}, opts...)
 }
+
+type BlockHeaderJSONRPC struct {
+	Number           *ethtypes.HexInteger        `json:"number"`
+	Hash             ethtypes.HexBytes0xPrefix   `json:"hash"`
+	MixHash          ethtypes.HexBytes0xPrefix   `json:"mixHash"`
+	ParentHash       ethtypes.HexBytes0xPrefix   `json:"parentHash"`
+	Nonce            ethtypes.HexBytes0xPrefix   `json:"nonce"`
+	SHA3Uncles       ethtypes.HexBytes0xPrefix   `json:"sha3Uncles"`
+	LogsBloom        ethtypes.HexBytes0xPrefix   `json:"logsBloom"`
+	TransactionsRoot ethtypes.HexBytes0xPrefix   `json:"transactionsRoot"`
+	StateRoot        ethtypes.HexBytes0xPrefix   `json:"stateRoot"`
+	ReceiptsRoot     ethtypes.HexBytes0xPrefix   `json:"receiptsRoot"`
+	Miner            *ethtypes.Address0xHex      `json:"miner"`
+	Difficulty       *ethtypes.HexInteger        `json:"difficulty"`
+	TotalDifficulty  *ethtypes.HexInteger        `json:"totalDifficulty"`
+	ExtraData        ethtypes.HexBytes0xPrefix   `json:"extraData"`
+	BaseFeePerGas    *ethtypes.HexInteger        `json:"baseFeePerGas"`
+	Size             *ethtypes.HexInteger        `json:"size"`
+	GasLimit         *ethtypes.HexInteger        `json:"gasLimit"`
+	GasUsed          *ethtypes.HexInteger        `json:"gasUsed"`
+	Timestamp        *ethtypes.HexInteger        `json:"timestamp"`
+	Uncles           []ethtypes.HexBytes0xPrefix `json:"uncles"`
+}
+
+func (b *BlockHeaderJSONRPC) getFormatMap() map[string]any {
+	unclesArray := make([]any, len(b.Uncles))
+	for i, uncle := range b.Uncles {
+		unclesArray[i] = ([]byte)(uncle)
+	}
+	return map[string]any{
+		"number":           (*big.Int)(b.Number),
+		"hash":             ([]byte)(b.Hash),
+		"mixHash":          ([]byte)(b.MixHash),
+		"parentHash":       ([]byte)(b.ParentHash),
+		"nonce":            ([]byte)(b.Nonce),
+		"sha3Uncles":       ([]byte)(b.SHA3Uncles),
+		"logsBloom":        ([]byte)(b.LogsBloom),
+		"transactionsRoot": ([]byte)(b.TransactionsRoot),
+		"stateRoot":        ([]byte)(b.StateRoot),
+		"receiptsRoot":     ([]byte)(b.ReceiptsRoot),
+		"miner":            (*[20]byte)(b.Miner),
+		"difficulty":       (*big.Int)(b.Difficulty),
+		"totalDifficulty":  (*big.Int)(b.TotalDifficulty),
+		"extraData":        ([]byte)(b.ExtraData),
+		"baseFeePerGas":    (*big.Int)(b.BaseFeePerGas),
+		"size":             (*big.Int)(b.Size),
+		"gasLimit":         (*big.Int)(b.GasLimit),
+		"gasUsed":          (*big.Int)(b.GasUsed),
+		"timestamp":        (*big.Int)(b.Timestamp),
+		"uncles":           unclesArray,
+	}
+}
+
+func (b *BlockHeaderJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
+	bi := &BlockInfoJSONRPC{
+		Number:     b.Number,
+		Hash:       b.Hash,
+		ParentHash: b.ParentHash,
+		Timestamp:  b.Timestamp,
+	}
+	if includeLogsBloom {
+		bi.LogsBloom = b.LogsBloom
+	}
+	return bi
+}
+
+// FullBlockWithTxHashesJSONRPC is the full JSON/RPC structure you get with "false" on eth_getBlockByNumber / eth_getBlockByHash
+type FullBlockWithTxHashesJSONRPC struct {
+	BlockHeaderJSONRPC
+	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
+}
+
+func (b *FullBlockWithTxHashesJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
+	if b == nil {
+		return nil
+	}
+	bi := b.BlockHeaderJSONRPC.ToBlockInfo(includeLogsBloom)
+	bi.Transactions = b.Transactions
+	return bi
+}
+
+// FullBlockWithTransactionsJSONRPC is the full JSON/RPC structure you get with "true" on eth_getBlockByNumber / eth_getBlockByHash
+type FullBlockWithTransactionsJSONRPC struct {
+	BlockHeaderJSONRPC
+	Transactions []*TxInfoJSONRPC `json:"transactions"`
+}
+
+func (b *FullBlockWithTransactionsJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
+	if b == nil {
+		return nil
+	}
+	bi := b.BlockHeaderJSONRPC.ToBlockInfo(includeLogsBloom)
+	bi.Transactions = make([]ethtypes.HexBytes0xPrefix, len(b.Transactions))
+	for i, t := range b.Transactions {
+		bi.Transactions[i] = t.Hash
+	}
+	return bi
+}
+
+func (b *FullBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
+	txnHashArray := make([]any, len(b.Transactions))
+	for i, t := range b.Transactions {
+		txnHashArray[i] = ([]byte)(t)
+	}
+	formatMap := b.BlockHeaderJSONRPC.getFormatMap()
+	formatMap["transactions"] = txnHashArray
+	return jss.MarshalFormattedMap(formatMap, opts...)
+}
+
+func (b *FullBlockWithTransactionsJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
+	txnsArray := make([]json.RawMessage, len(b.Transactions))
+	for i, l := range b.Transactions {
+		if err == nil {
+			txnsArray[i], err = l.MarshalFormat(jss, opts...)
+		}
+	}
+	if err == nil {
+		formatMap := b.BlockHeaderJSONRPC.getFormatMap()
+		formatMap["transactions"] = txnsArray
+		jb, err = jss.MarshalFormattedMap(formatMap, opts...)
+	}
+	return jb, err
+}

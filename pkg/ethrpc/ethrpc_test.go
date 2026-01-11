@@ -50,6 +50,29 @@ const sampleBlock = `{
 	"transactions": ["0x6431a7fc56e24319bb431ed3040d77d1a7b54add9207266c19df6fc53961da99", "0xa4dd8fc1be327a13c8f5be7b74331351c419fa8b908ff7277786270ebdf2a875"]
 }`
 
+const sampleBlockHeadersOnly = `{
+	"number": "0xe5f2",
+	"hash": "0xd33367228e0a0e3667c910c7d92d3f6e724e2b6e2f671b28823a22f82597d023",
+	"mixHash": "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
+	"parentHash": "0x78ec31452f053f75665033d4957b8b33283c55e1c7239dc5facbb684a866492e",
+	"nonce": "0x0000000000000000",
+	"sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+	"logsBloom": "0x00000000000000000000000000000000000000000000000000000080000100002000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000010008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020200000000000000204000000000000000000000000000002000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000404000000000000000",
+	"transactionsRoot": "0x77c428651debcc42d181d9067386d807b204235ebb3e45dfa5f1e6e71c0b67de",
+	"stateRoot": "0xaebe1ab7b242b261b1aced1a1ed729c3d6436634ff656efecad4609b38ee63a3",
+	"receiptsRoot": "0x0946e4baf57a46888aa1a78dc974a01a56bb221ae8d6ee381942695596f976ec",
+	"miner": "0xef5880ec6b859b6949d88ddbd6ec18e96d0f14aa",
+	"difficulty": "0x1",
+	"totalDifficulty": "0xe5f3",
+	"extraData": "0xf87ea00000000000000000000000000000000000000000000000000000000000000000d594ef5880ec6b859b6949d88ddbd6ec18e96d0f14aac080f843b8410469b43f8d873e7b3c54c0d2a606a37af533994653f077b234a563f00723641a7ad56e6ba07d56fb38ec68bc9b6234d54fe62730f41118658a12c886fb783c3100",
+	"baseFeePerGas": "0x0",
+	"size": "0x3dc",
+	"gasLimit": "0x2fefd800",
+	"gasUsed": "0x197b8",
+	"timestamp": "0x6849f937",
+	"uncles": ["d07bb65030d70714e250d0917bd4e8ebecc4222b3b520d72f7229e43c2395108"]
+}`
+
 const sampleTransaction = `{
 	"blockHash": "0xd33367228e0a0e3667c910c7d92d3f6e724e2b6e2f671b28823a22f82597d023",
 	"blockNumber": "0xe5f2",
@@ -164,7 +187,7 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 
 }
 
-func TestFormatBlock(t *testing.T) {
+func TestFormatBlockInfo(t *testing.T) {
 	var blockInfo BlockInfoJSONRPC
 	err := json.Unmarshal([]byte(sampleBlock), &blockInfo)
 	require.NoError(t, err)
@@ -186,4 +209,46 @@ func TestFormatBlock(t *testing.T) {
 			"0xa4dd8fc1be327a13c8f5be7b74331351c419fa8b908ff7277786270ebdf2a875"
 		]
 	}`, string(ethSerialized))
+}
+
+func TestFormatBlockFullWithHashes(t *testing.T) {
+	var block FullBlockWithTxHashesJSONRPC
+	err := json.Unmarshal([]byte(sampleBlock), &block)
+	require.NoError(t, err)
+
+	jss := testJSONSerializationSet(t, "number=hex&pretty=true")
+
+	ethSerialized, err := block.MarshalFormat(jss)
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+	require.JSONEq(t, sampleBlock, string(ethSerialized))
+
+	require.NotNil(t, block.ToBlockInfo(true))
+	require.Nil(t, (*FullBlockWithTxHashesJSONRPC)(nil).ToBlockInfo(true))
+}
+
+func TestFormatBlockFullWithTxns(t *testing.T) {
+	var block FullBlockWithTransactionsJSONRPC
+	err := json.Unmarshal([]byte(sampleBlockHeadersOnly), &block)
+	require.NoError(t, err)
+	var txn TxInfoJSONRPC
+	err = json.Unmarshal([]byte(sampleTransaction), &txn)
+	require.NoError(t, err)
+	block.Transactions = []*TxInfoJSONRPC{&txn}
+
+	jss := testJSONSerializationSet(t, "pretty=true")
+
+	ethSerialized, err := block.MarshalFormat(jss)
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+
+	var genericMap map[string]any
+	err = json.Unmarshal(ethSerialized, &genericMap)
+	require.NoError(t, err)
+
+	require.Equal(t, "58866", genericMap["transactions"].([]any)[0].(map[string]any)["blockNumber"])
+
+	require.NotNil(t, block.ToBlockInfo(true))
+	require.Nil(t, (*FullBlockWithTransactionsJSONRPC)(nil).ToBlockInfo(true))
+
 }

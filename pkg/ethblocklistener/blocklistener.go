@@ -56,6 +56,10 @@ type BlockListener interface {
 	GetHighestBlock(ctx context.Context) (uint64, bool)
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
+	GetFullBlockWithTxHashesByHash(ctx context.Context, hash0xString string) (b *ethrpc.FullBlockWithTxHashesJSONRPC, err error)
+	GetFullBlockWithTransactionsByHash(ctx context.Context, hash0xString string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error)
+	GetFullBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTxHashesJSONRPC, err error)
+	GetFullBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error)
 	FetchBlockReceiptsAsync(blockNumber *ethtypes.HexInteger, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error))
 	WaitClosed()
 	GetBackend() rpcbackend.RPC
