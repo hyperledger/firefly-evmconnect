@@ -55,6 +55,7 @@ type BlockListener interface {
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
 	WaitClosed()
+	GetBackend() rpcbackend.RPC
 	UTSetBackend(rpcbackend.RPC)
 }
 
@@ -125,6 +126,10 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
 	}
 	return bl, nil
+}
+
+func (bl *blockListener) GetBackend() rpcbackend.RPC {
+	return bl.backend
 }
 
 func (bl *blockListener) UTSetBackend(backend rpcbackend.RPC) {

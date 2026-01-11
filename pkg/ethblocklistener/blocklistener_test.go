@@ -1754,7 +1754,7 @@ func TestWaitUntilStartedCancelledCtx(t *testing.T) {
 	_, bl, _, done := newTestBlockListener(t)
 
 	bl.UTSetBackend(nil)
-	require.Nil(t, bl.backend)
+	require.Nil(t, bl.GetBackend())
 
 	cancelledFgCtx, cancelCtx := context.WithCancel(context.Background())
 	cancelCtx()
