@@ -153,10 +153,12 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 	})
 
 	if c.blockListener, err = ethblocklistener.NewBlockListenerSupplyBackend(ctx, c.retry.Retry, &ethblocklistener.BlockListenerConfig{
-		BlockPollingInterval:    conf.GetDuration(BlockPollingInterval),
-		MonitoredHeadLength:     int(c.checkpointBlockGap),
-		HederaCompatibilityMode: conf.GetBool(HederaCompatibilityMode),
-		BlockCacheSize:          conf.GetInt(BlockCacheSize),
+		BlockPollingInterval:          conf.GetDuration(BlockPollingInterval),
+		MonitoredHeadLength:           int(c.checkpointBlockGap),
+		HederaCompatibilityMode:       conf.GetBool(HederaCompatibilityMode),
+		BlockCacheSize:                conf.GetInt(BlockCacheSize),
+		MaxAsyncBlockFetchConcurrency: conf.GetInt(MaxAsyncBlockFetchConcurrency),
+		UseGetBlockReceipts:           conf.GetBool(UseGetBlockReceipts),
 	}, c.backend, c.wsBackend); err != nil {
 		return nil, err
 	}

@@ -39,12 +39,14 @@ import (
 )
 
 type BlockListenerConfig struct {
-	MonitoredHeadLength     int           `json:"monitoredHeadLength"`
-	BlockPollingInterval    time.Duration `json:"blockPollingInterval"`
-	HederaCompatibilityMode bool          `json:"hederaCompatibilityMode"`
-	BlockCacheSize          int           `json:"blockCacheSize"`
-	ReceiptCacheSize        int           `json:"receiptCacheSize"`
-	IncludeLogsBloom        bool          `json:"includeLogsBloom"`
+	MonitoredHeadLength           int           `json:"monitoredHeadLength"`
+	BlockPollingInterval          time.Duration `json:"blockPollingInterval"`
+	HederaCompatibilityMode       bool          `json:"hederaCompatibilityMode"`
+	BlockCacheSize                int           `json:"blockCacheSize"`
+	ReceiptCacheSize              int           `json:"receiptCacheSize"`
+	IncludeLogsBloom              bool          `json:"includeLogsBloom"`
+	UseGetBlockReceipts           bool          `json:"useGetBlockReceipts"`
+	MaxAsyncBlockFetchConcurrency int           `json:"maxAsyncBlockFetchConcurrency"`
 }
 
 type BlockListener interface {
@@ -54,6 +56,7 @@ type BlockListener interface {
 	GetHighestBlock(ctx context.Context) (uint64, bool)
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
+	FetchBlockReceiptsAsync(blockNumber *ethtypes.HexInteger, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error))
 	WaitClosed()
 	GetBackend() rpcbackend.RPC
 	UTSetBackend(rpcbackend.RPC)
@@ -78,15 +81,16 @@ type blockListener struct {
 	isStarted bool
 	startDone chan struct{}
 
-	initialBlockHeightObtained chan struct{}
-	newHeadsTap                chan struct{}
-	newHeadsSub                rpcbackend.Subscription
-	highestBlockSet            bool
-	highestBlock               uint64
-	mux                        sync.RWMutex
-	consumers                  map[fftypes.UUID]*BlockUpdateConsumer
-	blockCache                 *lru.Cache
-	receiptCache               *lru.Cache
+	initialBlockHeightObtained    chan struct{}
+	newHeadsTap                   chan struct{}
+	newHeadsSub                   rpcbackend.Subscription
+	highestBlockSet               bool
+	highestBlock                  uint64
+	mux                           sync.RWMutex
+	consumers                     map[fftypes.UUID]*BlockUpdateConsumer
+	blockCache                    *lru.Cache
+	receiptCache                  *lru.Cache
+	blockFetchConcurrencyThrottle chan *blockReceiptRequest
 	BlockListenerConfig
 
 	//  canonical chain
@@ -103,20 +107,24 @@ func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListen
 }
 
 func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf *BlockListenerConfig, httpBackend rpcbackend.RPC, wsBackend rpcbackend.WebSocketRPCClient) (_ BlockListener, err error) {
+	if conf.MaxAsyncBlockFetchConcurrency == 0 {
+		conf.MaxAsyncBlockFetchConcurrency = 1
+	}
 	bl := &blockListener{
-		ctx:                        log.WithLogField(ctx, "role", "blocklistener"),
-		retry:                      &retryutil.RetryWrapper{Retry: retry},
-		backend:                    httpBackend, // use the HTTP backend - might get overwritten by a connected websocket later
-		wsBackend:                  wsBackend,
-		isStarted:                  false,
-		startDone:                  make(chan struct{}),
-		initialBlockHeightObtained: make(chan struct{}),
-		newHeadsTap:                make(chan struct{}),
-		highestBlockSet:            false,
-		highestBlock:               0,
-		consumers:                  make(map[fftypes.UUID]*BlockUpdateConsumer),
-		canonicalChain:             list.New(),
-		BlockListenerConfig:        *conf,
+		ctx:                           log.WithLogField(ctx, "role", "blocklistener"),
+		retry:                         &retryutil.RetryWrapper{Retry: retry},
+		backend:                       httpBackend, // use the HTTP backend - might get overwritten by a connected websocket later
+		wsBackend:                     wsBackend,
+		isStarted:                     false,
+		startDone:                     make(chan struct{}),
+		initialBlockHeightObtained:    make(chan struct{}),
+		newHeadsTap:                   make(chan struct{}),
+		highestBlockSet:               false,
+		highestBlock:                  0,
+		consumers:                     make(map[fftypes.UUID]*BlockUpdateConsumer),
+		canonicalChain:                list.New(),
+		blockFetchConcurrencyThrottle: make(chan *blockReceiptRequest, conf.MaxAsyncBlockFetchConcurrency),
+		BlockListenerConfig:           *conf,
 	}
 	bl.blockCache, err = lru.New(conf.BlockCacheSize)
 	if err == nil {

@@ -43,11 +43,13 @@ const (
 
 	RetryEnabled = "retry.enabled"
 
-	MaxConcurrentRequests   = "maxConcurrentRequests"
-	TxCacheSize             = "txCacheSize"
-	HederaCompatibilityMode = "hederaCompatibilityMode"
-	TraceTXForRevertReason  = "traceTXForRevertReason"
-	WebSocketsEnabled       = "ws.enabled"
+	MaxConcurrentRequests         = "maxConcurrentRequests"
+	TxCacheSize                   = "txCacheSize"
+	HederaCompatibilityMode       = "hederaCompatibilityMode"
+	TraceTXForRevertReason        = "traceTXForRevertReason"
+	WebSocketsEnabled             = "ws.enabled"
+	MaxAsyncBlockFetchConcurrency = "maxAsyncBlockFetchConcurrency"
+	UseGetBlockReceipts           = "useGetBlockReceipts"
 )
 
 const (
@@ -88,6 +90,8 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(TxCacheSize, 250)
 	conf.AddKnownKey(HederaCompatibilityMode, false)
 	conf.AddKnownKey(TraceTXForRevertReason, false)
+	conf.AddKnownKey(MaxAsyncBlockFetchConcurrency, 25)
+	conf.AddKnownKey(UseGetBlockReceipts, true)
 
 	// FireFly Common default for retry enabled is false,
 	// but we want to enable it by default

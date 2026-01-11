@@ -84,4 +84,6 @@ var (
 	MsgFromBlockInvalid                         = ffe("FF23064", "From block invalid. Must be 'earliest', 'latest' or a decimal: %s", http.StatusBadRequest)
 	MsgInvalidJSONFormatOptions                 = ffe("FF23065", "The JSON formatting options must be a valid set of key=value pairs in URL query string format '%s'")
 	MsgUnknownJSONFormatOptions                 = ffe("FF23066", "JSON formatting option unknown %s=%s")
+	MsgObservedPanic                            = ffe("FF23067", "Observed panic: %v")
+	MsgReturnedBlockHashMismatch                = ffe("FF23068", "Returned block %d hash %s does not match requested hash %s")
 )
