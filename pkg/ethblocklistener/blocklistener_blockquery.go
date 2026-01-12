@@ -63,25 +63,15 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 	}, receipt, nil
 }
 
-func (bl *blockListener) GetTransactionReceipt(ctx context.Context, txHash string) (*ethrpc.TxReceiptJSONRPC, error) {
-	var ethReceipt *ethrpc.TxReceiptJSONRPC
-	cached, ok := bl.receiptCache.Get(txHash)
-	if ok {
-		ethReceipt = cached.(*ethrpc.TxReceiptJSONRPC)
-	}
-
-	if ethReceipt == nil {
-		rpcErr := bl.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", txHash)
-		if rpcErr != nil || ethReceipt == nil {
-			var err error
-			if rpcErr != nil {
-				err = rpcErr.Error()
-			}
-			return nil, err
+func (bl *blockListener) GetTransactionReceipt(ctx context.Context, txHash string) (ethReceipt *ethrpc.TxReceiptJSONRPC, err error) {
+	rpcErr := bl.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", txHash)
+	if rpcErr != nil || ethReceipt == nil {
+		var err error
+		if rpcErr != nil {
+			err = rpcErr.Error()
 		}
-		bl.receiptCache.Add(txHash, ethReceipt)
+		return nil, err
 	}
-
 	return ethReceipt, nil
 }
 

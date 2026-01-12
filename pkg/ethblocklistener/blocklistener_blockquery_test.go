@@ -69,29 +69,6 @@ func TestBlockCache(t *testing.T) {
 
 }
 
-func TestReceiptCache(t *testing.T) {
-	ctx, bl, mRPC, done := newTestBlockListener(t)
-	defer done()
-
-	txHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		assert.Equal(t, txHash.String(), args[3].(string))
-		*args[1].(**ethrpc.TxReceiptJSONRPC) = &ethrpc.TxReceiptJSONRPC{
-			TransactionHash: txHash,
-		}
-	}).Once()
-
-	receipt, err := bl.GetTransactionReceipt(ctx, txHash.String())
-	require.NoError(t, err)
-	require.Equal(t, txHash, receipt.TransactionHash)
-
-	// From cache (tested by Once() above)
-	receipt, err = bl.GetTransactionReceipt(ctx, txHash.String())
-	require.NoError(t, err)
-	require.Equal(t, txHash, receipt.TransactionHash)
-
-}
-
 func TestGetFullBlockWithTxHashesByHash(t *testing.T) {
 	ctx, bl, mRPC, done := newTestBlockListener(t)
 	defer done()

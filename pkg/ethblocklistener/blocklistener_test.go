@@ -55,7 +55,6 @@ func newTestBlockListener(t *testing.T, confSetup ...func(conf *BlockListenerCon
 		MonitoredHeadLength:     50,
 		HederaCompatibilityMode: false,
 		BlockCacheSize:          250,
-		ReceiptCacheSize:        10,
 	}
 	for _, fn := range confSetup {
 		fn(conf, mRPC, cancelCtx)

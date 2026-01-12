@@ -43,7 +43,6 @@ type BlockListenerConfig struct {
 	BlockPollingInterval          time.Duration `json:"blockPollingInterval"`
 	HederaCompatibilityMode       bool          `json:"hederaCompatibilityMode"`
 	BlockCacheSize                int           `json:"blockCacheSize"`
-	ReceiptCacheSize              int           `json:"receiptCacheSize"`
 	IncludeLogsBloom              bool          `json:"includeLogsBloom"`
 	UseGetBlockReceipts           bool          `json:"useGetBlockReceipts"`
 	MaxAsyncBlockFetchConcurrency int           `json:"maxAsyncBlockFetchConcurrency"`
@@ -93,7 +92,6 @@ type blockListener struct {
 	mux                           sync.RWMutex
 	consumers                     map[fftypes.UUID]*BlockUpdateConsumer
 	blockCache                    *lru.Cache
-	receiptCache                  *lru.Cache
 	blockFetchConcurrencyThrottle chan *blockReceiptRequest
 	BlockListenerConfig
 
@@ -131,9 +129,6 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 		BlockListenerConfig:           *conf,
 	}
 	bl.blockCache, err = lru.New(conf.BlockCacheSize)
-	if err == nil {
-		bl.receiptCache, err = lru.New(conf.ReceiptCacheSize)
-	}
 	if err != nil {
 		return nil, i18n.WrapError(ctx, err, msgs.MsgCacheInitFail, "block")
 	}

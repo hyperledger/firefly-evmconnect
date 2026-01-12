@@ -26,7 +26,6 @@ const (
 	ConfigDataFormat            = "dataFormat"
 	BlockPollingInterval        = "blockPollingInterval"
 	BlockCacheSize              = "blockCacheSize"
-	ReceiptCacheSize            = "receiptCacheSize"
 	EventsCatchupPageSize       = "events.catchupPageSize"
 	EventsCatchupThreshold      = "events.catchupThreshold"
 	EventsCatchupDownscaleRegex = "events.catchupDownscaleRegex"
@@ -70,7 +69,6 @@ func InitConfig(conf config.Section) {
 	wsclient.InitConfig(conf)
 	conf.AddKnownKey(WebSocketsEnabled, false)
 	conf.AddKnownKey(BlockCacheSize, 250)
-	conf.AddKnownKey(ReceiptCacheSize, 10)
 	conf.AddKnownKey(BlockPollingInterval, "1s")
 	conf.AddKnownKey(ConfigDataFormat, "map")
 	conf.AddKnownKey(ConfigGasEstimationFactor, DefaultGasEstimationFactor)
