@@ -155,10 +155,11 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 	largeInt, _ := new(big.Int).SetString("12300000000000000000000", 10)
 	receipt := &TxReceiptJSONRPC{
 		BlockHash:       ethtypes.MustNewHexBytes0xPrefix("0x3ef1ef8a761284b782eb1e7db3e42bbba3fe2626e5faaadb8ae94dfda8d2f4ca"),
-		BlockNumber:     ethtypes.NewHexInteger(largeInt),
+		BlockNumber:     10001,
 		ContractAddress: ethtypes.MustNewAddress("0x4a77dbf4e2ebec9d7dbb6e44fec7b5857128969c"),
 		RevertReason:    ethtypes.MustNewHexBytes0xPrefix("0xfeedbeef"),
 		LogsBloom:       ethtypes.MustNewHexBytes0xPrefix("0x000011112222"), // to be redacted
+		GasUsed:         (*ethtypes.HexInteger)(largeInt),
 	}
 
 	jss := testJSONSerializationSet(t, "number=json-number&bytes=base64&address=checksum")
@@ -170,12 +171,12 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{
 		"blockHash": "PvHvinYShLeC6x59s+Qru6P+Jibl+qrbiulN/ajS9Mo=",
-		"blockNumber": 12300000000000000000000,
+		"blockNumber": 10001,
 		"contractAddress": "0x4a77dBf4e2eBeC9d7dbB6E44FeC7B5857128969C",
 		"cumulativeGasUsed": null,
 		"effectiveGasPrice": null,
 		"from": null,
-		"gasUsed": null,
+		"gasUsed": 12300000000000000000000,
 		"logs": [],
 		"revertReason": "/u2+7w==",
 		"status": null,
@@ -224,6 +225,8 @@ func TestFormatBlockFullWithHashes(t *testing.T) {
 	require.JSONEq(t, sampleBlock, string(ethSerialized))
 
 	require.NotNil(t, block.ToBlockInfo(true))
+	require.NotNil(t, block.ToBlockInfo(true).ToFFCAPIMinimalBlockInfo())
+	require.True(t, block.ToBlockInfo(true).Equal(block.ToBlockInfo(true)))
 	require.Nil(t, (*FullBlockWithTxHashesJSONRPC)(nil).ToBlockInfo(true))
 }
 
@@ -251,4 +254,19 @@ func TestFormatBlockFullWithTxns(t *testing.T) {
 	require.NotNil(t, block.ToBlockInfo(true))
 	require.Nil(t, (*FullBlockWithTransactionsJSONRPC)(nil).ToBlockInfo(true))
 
+}
+
+func TestBlockInfoIsParent(t *testing.T) {
+	bi1 := &BlockInfoJSONRPC{
+		Number:     1000,
+		Hash:       ethtypes.MustNewHexBytes0xPrefix("86fc698428f38c8ac858ecef0380ee0a0b600488dc2225f88b2e91629c8e7090"),
+		ParentHash: ethtypes.MustNewHexBytes0xPrefix("0229ad47aeeaac6be351dc11054a3823a2ea36ef9eda34e1560dea8573f32121"),
+	}
+	bi2 := &BlockInfoJSONRPC{
+		Number:     1001,
+		Hash:       ethtypes.MustNewHexBytes0xPrefix("85fabf1197d73685fbb8f167334affcc36ceb725a37977dc5ef6eed8a8f585b1"),
+		ParentHash: ethtypes.MustNewHexBytes0xPrefix("86fc698428f38c8ac858ecef0380ee0a0b600488dc2225f88b2e91629c8e7090"),
+	}
+	require.True(t, bi1.IsParentOf(bi2))
+	require.False(t, bi2.IsParentOf(bi1))
 }

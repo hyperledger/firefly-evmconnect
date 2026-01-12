@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -58,7 +59,7 @@ func (c *ethConnector) BlockInfoByHash(ctx context.Context, req *ffcapi.BlockInf
 }
 
 func transformBlockInfo(bi *ethrpc.BlockInfoJSONRPC, t *ffcapi.BlockInfo) {
-	t.BlockNumber = (*fftypes.FFBigInt)(bi.Number)
+	t.BlockNumber = (*fftypes.FFBigInt)(new(big.Int).SetUint64(bi.Number.Uint64()))
 	t.BlockHash = bi.Hash.String()
 	t.ParentHash = bi.ParentHash.String()
 	stringHashes := make([]string, len(bi.Transactions))

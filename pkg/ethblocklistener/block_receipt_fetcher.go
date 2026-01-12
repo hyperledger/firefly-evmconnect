@@ -28,17 +28,17 @@ import (
 
 type blockReceiptRequest struct {
 	bl          *blockListener
-	blockNumber *ethtypes.HexInteger
+	blockNumber ethtypes.HexUint64
 	blockHash   ethtypes.HexBytes0xPrefix
 	cb          func([]*ethrpc.TxReceiptJSONRPC, error)
 }
 
 // Initiates a background request to get all the receipts in a block.
 // Blocks if throttled
-func (bl *blockListener) FetchBlockReceiptsAsync(blockNumber *ethtypes.HexInteger, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error)) {
+func (bl *blockListener) FetchBlockReceiptsAsync(blockNumber uint64, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error)) {
 	brr := &blockReceiptRequest{
 		bl:          bl,
-		blockNumber: blockNumber,
+		blockNumber: ethtypes.HexUint64(blockNumber),
 		blockHash:   blockHash,
 		cb:          cb,
 	}

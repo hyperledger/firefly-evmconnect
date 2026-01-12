@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
@@ -247,14 +248,15 @@ func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt 
 	if ethReceipt.TransactionIndex != nil {
 		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
 	}
+	blockNumberBigInteger := (*fftypes.FFBigInt)(new(big.Int).SetUint64(ethReceipt.BlockNumber.Uint64()))
 	receiptResponse := &ffcapi.TransactionReceiptResponse{
 		TransactionReceiptResponseBase: ffcapi.TransactionReceiptResponseBase{
 
-			BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
+			BlockNumber:      blockNumberBigInteger,
 			TransactionIndex: fftypes.NewFFBigInt(txIndex),
 			BlockHash:        ethReceipt.BlockHash.String(),
 			Success:          isSuccess,
-			ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
+			ProtocolID:       ProtocolIDForReceipt(blockNumberBigInteger, fftypes.NewFFBigInt(txIndex)),
 			ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
 		},
 	}

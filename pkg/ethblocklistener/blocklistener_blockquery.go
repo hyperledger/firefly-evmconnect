@@ -18,23 +18,20 @@ package ethblocklistener
 
 import (
 	"context"
-	"strconv"
 
-	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Hash.String(), blockInfo)
-	bl.blockCache.Add(blockInfo.Number.BigInt().String(), blockInfo)
+	bl.blockCache.Add(blockInfo.Number.String(), blockInfo)
 }
 
-func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ffcapi.MinimalBlockInfo, *ethrpc.TxReceiptJSONRPC, error) {
+func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ethrpc.BlockInfoJSONRPC, *ethrpc.TxReceiptJSONRPC, error) {
 
 	// Query the chain to find the transaction block
 	receipt, receiptErr := bl.GetTransactionReceipt(ctx, txHash)
@@ -56,11 +53,7 @@ func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash 
 		return nil, nil, nil
 	}
 
-	return &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
-		BlockHash:   bi.Hash.String(),
-		ParentHash:  bi.ParentHash.String(),
-	}, receipt, nil
+	return bi, receipt, nil
 }
 
 func (bl *blockListener) GetTransactionReceipt(ctx context.Context, txHash string) (ethReceipt *ethrpc.TxReceiptJSONRPC, err error) {
@@ -76,9 +69,10 @@ func (bl *blockListener) GetTransactionReceipt(ctx context.Context, txHash strin
 }
 
 func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error) {
+	hexBlockNumber := ethtypes.HexUint64(blockNumber)
 	var blockInfo *ethrpc.BlockInfoJSONRPC
 	if allowCache {
-		cached, ok := bl.blockCache.Get(strconv.FormatUint(blockNumber, 10))
+		cached, ok := bl.blockCache.Get(hexBlockNumber.String())
 		if ok {
 			blockInfo = cached.(*ethrpc.BlockInfoJSONRPC)
 			if (expectedParentHashStr != "" && blockInfo.ParentHash.String() != expectedParentHashStr) || (expectedBlockHashStr != "" && blockInfo.Hash.String() != expectedBlockHashStr) {
@@ -89,7 +83,7 @@ func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber u
 	}
 
 	if blockInfo == nil {
-		b, err := bl.GetFullBlockWithTxHashesByNumber(ctx, ethtypes.NewHexIntegerU64(blockNumber).String())
+		b, err := bl.GetFullBlockWithTxHashesByNumber(ctx, hexBlockNumber.String())
 		if err != nil {
 			return nil, err
 		}

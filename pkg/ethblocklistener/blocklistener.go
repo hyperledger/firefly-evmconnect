@@ -59,11 +59,19 @@ type BlockListener interface {
 	GetFullBlockWithTransactionsByHash(ctx context.Context, hash0xString string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error)
 	GetFullBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTxHashesJSONRPC, err error)
 	GetFullBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error)
-	FetchBlockReceiptsAsync(blockNumber *ethtypes.HexInteger, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error))
-	SnapshotMonitoredHeadChain() []*ffcapi.MinimalBlockInfo // snapshot the whole view, with complete blocks, using the read-lock.
+	FetchBlockReceiptsAsync(blockNumber uint64, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error))
+	SnapshotMonitoredHeadChain() []*ethrpc.BlockInfoJSONRPC // snapshot the whole view, with complete blocks, using the read-lock.
 	WaitClosed()
 	GetBackend() rpcbackend.RPC
 	UTSetBackend(rpcbackend.RPC)
+}
+
+func ffcapiMinimalBlockInfoList(blocks []*ethrpc.BlockInfoJSONRPC) []*ffcapi.MinimalBlockInfo {
+	res := make([]*ffcapi.MinimalBlockInfo, len(blocks))
+	for i, b := range blocks {
+		res[i] = b.ToFFCAPIMinimalBlockInfo()
+	}
+	return res
 }
 
 type BlockUpdateConsumer struct {
@@ -315,7 +323,7 @@ func (bl *blockListener) listenLoop() {
 			default:
 				candidate := bl.reconcileCanonicalChain(bi)
 				// Check this is the lowest position to notify from
-				if candidate != nil && (notifyPos == nil || candidate.Value.(*ffcapi.MinimalBlockInfo).BlockNumber <= notifyPos.Value.(*ffcapi.MinimalBlockInfo).BlockNumber) {
+				if candidate != nil && (notifyPos == nil || candidate.Value.(*ethrpc.BlockInfoJSONRPC).Number.Uint64() <= notifyPos.Value.(*ethrpc.BlockInfoJSONRPC).Number.Uint64()) {
 					notifyPos = candidate
 				}
 			}
@@ -323,7 +331,7 @@ func (bl *blockListener) listenLoop() {
 		if notifyPos != nil {
 			// We notify for all hashes from the point of change in the chain onwards
 			for notifyPos != nil {
-				update.BlockHashes = append(update.BlockHashes, notifyPos.Value.(*ffcapi.MinimalBlockInfo).BlockHash)
+				update.BlockHashes = append(update.BlockHashes, notifyPos.Value.(*ethrpc.BlockInfoJSONRPC).Hash.String())
 				notifyPos = notifyPos.Next()
 			}
 
@@ -353,31 +361,26 @@ func (bl *blockListener) reconcileCanonicalChain(bi *ethrpc.BlockInfoJSONRPC) *l
 	bl.canonicalChainLock.Lock()
 	defer bl.canonicalChainLock.Unlock()
 
-	mbi := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
-		BlockHash:   bi.Hash.String(),
-		ParentHash:  bi.ParentHash.String(),
-	}
-	bl.checkAndSetHighestBlock(mbi.BlockNumber.Uint64())
+	bl.checkAndSetHighestBlock(bi.Number.Uint64())
 
 	// Find the position of this block in the block sequence
 	pos := bl.canonicalChain.Back()
 	for {
 		if pos == nil || pos.Value == nil {
 			// We've eliminated all the existing chain (if there was any)
-			return bl.handleNewBlock(mbi, nil)
+			return bl.handleNewBlock(bi, nil)
 		}
-		posBlock := pos.Value.(*ffcapi.MinimalBlockInfo)
+		posBlock := pos.Value.(*ethrpc.BlockInfoJSONRPC)
 		switch {
-		case posBlock.Equal(mbi):
+		case posBlock.Equal(bi):
 			// This is a duplicate - no need to notify of anything
 			return nil
-		case posBlock.BlockNumber.Uint64() == mbi.BlockNumber.Uint64():
+		case posBlock.Number.Uint64() == bi.Number.Uint64():
 			// We are replacing a block in the chain
-			return bl.handleNewBlock(mbi, pos.Prev())
-		case posBlock.BlockNumber.Uint64() < mbi.BlockNumber.Uint64():
+			return bl.handleNewBlock(bi, pos.Prev())
+		case posBlock.Number.Uint64() < bi.Number.Uint64():
 			// We have a position where this block goes
-			return bl.handleNewBlock(mbi, pos)
+			return bl.handleNewBlock(bi, pos)
 		default:
 			// We've not wound back to the point this block fits yet
 			pos = pos.Prev()
@@ -389,14 +392,14 @@ func (bl *blockListener) reconcileCanonicalChain(bi *ethrpc.BlockInfoJSONRPC) *l
 // view of the canonical chain behind it, or trimming anything after it that is invalidated by a new fork.
 //
 // Caller MUST hold the canonicalChain WRITE LOCK
-func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *list.Element) *list.Element {
+func (bl *blockListener) handleNewBlock(mbi *ethrpc.BlockInfoJSONRPC, addAfter *list.Element) *list.Element {
 	// If we have an existing canonical chain before this point, then we need to check we've not
 	// invalidated that with this block. If we have, then we have to re-verify our whole canonical
 	// chain from the first block. Then notify from the earliest point where it has diverged.
 	if addAfter != nil {
-		prevBlock := addAfter.Value.(*ffcapi.MinimalBlockInfo)
-		if prevBlock.BlockNumber.Uint64() != (mbi.BlockNumber.Uint64()-1) || prevBlock.BlockHash != mbi.ParentHash {
-			log.L(bl.ctx).Infof("Notified of block %d / %s that does not fit after block %d / %s (expected parent: %s)", mbi.BlockNumber.Uint64(), mbi.BlockHash, prevBlock.BlockNumber.Uint64(), prevBlock.BlockHash, mbi.ParentHash)
+		prevBlock := addAfter.Value.(*ethrpc.BlockInfoJSONRPC)
+		if prevBlock.Number.Uint64() != (mbi.Number.Uint64()-1) || !prevBlock.Hash.Equals(mbi.ParentHash) {
+			log.L(bl.ctx).Infof("Notified of block %d / %s that does not fit after block %d / %s (expected parent: %s)", mbi.Number.Uint64(), mbi.Hash, prevBlock.Number.Uint64(), prevBlock.Hash, mbi.ParentHash)
 			return bl.rebuildCanonicalChain()
 		}
 	}
@@ -424,7 +427,7 @@ func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *
 		_ = bl.canonicalChain.Remove(bl.canonicalChain.Front())
 	}
 
-	log.L(bl.ctx).Debugf("Added block %d / %s parent=%s to in-memory canonical chain (new length=%d)", mbi.BlockNumber.Uint64(), mbi.BlockHash, mbi.ParentHash, bl.canonicalChain.Len())
+	log.L(bl.ctx).Debugf("Added block %d / %s parent=%s to in-memory canonical chain (new length=%d)", mbi.Number.Uint64(), mbi.Hash, mbi.ParentHash, bl.canonicalChain.Len())
 
 	return newElem
 }
@@ -438,17 +441,17 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	// If none of our blocks were valid, start from the first block number we've notified about previously
 	lastValidBlock := bl.trimToLastValidBlock()
 	var nextBlockNumber uint64
-	var expectedParentHash string
+	var expectedParentHash ethtypes.HexBytes0xPrefix
 	if lastValidBlock != nil {
-		nextBlockNumber = lastValidBlock.BlockNumber.Uint64() + 1
+		nextBlockNumber = lastValidBlock.Number.Uint64() + 1
 		log.L(bl.ctx).Infof("Canonical chain partially rebuilding from block %d", nextBlockNumber)
-		expectedParentHash = lastValidBlock.BlockHash
+		expectedParentHash = lastValidBlock.Hash
 	} else {
 		firstBlock := bl.canonicalChain.Front()
 		if firstBlock == nil || firstBlock.Value == nil {
 			return nil
 		}
-		nextBlockNumber = firstBlock.Value.(*ffcapi.MinimalBlockInfo).BlockNumber.Uint64()
+		nextBlockNumber = firstBlock.Value.(*ethrpc.BlockInfoJSONRPC).Number.Uint64()
 		log.L(bl.ctx).Warnf("Canonical chain re-initialized at block %d", nextBlockNumber)
 		// Clear out the whole chain
 		bl.canonicalChain = bl.canonicalChain.Init()
@@ -470,60 +473,55 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 			log.L(bl.ctx).Infof("Canonical chain rebuilt the chain to the head block %d", nextBlockNumber-1)
 			break
 		}
-		mbi := &ffcapi.MinimalBlockInfo{
-			BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
-			BlockHash:   bi.Hash.String(),
-			ParentHash:  bi.ParentHash.String(),
-		}
 
 		// It's possible the chain will change while we're doing this, and we fall back to the next block notification
 		// to sort that out.
-		if expectedParentHash != "" && mbi.ParentHash != expectedParentHash {
-			log.L(bl.ctx).Infof("Canonical chain rebuilding stopped at block: %d due to mismatch hash for parent block (%d): %s (expected: %s)", nextBlockNumber, nextBlockNumber-1, mbi.ParentHash, expectedParentHash)
+		if expectedParentHash != nil && !bi.ParentHash.Equals(expectedParentHash) {
+			log.L(bl.ctx).Infof("Canonical chain rebuilding stopped at block: %d due to mismatch hash for parent block (%d): %s (expected: %s)", nextBlockNumber, nextBlockNumber-1, bi.ParentHash, expectedParentHash)
 			break
 		}
-		expectedParentHash = mbi.BlockHash
+		expectedParentHash = bi.Hash
 		nextBlockNumber++
 
 		// Note we do not trim to a length here, as we need to notify for every block we haven't notified for.
 		// Trimming to a length will happen when we get blocks that slot into our existing view
-		newElem := bl.canonicalChain.PushBack(mbi)
+		newElem := bl.canonicalChain.PushBack(bi)
 		if notifyPos == nil {
 			notifyPos = newElem
 		}
 
-		bl.checkAndSetHighestBlock(mbi.BlockNumber.Uint64())
+		bl.checkAndSetHighestBlock(bi.Number.Uint64())
 
 	}
 	return notifyPos
 }
 
 // Caller MUST hold the canonicalChain WRITE LOCK
-func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalBlockInfo) {
+func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ethrpc.BlockInfoJSONRPC) {
 	// First remove from the end until we get a block that matches the current un-cached query view from the chain
 	lastElem := bl.canonicalChain.Back()
 	var startingNumber *uint64
 	for lastElem != nil && lastElem.Value != nil {
 
 		// Query the block that is no at this blockNumber
-		currentViewBlock := lastElem.Value.(*ffcapi.MinimalBlockInfo)
+		currentViewBlock := lastElem.Value.(*ethrpc.BlockInfoJSONRPC)
 		if startingNumber == nil {
-			currentNumber := currentViewBlock.BlockNumber.Uint64()
+			currentNumber := currentViewBlock.Number.Uint64()
 			startingNumber = &currentNumber
 			log.L(bl.ctx).Debugf("Canonical chain checking from last block: %d", startingNumber)
 		}
 		var freshBlockInfo *ethrpc.BlockInfoJSONRPC
 		err := bl.retry.Do(bl.ctx, "rebuild listener canonical chain", func(_ int) (retry bool, err error) {
-			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.BlockNumber.Uint64())
-			freshBlockInfo, err = bl.GetBlockInfoByNumber(bl.ctx, currentViewBlock.BlockNumber.Uint64(), false, "", "")
+			log.L(bl.ctx).Debugf("Canonical chain validating block: %d", currentViewBlock.Number.Uint64())
+			freshBlockInfo, err = bl.GetBlockInfoByNumber(bl.ctx, currentViewBlock.Number.Uint64(), false, "", "")
 			return true, err
 		})
 		if err != nil {
 			return nil // Context must have been cancelled
 		}
 
-		if freshBlockInfo != nil && freshBlockInfo.Hash.String() == currentViewBlock.BlockHash {
-			log.L(bl.ctx).Debugf("Canonical chain found last valid block %d", currentViewBlock.BlockNumber.Uint64())
+		if freshBlockInfo != nil && freshBlockInfo.Hash.Equals(currentViewBlock.Hash) {
+			log.L(bl.ctx).Debugf("Canonical chain found last valid block %d", currentViewBlock.Number.Uint64())
 			lastValidBlock = currentViewBlock
 			// Trim everything after this point, as it's invalidated
 			nextElem := lastElem.Next()
@@ -537,8 +535,8 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalB
 		lastElem = lastElem.Prev()
 	}
 
-	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.BlockNumber.Uint64() {
-		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.BlockNumber.Uint64(), bl.MonitoredHeadLength)
+	if startingNumber != nil && lastValidBlock != nil && *startingNumber != lastValidBlock.Number.Uint64() {
+		log.L(bl.ctx).Debugf("Canonical chain trimmed from block %d to block %d (total number of in memory blocks: %d)", startingNumber, lastValidBlock.Number.Uint64(), bl.MonitoredHeadLength)
 	}
 	return lastValidBlock
 }
@@ -614,13 +612,13 @@ func (bl *blockListener) checkAndSetHighestBlock(block uint64) {
 }
 
 // snapshot the whole view using the read-lock.
-func (bl *blockListener) SnapshotMonitoredHeadChain() []*ffcapi.MinimalBlockInfo {
+func (bl *blockListener) SnapshotMonitoredHeadChain() []*ethrpc.BlockInfoJSONRPC {
 	bl.canonicalChainLock.RLock()
 	defer bl.canonicalChainLock.RUnlock()
 
-	res := make([]*ffcapi.MinimalBlockInfo, 0, bl.canonicalChain.Len())
+	res := make([]*ethrpc.BlockInfoJSONRPC, 0, bl.canonicalChain.Len())
 	for pos := bl.canonicalChain.Front(); pos != nil; pos = pos.Next() {
-		res = append(res, pos.Value.(*ffcapi.MinimalBlockInfo))
+		res = append(res, pos.Value.(*ethrpc.BlockInfoJSONRPC))
 	}
 	return res
 }

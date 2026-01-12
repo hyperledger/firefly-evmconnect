@@ -37,7 +37,7 @@ func TestFetchBlockReceiptsAsyncOptimizedOk(t *testing.T) {
 	defer done()
 
 	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
-	blockNumber := ethtypes.NewHexIntegerU64(12346)
+	blockNumber := ethtypes.HexUint64(12346)
 
 	receipt := &ethrpc.TxReceiptJSONRPC{
 		TransactionHash: ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String()),
@@ -51,7 +51,7 @@ func TestFetchBlockReceiptsAsyncOptimizedOk(t *testing.T) {
 	})
 
 	fetched := make(chan struct{})
-	bl.FetchBlockReceiptsAsync(blockNumber, blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
 		defer close(fetched)
 		assert.NoError(t, err)
 		assert.Equal(t, []*ethrpc.TxReceiptJSONRPC{receipt}, receipts)
@@ -66,7 +66,7 @@ func TestFetchBlockReceiptsAsyncOptimizedBlockMismatch(t *testing.T) {
 	defer done()
 
 	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
-	blockNumber := ethtypes.NewHexIntegerU64(12346)
+	blockNumber := ethtypes.HexUint64(12346)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockReceipts", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, blockNumber, args[3])
@@ -80,7 +80,7 @@ func TestFetchBlockReceiptsAsyncOptimizedBlockMismatch(t *testing.T) {
 	})
 
 	fetched := make(chan struct{})
-	bl.FetchBlockReceiptsAsync(blockNumber, blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
 		defer close(fetched)
 		assert.Regexp(t, "FF23068.*"+blockHash.String(), err)
 	})
@@ -94,13 +94,13 @@ func TestFetchBlockReceiptsAsyncOptimizedBlockHandleError(t *testing.T) {
 	defer done()
 
 	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
-	blockNumber := ethtypes.NewHexIntegerU64(12346)
+	blockNumber := ethtypes.HexUint64(12346)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockReceipts", mock.Anything).
 		Return(rpcbackend.NewRPCError(ctx, rpcbackend.RPCCodeInternalError, i18n.Msg404NotFound))
 
 	fetched := make(chan struct{})
-	bl.FetchBlockReceiptsAsync(blockNumber, blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
 		defer close(fetched)
 		assert.Regexp(t, "FF00167", err)
 	})
@@ -114,12 +114,12 @@ func TestFetchBlockReceiptsAsyncOptimizedBlockHandlePanic(t *testing.T) {
 	defer done()
 
 	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
-	blockNumber := ethtypes.NewHexIntegerU64(12346)
+	blockNumber := ethtypes.HexUint64(12346)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockReceipts", mock.Anything).Panic("pop")
 
 	fetched := make(chan struct{})
-	bl.FetchBlockReceiptsAsync(blockNumber, blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
 		defer close(fetched)
 		assert.Regexp(t, "FF23067.*pop", err)
 	})
@@ -131,7 +131,7 @@ func TestFetchBlockReceiptsAsyncNonOptimizedOk(t *testing.T) {
 	defer done()
 
 	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
-	blockNumber := ethtypes.NewHexIntegerU64(12346)
+	blockNumber := ethtypes.HexUint64(12346)
 	txHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
 	block := &ethrpc.FullBlockWithTxHashesJSONRPC{
@@ -159,7 +159,7 @@ func TestFetchBlockReceiptsAsyncNonOptimizedOk(t *testing.T) {
 	})
 
 	fetched := make(chan struct{})
-	bl.FetchBlockReceiptsAsync(blockNumber, blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
 		defer close(fetched)
 		assert.NoError(t, err)
 		assert.Equal(t, []*ethrpc.TxReceiptJSONRPC{receipt}, receipts)

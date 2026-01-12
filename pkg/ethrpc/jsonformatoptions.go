@@ -198,6 +198,11 @@ func (ss *JSONSerializerSet) buildFormatElem(value any, opts []MarshalOption) (_
 		if !isNil {
 			return ss.Integer(vt), false
 		}
+	case *uint64:
+		isNil = (vt == nil)
+		if !isNil {
+			return ss.Integer(new(big.Int).SetUint64(*vt)), false
+		}
 	case *big.Float:
 		isNil = (vt == nil)
 		if !isNil {

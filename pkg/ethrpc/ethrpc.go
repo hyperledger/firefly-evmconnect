@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
@@ -28,7 +30,7 @@ type TxReceiptJSONRPC struct {
 	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
 	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
 	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger      `json:"blockNumber"`
+	BlockNumber       ethtypes.HexUint64        `json:"blockNumber"`
 	From              *ethtypes.Address0xHex    `json:"from"`
 	To                *ethtypes.Address0xHex    `json:"to"`
 	CumulativeGasUsed *ethtypes.HexInteger      `json:"cumulativeGasUsed"`
@@ -54,7 +56,7 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 			"transactionHash":   ([]byte)(txr.TransactionHash),
 			"transactionIndex":  (*big.Int)(txr.TransactionIndex),
 			"blockHash":         ([]byte)(txr.BlockHash),
-			"blockNumber":       (*big.Int)(txr.BlockNumber),
+			"blockNumber":       (*uint64)(&txr.BlockNumber),
 			"from":              (*[20]byte)(txr.From),
 			"to":                (*[20]byte)(txr.To),
 			"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
@@ -156,7 +158,7 @@ func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption
 
 // BlockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
 type BlockInfoJSONRPC struct {
-	Number       *ethtypes.HexInteger        `json:"number"`
+	Number       ethtypes.HexUint64          `json:"number"`
 	Hash         ethtypes.HexBytes0xPrefix   `json:"hash"`
 	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash"`
 	Timestamp    *ethtypes.HexInteger        `json:"timestamp"`
@@ -170,7 +172,7 @@ func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsha
 		txnArray[i] = ([]byte)(t)
 	}
 	return jss.MarshalFormattedMap(map[string]any{
-		"number":       (*big.Int)(bi.Number),
+		"number":       (*uint64)(&bi.Number),
 		"hash":         ([]byte)(bi.Hash),
 		"parentHash":   ([]byte)(bi.ParentHash),
 		"timestamp":    (*big.Int)(bi.Timestamp),
@@ -179,8 +181,26 @@ func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsha
 	}, opts...)
 }
 
+func (bi *BlockInfoJSONRPC) Equal(bi2 *BlockInfoJSONRPC) bool {
+	return bi.Hash.Equals(bi2.Hash) &&
+		bi.ParentHash.Equals(bi2.ParentHash) &&
+		bi.Number == bi2.Number
+}
+
+func (bi *BlockInfoJSONRPC) IsParentOf(other *BlockInfoJSONRPC) bool {
+	return bi.Hash.Equals(other.ParentHash) && (bi.Number.Uint64()+1) == other.Number.Uint64()
+}
+
+func (bi *BlockInfoJSONRPC) ToFFCAPIMinimalBlockInfo() *ffcapi.MinimalBlockInfo {
+	return &ffcapi.MinimalBlockInfo{
+		BlockNumber: fftypes.FFuint64(bi.Number.Uint64()),
+		BlockHash:   bi.Hash.String(),
+		ParentHash:  bi.ParentHash.String(),
+	}
+}
+
 type BlockHeaderJSONRPC struct {
-	Number           *ethtypes.HexInteger        `json:"number"`
+	Number           ethtypes.HexUint64          `json:"number"`
 	Hash             ethtypes.HexBytes0xPrefix   `json:"hash"`
 	MixHash          ethtypes.HexBytes0xPrefix   `json:"mixHash"`
 	ParentHash       ethtypes.HexBytes0xPrefix   `json:"parentHash"`
@@ -208,7 +228,7 @@ func (b *BlockHeaderJSONRPC) getFormatMap() map[string]any {
 		unclesArray[i] = ([]byte)(uncle)
 	}
 	return map[string]any{
-		"number":           (*big.Int)(b.Number),
+		"number":           (*uint64)(&b.Number),
 		"hash":             ([]byte)(b.Hash),
 		"mixHash":          ([]byte)(b.MixHash),
 		"parentHash":       ([]byte)(b.ParentHash),

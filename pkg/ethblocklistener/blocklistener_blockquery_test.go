@@ -39,7 +39,7 @@ func TestBlockCache(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, block1001AHash.String(), args[3].(string))
 		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-			Number:     ethtypes.NewHexInteger64(1001),
+			Number:     ethtypes.HexUint64(1001),
 			Hash:       block1001AHash,
 			ParentHash: block1000Hash,
 		}}
@@ -47,7 +47,7 @@ func TestBlockCache(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, ethtypes.NewHexInteger64(1001).String(), args[3].(string))
 		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-			Number:     ethtypes.NewHexInteger64(1001),
+			Number:     ethtypes.HexUint64(1001),
 			Hash:       block1001BHash,
 			ParentHash: block1000Hash,
 		}}
@@ -80,7 +80,7 @@ func TestGetFullBlockWithTxHashesByHash(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-					Number:     ethtypes.NewHexInteger64(1001),
+					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
 					ParentHash: block1000Hash,
 				},
@@ -109,7 +109,7 @@ func TestGetFullBlockWithTransactionsByHash(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			*args[1].(**ethrpc.FullBlockWithTransactionsJSONRPC) = &ethrpc.FullBlockWithTransactionsJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-					Number:     ethtypes.NewHexInteger64(1001),
+					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
 					ParentHash: block1000Hash,
 				},
@@ -138,7 +138,7 @@ func TestGetFullBlockWithTxHashesByNumber(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-					Number:     ethtypes.NewHexInteger64(1001),
+					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
 					ParentHash: block1000Hash,
 				},
@@ -167,7 +167,7 @@ func TestGetFullBlockWithTransactionsByNumber(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			*args[1].(**ethrpc.FullBlockWithTransactionsJSONRPC) = &ethrpc.FullBlockWithTransactionsJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-					Number:     ethtypes.NewHexInteger64(1001),
+					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
 					ParentHash: block1000Hash,
 				},
