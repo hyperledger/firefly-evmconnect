@@ -223,7 +223,7 @@ func (l *listener) listenerCatchupLoop() {
 func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *ethrpc.LogJSONRPC) (*ffcapi.ListenerEvent, bool, error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
-	blockNumber := ethLog.BlockNumber.BigInt().Int64()
+	blockNumber := trimUint64(ethLog.BlockNumber.Uint64())
 	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
 	logIndex := ethLog.LogIndex.BigInt().Int64()
 	if blockNumber < l.hwmBlock {

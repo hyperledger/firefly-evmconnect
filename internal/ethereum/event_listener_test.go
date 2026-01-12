@@ -72,7 +72,7 @@ func TestListenerCheckpointLessThan(t *testing.T) {
 func sampleTransferLog() *ethrpc.LogJSONRPC {
 	return &ethrpc.LogJSONRPC{
 		Address:          ethtypes.MustNewAddress("0x20355f3E852D4b6a9944AdA8d5399dDD3409A431"),
-		BlockNumber:      ethtypes.NewHexInteger64(1024),
+		BlockNumber:      ethtypes.HexUint64(1024),
 		TransactionIndex: ethtypes.NewHexInteger64(64),
 		LogIndex:         ethtypes.NewHexInteger64(2),
 		BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
@@ -445,7 +445,7 @@ func TestFilterEnrichEthLogBlockBelowHWM(t *testing.T) {
 
 	l.hwmBlock = 2
 	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &ethrpc.LogJSONRPC{
-		BlockNumber: ethtypes.NewHexInteger64(1),
+		BlockNumber: ethtypes.HexUint64(1),
 	})
 	assert.NoError(t, err)
 	assert.False(t, ok)

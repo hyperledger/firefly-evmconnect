@@ -19,6 +19,7 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"math"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -35,10 +36,18 @@ type eventEnricher struct {
 	extractSigner bool
 }
 
+// We rely on -1 in our logic, so we don't actually support the full range of uint64
+func trimUint64(v uint64) int64 {
+	if v > math.MaxInt64 {
+		panic("block number too large to fit in int64")
+	}
+	return (int64)(v)
+}
+
 func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *ethrpc.LogJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
-	blockNumber := ethLog.BlockNumber.BigInt().Int64()
+	blockNumber := trimUint64(ethLog.BlockNumber.Uint64())
 	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
 	logIndex := ethLog.LogIndex.BigInt().Int64()
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
@@ -115,7 +124,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 			Signature:        signature,
 			BlockHash:        ethLog.BlockHash.String(),
 			TransactionHash:  ethLog.TransactionHash.String(),
-			BlockNumber:      fftypes.FFuint64(ethLog.BlockNumber.BigInt().Uint64()),
+			BlockNumber:      fftypes.FFuint64(ethLog.BlockNumber),
 			TransactionIndex: fftypes.FFuint64(ethLog.TransactionIndex.BigInt().Uint64()),
 			LogIndex:         fftypes.FFuint64(ethLog.LogIndex.BigInt().Uint64()),
 			Timestamp:        timestamp,

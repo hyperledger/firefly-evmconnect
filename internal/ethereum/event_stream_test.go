@@ -220,7 +220,7 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		switch fromBlock {
 		case 1000:
 			ethLogs = append(ethLogs, &ethrpc.LogJSONRPC{
-				BlockNumber:      ethtypes.NewHexInteger64(1024),
+				BlockNumber:      ethtypes.HexUint64(1024),
 				TransactionIndex: ethtypes.NewHexInteger64(64),
 				LogIndex:         ethtypes.NewHexInteger64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
@@ -400,7 +400,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
 			{
-				BlockNumber:      ethtypes.NewHexInteger64(212122),
+				BlockNumber:      ethtypes.HexUint64(212122),
 				TransactionIndex: ethtypes.NewHexInteger64(64),
 				LogIndex:         ethtypes.NewHexInteger64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
@@ -744,7 +744,7 @@ func TestStreamLoopEnrichFail(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
 			{
-				BlockNumber:      ethtypes.NewHexInteger64(212122),
+				BlockNumber:      ethtypes.HexUint64(212122),
 				TransactionIndex: ethtypes.NewHexInteger64(64),
 				LogIndex:         ethtypes.NewHexInteger64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),

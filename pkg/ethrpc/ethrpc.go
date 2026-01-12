@@ -130,7 +130,7 @@ type LogJSONRPC struct {
 	Removed          bool                        `json:"removed"`
 	LogIndex         *ethtypes.HexInteger        `json:"logIndex"`
 	TransactionIndex *ethtypes.HexInteger        `json:"transactionIndex"`
-	BlockNumber      *ethtypes.HexInteger        `json:"blockNumber"`
+	BlockNumber      ethtypes.HexUint64          `json:"blockNumber"`
 	TransactionHash  ethtypes.HexBytes0xPrefix   `json:"transactionHash"`
 	BlockHash        ethtypes.HexBytes0xPrefix   `json:"blockHash"`
 	Address          *ethtypes.Address0xHex      `json:"address"`
@@ -147,7 +147,7 @@ func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption
 		"removed":          l.Removed,
 		"logIndex":         (*big.Int)(l.LogIndex),
 		"transactionIndex": (*big.Int)(l.TransactionIndex),
-		"blockNumber":      (*big.Int)(l.BlockNumber),
+		"blockNumber":      (*uint64)(&l.BlockNumber),
 		"transactionHash":  ([]byte)(l.TransactionHash),
 		"blockHash":        ([]byte)(l.BlockHash),
 		"address":          (*[20]byte)(l.Address),

@@ -19,6 +19,7 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
@@ -26,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
@@ -81,7 +83,7 @@ func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
-		BlockNumber:      ethtypes.NewHexInteger64(100),
+		BlockNumber:      ethtypes.HexUint64(100),
 		TransactionIndex: ethtypes.NewHexInteger64(1),
 		LogIndex:         ethtypes.NewHexInteger64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
@@ -134,7 +136,7 @@ func TestEventEnricher_FilterEnrichEthLog_TopicNoMatch(t *testing.T) {
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{otherTopic},
 		Data:             []byte{},
-		BlockNumber:      ethtypes.NewHexInteger64(100),
+		BlockNumber:      ethtypes.HexUint64(100),
 		TransactionIndex: ethtypes.NewHexInteger64(1),
 		LogIndex:         ethtypes.NewHexInteger64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
@@ -185,7 +187,7 @@ func TestEventEnricher_FilterEnrichEthLog_AddressNoMatch(t *testing.T) {
 		Address:          otherAddr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
-		BlockNumber:      ethtypes.NewHexInteger64(100),
+		BlockNumber:      ethtypes.HexUint64(100),
 		TransactionIndex: ethtypes.NewHexInteger64(1),
 		LogIndex:         ethtypes.NewHexInteger64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
@@ -252,7 +254,7 @@ func TestEventEnricher_FilterEnrichEthLog_NoAddressFilter(t *testing.T) {
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
-		BlockNumber:      ethtypes.NewHexInteger64(100),
+		BlockNumber:      ethtypes.HexUint64(100),
 		TransactionIndex: ethtypes.NewHexInteger64(1),
 		LogIndex:         ethtypes.NewHexInteger64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
@@ -318,7 +320,7 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 		Address:          addr,
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
-		BlockNumber:      ethtypes.NewHexInteger64(100),
+		BlockNumber:      ethtypes.HexUint64(100),
 		TransactionIndex: ethtypes.NewHexInteger64(1),
 		LogIndex:         ethtypes.NewHexInteger64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
@@ -329,4 +331,10 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, matched)
 	assert.NotNil(t, ev)
+}
+
+func TestTrimUint64Panics(t *testing.T) {
+	require.Panics(t, func() {
+		_ = trimUint64(math.MaxUint64)
+	})
 }
