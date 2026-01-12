@@ -60,6 +60,7 @@ type BlockListener interface {
 	GetFullBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTxHashesJSONRPC, err error)
 	GetFullBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (b *ethrpc.FullBlockWithTransactionsJSONRPC, err error)
 	FetchBlockReceiptsAsync(blockNumber *ethtypes.HexInteger, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error))
+	SnapshotMonitoredHeadChain() []*ffcapi.MinimalBlockInfo // snapshot the whole view, with complete blocks, using the read-lock.
 	WaitClosed()
 	GetBackend() rpcbackend.RPC
 	UTSetBackend(rpcbackend.RPC)
@@ -68,7 +69,7 @@ type BlockListener interface {
 type BlockUpdateConsumer struct {
 	ID      *fftypes.UUID // could be an event stream ID for example - must be unique
 	Ctx     context.Context
-	Updates chan<- *ffcapi.BlockHashEvent
+	Updates chan<- *ffcapi.BlockHashEvent // FFTM change events
 }
 
 // blockListener has two functions:
@@ -87,16 +88,17 @@ type blockListener struct {
 	initialBlockHeightObtained    chan struct{}
 	newHeadsTap                   chan struct{}
 	newHeadsSub                   rpcbackend.Subscription
-	highestBlockSet               bool
-	highestBlock                  uint64
-	mux                           sync.RWMutex
+	consumerMux                   sync.Mutex // covers consumers and listenLoopDone
 	consumers                     map[fftypes.UUID]*BlockUpdateConsumer
 	blockCache                    *lru.Cache
 	blockFetchConcurrencyThrottle chan *blockReceiptRequest
 	BlockListenerConfig
 
 	//  canonical chain
-	canonicalChain *list.List
+	canonicalChainLock sync.RWMutex // covers highestBlock and canonicalChain
+	canonicalChain     *list.List
+	highestBlockSet    bool
+	highestBlock       uint64
 }
 
 func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListenerConfig, httpConf *ffresty.Config, wsConf *wsclient.WSConfig) (bl BlockListener, err error) {
@@ -326,12 +328,12 @@ func (bl *blockListener) listenLoop() {
 			}
 
 			// Take a copy of the consumers in the lock
-			bl.mux.Lock()
+			bl.consumerMux.Lock()
 			consumers := make([]*BlockUpdateConsumer, 0, len(bl.consumers))
 			for _, c := range bl.consumers {
 				consumers = append(consumers, c)
 			}
-			bl.mux.Unlock()
+			bl.consumerMux.Unlock()
 
 			// Spin through delivering the block update
 			bl.dispatchToConsumers(consumers, update)
@@ -348,6 +350,9 @@ func (bl *blockListener) listenLoop() {
 // head of the canonical chain we have. If these blocks do not just fit onto the end of the chain, then we
 // work backwards building a new view and notify about all blocks that are changed in that process.
 func (bl *blockListener) reconcileCanonicalChain(bi *ethrpc.BlockInfoJSONRPC) *list.Element {
+	bl.canonicalChainLock.Lock()
+	defer bl.canonicalChainLock.Unlock()
+
 	mbi := &ffcapi.MinimalBlockInfo{
 		BlockNumber: fftypes.FFuint64(bi.Number.BigInt().Uint64()),
 		BlockHash:   bi.Hash.String(),
@@ -382,6 +387,8 @@ func (bl *blockListener) reconcileCanonicalChain(bi *ethrpc.BlockInfoJSONRPC) *l
 
 // handleNewBlock rebuilds the canonical chain around a new block, checking if we need to rebuild our
 // view of the canonical chain behind it, or trimming anything after it that is invalidated by a new fork.
+//
+// Caller MUST hold the canonicalChain WRITE LOCK
 func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *list.Element) *list.Element {
 	// If we have an existing canonical chain before this point, then we need to check we've not
 	// invalidated that with this block. If we have, then we have to re-verify our whole canonical
@@ -425,6 +432,8 @@ func (bl *blockListener) handleNewBlock(mbi *ffcapi.MinimalBlockInfo, addAfter *
 // rebuildCanonicalChain is called (only on non-empty case) when our current chain does not seem to line up with
 // a recent block advertisement. So we need to work backwards to the last point of consistency with the current
 // chain and re-query the chain state from there.
+//
+// Caller MUST hold the canonicalChain WRITE LOCK
 func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	// If none of our blocks were valid, start from the first block number we've notified about previously
 	lastValidBlock := bl.trimToLastValidBlock()
@@ -489,6 +498,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 	return notifyPos
 }
 
+// Caller MUST hold the canonicalChain WRITE LOCK
 func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ffcapi.MinimalBlockInfo) {
 	// First remove from the end until we get a block that matches the current un-cached query view from the chain
 	lastElem := bl.canonicalChain.Back()
@@ -541,16 +551,16 @@ func (bl *blockListener) dispatchToConsumers(consumers []*BlockUpdateConsumer, u
 		case <-bl.ctx.Done(): // loop, we're stopping and will exit on next loop
 		case <-c.Ctx.Done():
 			log.L(bl.ctx).Debugf("Block update consumer %s closed", c.ID)
-			bl.mux.Lock()
+			bl.consumerMux.Lock()
 			delete(bl.consumers, *c.ID)
-			bl.mux.Unlock()
+			bl.consumerMux.Unlock()
 		}
 	}
 }
 
 func (bl *blockListener) checkAndStartListenerLoop() {
-	bl.mux.Lock()
-	defer bl.mux.Unlock()
+	bl.consumerMux.Lock()
+	defer bl.consumerMux.Unlock()
 	if bl.listenLoopDone == nil {
 		bl.listenLoopDone = make(chan struct{})
 		go bl.listenLoop()
@@ -560,8 +570,8 @@ func (bl *blockListener) checkAndStartListenerLoop() {
 func (bl *blockListener) AddConsumer(ctx context.Context, c *BlockUpdateConsumer) {
 	bl.checkAndStartListenerLoop()
 	bl.waitUntilStarted(ctx) // need to make sure the listener is started before adding any consumers
-	bl.mux.Lock()
-	defer bl.mux.Unlock()
+	bl.consumerMux.Lock()
+	defer bl.consumerMux.Unlock()
 	bl.consumers[*c.ID] = c
 }
 
@@ -569,9 +579,9 @@ func (bl *blockListener) GetHighestBlock(ctx context.Context) (uint64, bool) {
 	bl.checkAndStartListenerLoop()
 	// block height will be established as the first step of listener startup process
 	// so we don't need to wait for the entire startup process to finish to return the result
-	bl.mux.Lock()
+	bl.canonicalChainLock.RLock()
 	highestBlockSet := bl.highestBlockSet
-	bl.mux.Unlock()
+	bl.canonicalChainLock.RUnlock()
 	// if not yet initialized, wait to be initialized
 	if !highestBlockSet {
 		select {
@@ -581,33 +591,44 @@ func (bl *blockListener) GetHighestBlock(ctx context.Context) (uint64, bool) {
 			return 0, false
 		}
 	}
-	bl.mux.Lock()
+	bl.canonicalChainLock.RLock()
 	highestBlock := bl.highestBlock
-	bl.mux.Unlock()
+	bl.canonicalChainLock.RUnlock()
 	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
 	return highestBlock, true
 }
 
 func (bl *blockListener) setHighestBlock(block uint64) {
-	bl.mux.Lock()
-	defer bl.mux.Unlock()
+	bl.canonicalChainLock.Lock()
+	defer bl.canonicalChainLock.Unlock()
 	bl.highestBlock = block
 	bl.highestBlockSet = true
 }
 
+// Caller MUST hold the canonicalChain WRITE LOCK
 func (bl *blockListener) checkAndSetHighestBlock(block uint64) {
-	bl.mux.Lock()
-	defer bl.mux.Unlock()
 	if block > bl.highestBlock {
 		bl.highestBlock = block
 		bl.highestBlockSet = true
 	}
 }
 
+// snapshot the whole view using the read-lock.
+func (bl *blockListener) SnapshotMonitoredHeadChain() []*ffcapi.MinimalBlockInfo {
+	bl.canonicalChainLock.RLock()
+	defer bl.canonicalChainLock.RUnlock()
+
+	res := make([]*ffcapi.MinimalBlockInfo, 0, bl.canonicalChain.Len())
+	for pos := bl.canonicalChain.Front(); pos != nil; pos = pos.Next() {
+		res = append(res, pos.Value.(*ffcapi.MinimalBlockInfo))
+	}
+	return res
+}
+
 func (bl *blockListener) WaitClosed() {
-	bl.mux.Lock()
+	bl.consumerMux.Lock()
 	listenLoopDone := bl.listenLoopDone
-	bl.mux.Unlock()
+	bl.consumerMux.Unlock()
 	if bl.wsBackend != nil {
 		_ = bl.wsBackend.UnsubscribeAll(bl.ctx)
 		bl.wsBackend.Close()

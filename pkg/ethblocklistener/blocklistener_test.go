@@ -244,7 +244,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 
 	mRPC.AssertExpectations(t)
 
-	assert.Equal(t, bl.MonitoredHeadLength, bl.canonicalChain.Len())
+	assert.Len(t, bl.SnapshotMonitoredHeadChain(), bl.MonitoredHeadLength)
 
 }
 

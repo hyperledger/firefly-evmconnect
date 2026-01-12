@@ -295,8 +295,8 @@ func (bl *blockListener) validateChainCaughtUp(ctx context.Context, txBlockInfo 
 // It does not modify the in-memory partial chain itself, only reads from it.
 // This function holds a read lock on the in-memory partial chain, so it should not make long-running queries.
 func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (newConfirmationsWithoutTxBlock []*ffcapi.MinimalBlockInfo, err error) {
-	bl.mux.RLock()
-	defer bl.mux.RUnlock()
+	bl.canonicalChainLock.RLock()
+	defer bl.canonicalChainLock.RUnlock()
 	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
 	targetBlockNumber := txBlockInfo.BlockNumber.Uint64() + targetConfirmationCount
 
@@ -336,8 +336,8 @@ func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx con
 }
 
 func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, txBlockInfo *ffcapi.MinimalBlockInfo) (*ffcapi.ConfirmationUpdateResult, error) {
-	bl.mux.RLock()
-	defer bl.mux.RUnlock()
+	bl.canonicalChainLock.RLock()
+	defer bl.canonicalChainLock.RUnlock()
 	// if the target confirmation count is 0, and the transaction blocks is before the last block in the in-memory partial chain,
 	// we can immediately return a confirmed result
 	txBlockNumber := txBlockInfo.BlockNumber.Uint64()
@@ -354,8 +354,8 @@ func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, 
 }
 
 func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) *ffcapi.ConfirmationUpdateResult {
-	bl.mux.RLock()
-	defer bl.mux.RUnlock()
+	bl.canonicalChainLock.RLock()
+	defer bl.canonicalChainLock.RUnlock()
 	nextInMemoryBlock := bl.canonicalChain.Front()
 	var nextInMemoryBlockInfo *ffcapi.MinimalBlockInfo
 	lastExistingConfirmation := existingConfirmations[len(existingConfirmations)-1]
