@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
@@ -75,12 +74,7 @@ func TestGetBlockInfoByNumberOK(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber",
-		mock.MatchedBy(
-			func(blockNumber *ethtypes.HexInteger) bool {
-				return blockNumber.BigInt().String() == "12345"
-			}),
-		false).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x3039", false).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleBlockJSONRPC), args[1])
