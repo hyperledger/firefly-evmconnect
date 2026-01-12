@@ -78,7 +78,7 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 // TxInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
 type TxInfoJSONRPC struct {
 	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
-	BlockNumber      *ethtypes.HexInteger      `json:"blockNumber"` // null if pending
+	BlockNumber      ethtypes.HexUint64        `json:"blockNumber"` // null if pending
 	ChainID          *ethtypes.HexInteger      `json:"chainId"`
 	From             *ethtypes.Address0xHex    `json:"from"`
 	Gas              *ethtypes.HexInteger      `json:"gas"`
@@ -98,7 +98,7 @@ type TxInfoJSONRPC struct {
 func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
 	return jss.MarshalFormattedMap(map[string]any{
 		"blockHash":        ([]byte)(txi.BlockHash),
-		"blockNumber":      (*big.Int)(txi.BlockNumber),
+		"blockNumber":      (*uint64)(&txi.BlockNumber),
 		"chainId":          (*big.Int)(txi.ChainID),
 		"from":             (*[20]byte)(txi.From),
 		"gas":              (*big.Int)(txi.Gas),

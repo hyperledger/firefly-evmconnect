@@ -38,7 +38,7 @@ func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		bi := &ethrpc.TxInfoJSONRPC{
-			BlockNumber: ethtypes.NewHexInteger64(100),
+			BlockNumber: ethtypes.HexUint64(100),
 		}
 		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
@@ -210,7 +210,7 @@ func TestEventEnricher_FilterEnrichEthLog_NoAddressFilter(t *testing.T) {
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		bi := &ethrpc.TxInfoJSONRPC{
-			BlockNumber: ethtypes.NewHexInteger64(100),
+			BlockNumber: ethtypes.HexUint64(100),
 		}
 		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
@@ -276,7 +276,7 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		bi := &ethrpc.TxInfoJSONRPC{
-			BlockNumber: ethtypes.NewHexInteger64(100),
+			BlockNumber: ethtypes.HexUint64(100),
 		}
 		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
