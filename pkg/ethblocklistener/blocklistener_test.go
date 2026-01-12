@@ -224,8 +224,9 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	})
 
 	updates := make(chan *ffcapi.BlockHashEvent)
+	consumerID := fftypes.NewUUID()
 	bl.AddConsumer(context.Background(), &BlockUpdateConsumer{
-		ID:      fftypes.NewUUID(),
+		ID:      consumerID,
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
@@ -242,6 +243,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	}, bu.BlockHashes)
 	assert.False(t, bu.GapPotential)
 
+	bl.RemoveConsumer(context.Background(), consumerID)
 	done()
 	<-bl.listenLoopDone
 

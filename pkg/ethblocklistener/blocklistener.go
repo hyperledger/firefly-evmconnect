@@ -52,6 +52,7 @@ type BlockListener interface {
 	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
 	GetMonitoredHeadLength() int // provides a getter on the configuration for unstable head length - as this information is important to consumers (might be multiple from this block listener)
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
+	RemoveConsumer(ctx context.Context, id *fftypes.UUID)
 	GetHighestBlock(ctx context.Context) (uint64, bool)
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
@@ -571,6 +572,12 @@ func (bl *blockListener) AddConsumer(ctx context.Context, c *BlockUpdateConsumer
 	bl.consumerMux.Lock()
 	defer bl.consumerMux.Unlock()
 	bl.consumers[*c.ID] = c
+}
+
+func (bl *blockListener) RemoveConsumer(_ context.Context, id *fftypes.UUID) {
+	bl.consumerMux.Lock()
+	defer bl.consumerMux.Unlock()
+	delete(bl.consumers, *id)
 }
 
 func (bl *blockListener) GetHighestBlock(ctx context.Context) (uint64, bool) {
