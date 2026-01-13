@@ -244,19 +244,16 @@ func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt 
 		ErrorMessage:      transactionErrorMessage,
 	})
 
-	var txIndex int64
-	if ethReceipt.TransactionIndex != nil {
-		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
-	}
+	txIndex := (*fftypes.FFBigInt)(new(big.Int).SetUint64(ethReceipt.TransactionIndex.Uint64()))
 	blockNumberBigInteger := (*fftypes.FFBigInt)(new(big.Int).SetUint64(ethReceipt.BlockNumber.Uint64()))
 	receiptResponse := &ffcapi.TransactionReceiptResponse{
 		TransactionReceiptResponseBase: ffcapi.TransactionReceiptResponseBase{
 
 			BlockNumber:      blockNumberBigInteger,
-			TransactionIndex: fftypes.NewFFBigInt(txIndex),
+			TransactionIndex: txIndex,
 			BlockHash:        ethReceipt.BlockHash.String(),
 			Success:          isSuccess,
-			ProtocolID:       ProtocolIDForReceipt(blockNumberBigInteger, fftypes.NewFFBigInt(txIndex)),
+			ProtocolID:       ProtocolIDForReceipt(blockNumberBigInteger, txIndex),
 			ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
 		},
 	}

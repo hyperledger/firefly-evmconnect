@@ -84,8 +84,8 @@ func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
 		BlockNumber:      ethtypes.HexUint64(100),
-		TransactionIndex: ethtypes.NewHexInteger64(1),
-		LogIndex:         ethtypes.NewHexInteger64(0),
+		TransactionIndex: ethtypes.HexUint64(1),
+		LogIndex:         ethtypes.HexUint64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
 	}
 
@@ -137,8 +137,8 @@ func TestEventEnricher_FilterEnrichEthLog_TopicNoMatch(t *testing.T) {
 		Topics:           []ethtypes.HexBytes0xPrefix{otherTopic},
 		Data:             []byte{},
 		BlockNumber:      ethtypes.HexUint64(100),
-		TransactionIndex: ethtypes.NewHexInteger64(1),
-		LogIndex:         ethtypes.NewHexInteger64(0),
+		TransactionIndex: ethtypes.HexUint64(1),
+		LogIndex:         ethtypes.HexUint64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
 	}
 
@@ -188,8 +188,8 @@ func TestEventEnricher_FilterEnrichEthLog_AddressNoMatch(t *testing.T) {
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
 		BlockNumber:      ethtypes.HexUint64(100),
-		TransactionIndex: ethtypes.NewHexInteger64(1),
-		LogIndex:         ethtypes.NewHexInteger64(0),
+		TransactionIndex: ethtypes.HexUint64(1),
+		LogIndex:         ethtypes.HexUint64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
 	}
 
@@ -255,8 +255,8 @@ func TestEventEnricher_FilterEnrichEthLog_NoAddressFilter(t *testing.T) {
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
 		BlockNumber:      ethtypes.HexUint64(100),
-		TransactionIndex: ethtypes.NewHexInteger64(1),
-		LogIndex:         ethtypes.NewHexInteger64(0),
+		TransactionIndex: ethtypes.HexUint64(1),
+		LogIndex:         ethtypes.HexUint64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
 	}
 
@@ -321,8 +321,8 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 		Topics:           []ethtypes.HexBytes0xPrefix{topic0},
 		Data:             []byte{},
 		BlockNumber:      ethtypes.HexUint64(100),
-		TransactionIndex: ethtypes.NewHexInteger64(1),
-		LogIndex:         ethtypes.NewHexInteger64(0),
+		TransactionIndex: ethtypes.HexUint64(1),
+		LogIndex:         ethtypes.HexUint64(0),
 		BlockHash:        ethtypes.HexBytes0xPrefix{},
 	}
 

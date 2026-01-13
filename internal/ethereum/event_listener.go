@@ -224,8 +224,8 @@ func (l *listener) filterEnrichEthLog(ctx context.Context, f *eventFilter, metho
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := trimUint64(ethLog.BlockNumber.Uint64())
-	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
-	logIndex := ethLog.LogIndex.BigInt().Int64()
+	transactionIndex := trimUint64(ethLog.TransactionIndex.Uint64())
+	logIndex := trimUint64(ethLog.LogIndex.Uint64())
 	if blockNumber < l.hwmBlock {
 		log.L(ctx).Debugf("Listener %s already delivered event '%s' hwm=%d", l.id, getEventProtoID(blockNumber, transactionIndex, logIndex), l.hwmBlock)
 		return nil, false, nil

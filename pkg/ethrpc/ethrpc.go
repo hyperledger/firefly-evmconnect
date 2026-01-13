@@ -28,7 +28,7 @@ import (
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
 type TxReceiptJSONRPC struct {
 	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
-	TransactionIndex  *ethtypes.HexInteger      `json:"transactionIndex"`
+	TransactionIndex  ethtypes.HexUint64        `json:"transactionIndex"`
 	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash"`
 	BlockNumber       ethtypes.HexUint64        `json:"blockNumber"`
 	From              *ethtypes.Address0xHex    `json:"from"`
@@ -54,7 +54,7 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 	if err == nil {
 		jb, err = jss.MarshalFormattedMap(map[string]any{
 			"transactionHash":   ([]byte)(txr.TransactionHash),
-			"transactionIndex":  (*big.Int)(txr.TransactionIndex),
+			"transactionIndex":  (*uint64)(&txr.TransactionIndex),
 			"blockHash":         ([]byte)(txr.BlockHash),
 			"blockNumber":       (*uint64)(&txr.BlockNumber),
 			"from":              (*[20]byte)(txr.From),
@@ -128,8 +128,8 @@ type LogFilterJSONRPC struct {
 
 type LogJSONRPC struct {
 	Removed          bool                        `json:"removed"`
-	LogIndex         *ethtypes.HexInteger        `json:"logIndex"`
-	TransactionIndex *ethtypes.HexInteger        `json:"transactionIndex"`
+	LogIndex         ethtypes.HexUint64          `json:"logIndex"`
+	TransactionIndex ethtypes.HexUint64          `json:"transactionIndex"`
 	BlockNumber      ethtypes.HexUint64          `json:"blockNumber"`
 	TransactionHash  ethtypes.HexBytes0xPrefix   `json:"transactionHash"`
 	BlockHash        ethtypes.HexBytes0xPrefix   `json:"blockHash"`
@@ -145,8 +145,8 @@ func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption
 	}
 	return jss.MarshalFormattedMap(map[string]any{
 		"removed":          l.Removed,
-		"logIndex":         (*big.Int)(l.LogIndex),
-		"transactionIndex": (*big.Int)(l.TransactionIndex),
+		"logIndex":         (*uint64)(&l.LogIndex),
+		"transactionIndex": (*uint64)(&l.TransactionIndex),
 		"blockNumber":      (*uint64)(&l.BlockNumber),
 		"transactionHash":  ([]byte)(l.TransactionHash),
 		"blockHash":        ([]byte)(l.BlockHash),

@@ -48,8 +48,8 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
 	blockNumber := trimUint64(ethLog.BlockNumber.Uint64())
-	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
-	logIndex := ethLog.LogIndex.BigInt().Int64()
+	transactionIndex := trimUint64(ethLog.TransactionIndex.Uint64())
+	logIndex := trimUint64(ethLog.LogIndex.Uint64())
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
 
 	// Apply a post-filter check to the event
@@ -114,10 +114,6 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		}
 	}
 
-	if blockNumber < 0 || transactionIndex < 0 || logIndex < 0 {
-		log.L(ctx).Errorf("Invalid block number, transaction index or log index for event '%s'", protoID)
-		return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgInvalidProtocolID, protoID)
-	}
 	signature := f.Signature
 	return &ffcapi.Event{
 		ID: ffcapi.EventID{
@@ -125,8 +121,8 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 			BlockHash:        ethLog.BlockHash.String(),
 			TransactionHash:  ethLog.TransactionHash.String(),
 			BlockNumber:      fftypes.FFuint64(ethLog.BlockNumber),
-			TransactionIndex: fftypes.FFuint64(ethLog.TransactionIndex.BigInt().Uint64()),
-			LogIndex:         fftypes.FFuint64(ethLog.LogIndex.BigInt().Uint64()),
+			TransactionIndex: fftypes.FFuint64(ethLog.TransactionIndex),
+			LogIndex:         fftypes.FFuint64(ethLog.LogIndex),
 			Timestamp:        timestamp,
 		},
 		Info: &info,

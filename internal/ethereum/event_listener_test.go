@@ -73,8 +73,8 @@ func sampleTransferLog() *ethrpc.LogJSONRPC {
 	return &ethrpc.LogJSONRPC{
 		Address:          ethtypes.MustNewAddress("0x20355f3E852D4b6a9944AdA8d5399dDD3409A431"),
 		BlockNumber:      ethtypes.HexUint64(1024),
-		TransactionIndex: ethtypes.NewHexInteger64(64),
-		LogIndex:         ethtypes.NewHexInteger64(2),
+		TransactionIndex: ethtypes.HexUint64(64),
+		LogIndex:         ethtypes.HexUint64(2),
 		BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		TransactionHash:  ethtypes.MustNewHexBytes0xPrefix("0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"),
 		Topics: []ethtypes.HexBytes0xPrefix{
@@ -507,38 +507,6 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 	assert.Equal(t, `{"_to":"0xd0f2f5103fd050739a9fb567251bc460cc24d091","_value":"1000"}`, ei.InputArgs.String())
 	assert.Equal(t, `transfer(address,uint256)`, ei.InputMethod)
 	assert.Equal(t, `0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4`, ei.InputSigner.String())
-
-}
-
-func TestFilterEnrichEthLogInvalidNegativeID(t *testing.T) {
-
-	l, mRPC, _ := newTestListener(t, true)
-
-	var abiEvent *abi.Entry
-	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
-	assert.NoError(t, err)
-
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
-		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-			Number: ethtypes.HexUint64(1024),
-		}}
-	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
-		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
-	})).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.TxInfoJSONRPC) = &ethrpc.TxInfoJSONRPC{
-			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
-			Input: ethtypes.MustNewHexBytes0xPrefix("0xa9059cbb000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d09100000000000000000000000000000000000000000000000000000000000003e8"),
-		}
-	}).Once()
-
-	ethLogWithNegativeLogIndex := sampleTransferLog()
-	ethLogWithNegativeLogIndex.LogIndex = ethtypes.NewHexInteger64(-1)
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, ethLogWithNegativeLogIndex) // cache miss
-	assert.False(t, ok)
-	assert.Regexp(t, "FF23055", err)
 
 }
 

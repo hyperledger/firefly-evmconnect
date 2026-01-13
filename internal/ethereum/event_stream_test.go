@@ -221,8 +221,8 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		case 1000:
 			ethLogs = append(ethLogs, &ethrpc.LogJSONRPC{
 				BlockNumber:      ethtypes.HexUint64(1024),
-				TransactionIndex: ethtypes.NewHexInteger64(64),
-				LogIndex:         ethtypes.NewHexInteger64(2),
+				TransactionIndex: ethtypes.HexUint64(64),
+				LogIndex:         ethtypes.HexUint64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Topics: []ethtypes.HexBytes0xPrefix{
 					ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"),
@@ -401,8 +401,8 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
 			{
 				BlockNumber:      ethtypes.HexUint64(212122),
-				TransactionIndex: ethtypes.NewHexInteger64(64),
-				LogIndex:         ethtypes.NewHexInteger64(2),
+				TransactionIndex: ethtypes.HexUint64(64),
+				LogIndex:         ethtypes.HexUint64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Address:          ethtypes.MustNewAddress("0xc89E46EEED41b777ca6625d37E1Cc87C5c037828"),
 				Topics: []ethtypes.HexBytes0xPrefix{
@@ -745,8 +745,8 @@ func TestStreamLoopEnrichFail(t *testing.T) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
 			{
 				BlockNumber:      ethtypes.HexUint64(212122),
-				TransactionIndex: ethtypes.NewHexInteger64(64),
-				LogIndex:         ethtypes.NewHexInteger64(2),
+				TransactionIndex: ethtypes.HexUint64(64),
+				LogIndex:         ethtypes.HexUint64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Address:          ethtypes.MustNewAddress("0x171AE0BDd882F7b4C84D5b7FBFA994E39C5a3129"),
 				Topics: []ethtypes.HexBytes0xPrefix{

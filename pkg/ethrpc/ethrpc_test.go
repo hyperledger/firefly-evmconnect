@@ -182,7 +182,7 @@ func TestFormatReceiptRevertReasonAndFormatVariation(t *testing.T) {
 		"status": null,
 		"to": null,
 		"transactionHash": null,
-		"transactionIndex": null,
+		"transactionIndex": 0,
 		"type": null
 	}`, string(ethSerialized))
 
