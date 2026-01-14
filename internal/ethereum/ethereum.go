@@ -70,6 +70,9 @@ type Connector interface {
 	// WSRPC returns the websocket JSON/RPC client
 	// NOTE: websocket client will be nil if websockets are not enabled
 	WSRPC() rpcbackend.WebSocketRPCClient
+
+	// Get the high level block listener functionality, which provides a view of the head of the chain
+	BlockListener() ethblocklistener.BlockListener
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
@@ -172,6 +175,10 @@ func (c *ethConnector) RPC() rpcbackend.RPC {
 
 func (c *ethConnector) WSRPC() rpcbackend.WebSocketRPCClient {
 	return c.wsBackend
+}
+
+func (c *ethConnector) BlockListener() ethblocklistener.BlockListener {
+	return c.blockListener
 }
 
 // WaitClosed can be called after cancelling all the contexts, to wait for everything to close down
