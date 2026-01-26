@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -22,32 +22,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
-
-// txReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
-type txReceiptJSONRPC struct {
-	BlockHash         ethtypes.HexBytes0xPrefix  `json:"blockHash"`
-	BlockNumber       *ethtypes.HexInteger       `json:"blockNumber"`
-	ContractAddress   *ethtypes.Address0xHex     `json:"contractAddress"`
-	CumulativeGasUsed *ethtypes.HexInteger       `json:"cumulativeGasUsed"`
-	From              *ethtypes.Address0xHex     `json:"from"`
-	GasUsed           *ethtypes.HexInteger       `json:"gasUsed"`
-	Logs              []*logJSONRPC              `json:"logs"`
-	Status            *ethtypes.HexInteger       `json:"status"`
-	To                *ethtypes.Address0xHex     `json:"to"`
-	TransactionHash   ethtypes.HexBytes0xPrefix  `json:"transactionHash"`
-	TransactionIndex  *ethtypes.HexInteger       `json:"transactionIndex"`
-	RevertReason      *ethtypes.HexBytes0xPrefix `json:"revertReason"`
-}
 
 // receiptExtraInfo is the version of the receipt we store under the TX.
 // - We omit the full logs from the JSON/RPC
@@ -62,23 +48,6 @@ type receiptExtraInfo struct {
 	Status            *fftypes.FFBigInt      `json:"status"`
 	ErrorMessage      *string                `json:"errorMessage"`
 	ReturnValue       *string                `json:"returnValue,omitempty"`
-}
-
-// txInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
-type txInfoJSONRPC struct {
-	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
-	BlockNumber      *ethtypes.HexInteger      `json:"blockNumber"` // null if pending
-	From             *ethtypes.Address0xHex    `json:"from"`
-	Gas              *ethtypes.HexInteger      `json:"gas"`
-	GasPrice         *ethtypes.HexInteger      `json:"gasPrice"`
-	Hash             ethtypes.HexBytes0xPrefix `json:"hash"`
-	Input            ethtypes.HexBytes0xPrefix `json:"input"`
-	R                *ethtypes.HexInteger      `json:"r"`
-	S                *ethtypes.HexInteger      `json:"s"`
-	To               *ethtypes.Address0xHex    `json:"to"`
-	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
-	V                *ethtypes.HexInteger      `json:"v"`
-	Value            *ethtypes.HexInteger      `json:"value"`
 }
 
 type StructLog struct {
@@ -98,11 +67,11 @@ type txDebugTrace struct {
 	StructLogs  []StructLog       `json:"structLogs"`
 }
 
-func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*txInfoJSONRPC, error) {
-	var txInfo *txInfoJSONRPC
+func (c *ethConnector) getTransactionInfo(ctx context.Context, hash ethtypes.HexBytes0xPrefix) (*ethrpc.TxInfoJSONRPC, error) {
+	var txInfo *ethrpc.TxInfoJSONRPC
 	cached, ok := c.txCache.Get(hash.String())
 	if ok {
-		return cached.(*txInfoJSONRPC), nil
+		return cached.(*ethrpc.TxInfoJSONRPC), nil
 	}
 
 	rpcErr := c.backend.CallRPC(ctx, &txInfo, "eth_getTransactionByHash", hash)
@@ -131,7 +100,7 @@ func padHexData(hexString string) string {
 	return hexString
 }
 
-func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt *ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
+func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string, revertFromReceipt ethtypes.HexBytes0xPrefix) (pReturnValue *string, pErrorMessage *string) {
 
 	var revertReason string
 	if revertFromReceipt == nil {
@@ -206,7 +175,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	}
 
 	// Get the receipt in the back-end JSON/RPC format
-	var ethReceipt *txReceiptJSONRPC
+	var ethReceipt *ethrpc.TxReceiptJSONRPC
 	rpcErr := c.backend.CallRPC(ctx, &ethReceipt, "eth_getTransactionReceipt", req.TransactionHash)
 	if rpcErr != nil {
 		return nil, "", rpcErr.Error()
@@ -214,48 +183,10 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 	if ethReceipt == nil {
 		return nil, ffcapi.ErrorReasonNotFound, i18n.NewError(ctx, msgs.MsgReceiptNotAvailable, req.TransactionHash)
 	}
-	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
 
-	var returnDataString *string
-	var transactionErrorMessage *string
+	// Enrich the receipt with error information and build it up into the FFTM object
+	receiptResponse := c.enrichTransactionReceipt(ctx, ethReceipt)
 
-	if !isSuccess {
-		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, req.TransactionHash, ethReceipt.RevertReason)
-	}
-
-	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
-		ContractAddress:   ethReceipt.ContractAddress,
-		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
-		From:              ethReceipt.From,
-		To:                ethReceipt.To,
-		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
-		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
-		ReturnValue:       returnDataString,
-		ErrorMessage:      transactionErrorMessage,
-	})
-
-	var txIndex int64
-	if ethReceipt.TransactionIndex != nil {
-		txIndex = ethReceipt.TransactionIndex.BigInt().Int64()
-	}
-	receiptResponse := &ffcapi.TransactionReceiptResponse{
-		TransactionReceiptResponseBase: ffcapi.TransactionReceiptResponseBase{
-
-			BlockNumber:      (*fftypes.FFBigInt)(ethReceipt.BlockNumber),
-			TransactionIndex: fftypes.NewFFBigInt(txIndex),
-			BlockHash:        ethReceipt.BlockHash.String(),
-			Success:          isSuccess,
-			ProtocolID:       ProtocolIDForReceipt((*fftypes.FFBigInt)(ethReceipt.BlockNumber), fftypes.NewFFBigInt(txIndex)),
-			ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
-		},
-	}
-	if req.IncludeLogs {
-		receiptResponse.Logs = make([]fftypes.JSONAny, len(ethReceipt.Logs))
-		for i, l := range ethReceipt.Logs {
-			b, _ := json.Marshal(l) // no error injectable here as we unmarshalled to a struct we control
-			receiptResponse.Logs[i] = *fftypes.JSONAnyPtrBytes(b)
-		}
-	}
 	// Try to decode the events etc. if we have filters supplied
 	if len(filters) > 0 {
 		ee := &eventEnricher{
@@ -277,14 +208,62 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 				receiptResponse.Events = append(receiptResponse.Events, bestMatch)
 			}
 		}
-
 	}
+
+	if req.IncludeLogs {
+		receiptResponse.Logs = make([]fftypes.JSONAny, len(ethReceipt.Logs))
+		for i, l := range ethReceipt.Logs {
+			b, _ := json.Marshal(l) // no error injectable here as we unmarshalled to a struct we control
+			receiptResponse.Logs[i] = *fftypes.JSONAnyPtrBytes(b)
+		}
+	}
+
+	return receiptResponse, "", nil
+}
+
+// enrichTransactionReceipt tries to get the error information
+func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt *ethrpc.TxReceiptJSONRPC) *ffcapi.TransactionReceiptResponse {
+
+	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
+
+	var returnDataString *string
+	var transactionErrorMessage *string
+
+	if !isSuccess {
+		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, ethReceipt.TransactionHash.String(), ethReceipt.RevertReason)
+	}
+
+	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
+		ContractAddress:   ethReceipt.ContractAddress,
+		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
+		From:              ethReceipt.From,
+		To:                ethReceipt.To,
+		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
+		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		ReturnValue:       returnDataString,
+		ErrorMessage:      transactionErrorMessage,
+	})
+
+	txIndex := (*fftypes.FFBigInt)(new(big.Int).SetUint64(ethReceipt.TransactionIndex.Uint64()))
+	blockNumberBigInteger := (*fftypes.FFBigInt)(new(big.Int).SetUint64(ethReceipt.BlockNumber.Uint64()))
+	receiptResponse := &ffcapi.TransactionReceiptResponse{
+		TransactionReceiptResponseBase: ffcapi.TransactionReceiptResponseBase{
+
+			BlockNumber:      blockNumberBigInteger,
+			TransactionIndex: txIndex,
+			BlockHash:        ethReceipt.BlockHash.String(),
+			Success:          isSuccess,
+			ProtocolID:       ProtocolIDForReceipt(blockNumberBigInteger, txIndex),
+			ExtraInfo:        fftypes.JSONAnyPtrBytes(fullReceipt),
+		},
+	}
+
 	if ethReceipt.ContractAddress != nil {
 		location, _ := json.Marshal(map[string]string{
 			"address": ethReceipt.ContractAddress.String(),
 		})
 		receiptResponse.ContractLocation = fftypes.JSONAnyPtrBytes(location)
 	}
-	return receiptResponse, "", nil
+	return receiptResponse
 
 }

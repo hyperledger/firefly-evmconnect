@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -61,7 +62,7 @@ func (c *ethConnector) TransactionSend(ctx context.Context, req *ffcapi.Transact
 	if rpcError != nil {
 		// send transaction responses never returns error details, only the error message
 		// so no need to parse the error data
-		return nil, mapError(sendRPCMethods, rpcError.Error()), rpcError.Error()
+		return nil, etherrors.MapError(etherrors.SendRPCMethods, rpcError.Error()), rpcError.Error()
 	}
 	return &ffcapi.TransactionSendResponse{
 		TransactionHash: txHash.String(),

@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -14,28 +14,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package retryutil
 
 import (
 	"context"
 	"time"
 
 	"github.com/hyperledger/firefly-common/pkg/log"
+	"github.com/hyperledger/firefly-common/pkg/retry"
 )
 
-func (c *ethConnector) doFailureDelay(ctx context.Context, failureCount int) bool {
+type RetryWrapper struct {
+	*retry.Retry
+}
+
+func (rw *RetryWrapper) CalcFailureDelay(failureCount int) time.Duration {
+	if failureCount == 0 {
+		return 0
+	}
+	retryDelay := rw.InitialDelay
+	for i := 0; i < (failureCount - 1); i++ {
+		retryDelay = time.Duration(float64(retryDelay) * rw.Factor)
+		if retryDelay > rw.MaximumDelay {
+			retryDelay = rw.MaximumDelay
+			break
+		}
+	}
+	return retryDelay
+}
+
+func (rw *RetryWrapper) DoFailureDelay(ctx context.Context, failureCount int) bool {
 	if failureCount <= 0 {
 		return false
 	}
 
-	retryDelay := c.retry.InitialDelay
-	for i := 0; i < (failureCount - 1); i++ {
-		retryDelay = time.Duration(float64(retryDelay) * c.retry.Factor)
-		if retryDelay > c.retry.MaximumDelay {
-			retryDelay = c.retry.MaximumDelay
-			break
-		}
-	}
+	retryDelay := rw.CalcFailureDelay(failureCount)
 	log.L(ctx).Debugf("Retrying after %.2f (failures=%d)", retryDelay.Seconds(), failureCount)
 	select {
 	case <-time.After(retryDelay):

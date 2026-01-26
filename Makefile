@@ -1,5 +1,5 @@
 VGO=go
-GOFILES := $(shell find cmd internal -name '*.go' -print)
+GOFILES := $(shell find cmd pkg internal -name '*.go' -print)
 GOBIN := $(shell $(VGO) env GOPATH)/bin
 LINT := $(GOBIN)/golangci-lint
 MOCKERY := $(GOBIN)/mockery
@@ -12,7 +12,7 @@ GOGC=30
 
 all: build test go-mod-tidy
 test: deps lint
-		$(VGO) test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s
+		$(VGO) test ./pkg/... ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=30s
 coverage.html:
 		$(VGO) tool cover -html=coverage.txt
 coverage: test coverage.html
@@ -32,8 +32,9 @@ mocks-$(strip $(1))-$(strip $(2)): ${MOCKERY} mockpaths
 	${MOCKERY} --case underscore --dir $(1) --name $(2) --outpkg $(3) --output mocks/$(strip $(3))
 endef
 
-$(eval $(call makemock, $$(FF_SIGNER_PATH),   Backend,   rpcbackendmocks))
-$(eval $(call makemock, $$(FFTM_PATH),        Manager,   fftmmocks))
+$(eval $(call makemock, $$(FF_SIGNER_PATH),   Backend,      rpcbackendmocks))
+$(eval $(call makemock, $$(FF_SIGNER_PATH),   Subscription, rpcbackendmocks))
+$(eval $(call makemock, $$(FFTM_PATH),        Manager,      fftmmocks))
 
 firefly-evmconnect: ${GOFILES}
 		$(VGO) build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v ./evmconnect

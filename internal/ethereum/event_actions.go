@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
@@ -62,10 +63,10 @@ func (c *ethConnector) EventStreamStart(ctx context.Context, req *ffcapi.EventSt
 	go es.streamLoop()
 
 	// Add the block consumer
-	c.blockListener.addConsumer(req.StreamContext, &blockUpdateConsumer{
-		id:      es.id,
-		ctx:     req.StreamContext,
-		updates: req.BlockListener,
+	c.blockListener.AddConsumer(req.StreamContext, &ethblocklistener.BlockUpdateConsumer{
+		ID:      es.id,
+		Ctx:     req.StreamContext,
+		Updates: req.BlockListener,
 	})
 
 	return &ffcapi.EventStreamStartResponse{}, "", nil

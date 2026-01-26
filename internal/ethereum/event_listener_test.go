@@ -25,6 +25,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -68,12 +69,12 @@ func TestListenerCheckpointLessThan(t *testing.T) {
 
 }
 
-func sampleTransferLog() *logJSONRPC {
-	return &logJSONRPC{
+func sampleTransferLog() *ethrpc.LogJSONRPC {
+	return &ethrpc.LogJSONRPC{
 		Address:          ethtypes.MustNewAddress("0x20355f3E852D4b6a9944AdA8d5399dDD3409A431"),
-		BlockNumber:      ethtypes.NewHexInteger64(1024),
-		TransactionIndex: ethtypes.NewHexInteger64(64),
-		LogIndex:         ethtypes.NewHexInteger64(2),
+		BlockNumber:      ethtypes.HexUint64(1024),
+		TransactionIndex: ethtypes.HexUint64(64),
+		LogIndex:         ethtypes.HexUint64(2),
 		BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		TransactionHash:  ethtypes.MustNewHexBytes0xPrefix("0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"),
 		Topics: []ethtypes.HexBytes0xPrefix{
@@ -175,13 +176,13 @@ func TestListenerCatchupErrorsThenDeliveryExit(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "pop"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -203,13 +204,13 @@ func TestListenerCatchupScalesBackOnExpectedError(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit error."}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -233,13 +234,13 @@ func TestListenerCatchupScalesBackNTimesOnExpectedError(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit"}).Times(5)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -263,13 +264,13 @@ func TestListenerCatchupScalesBackToOne(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size is larger than 150MB limit"}).Times(50)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -293,13 +294,13 @@ func TestListenerNoCatchupScaleBackOnErrorMismatch(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "Response size problem"}).Times(5) // This doesn't match the default regex pattern so scaling back doesn't occur
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -327,13 +328,13 @@ func TestListenerCatchupScalesBackCustomRegex(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "ACME JSON/RPC endpoint error - eth_getLogs response size is too large"}).Times(5)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -358,9 +359,9 @@ func TestListenerCatchupNoScaleBackEmptyRegex(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1001),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1001),
+		}}
 	})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "net_version", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -368,7 +369,7 @@ func TestListenerCatchupNoScaleBackEmptyRegex(t *testing.T) {
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "ACME JSON/RPC endpoint error - eth_getLogs response size is too large"}).Times(5)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{sampleTransferLog()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{sampleTransferLog()}
 		// Cancel the context here so we exit pushing the event
 		cancelCtx()
 	})
@@ -443,8 +444,8 @@ func TestFilterEnrichEthLogBlockBelowHWM(t *testing.T) {
 	assert.NoError(t, err)
 
 	l.hwmBlock = 2
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &logJSONRPC{
-		BlockNumber: ethtypes.NewHexInteger64(1),
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &ethrpc.LogJSONRPC{
+		BlockNumber: ethtypes.HexUint64(1),
 	})
 	assert.NoError(t, err)
 	assert.False(t, ok)
@@ -459,7 +460,7 @@ func TestFilterEnrichEthLogAddressMismatch(t *testing.T) {
 	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
 	assert.NoError(t, err)
 
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &logJSONRPC{
+	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, &ethrpc.LogJSONRPC{
 		Address: ethtypes.MustNewAddress("0x20355f3e852d4b6a9944ada8d5399ddd3409a431"),
 	})
 	assert.NoError(t, err)
@@ -481,14 +482,14 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**txInfoJSONRPC) = &txInfoJSONRPC{
+		*args[1].(**ethrpc.TxInfoJSONRPC) = &ethrpc.TxInfoJSONRPC{
 			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
 			Input: ethtypes.MustNewHexBytes0xPrefix("0xa9059cbb000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d09100000000000000000000000000000000000000000000000000000000000003e8"),
 		}
@@ -509,38 +510,6 @@ func TestFilterEnrichEthLogMethodInputsOk(t *testing.T) {
 
 }
 
-func TestFilterEnrichEthLogInvalidNegativeID(t *testing.T) {
-
-	l, mRPC, _ := newTestListener(t, true)
-
-	var abiEvent *abi.Entry
-	err := json.Unmarshal([]byte(abiTransferEvent), &abiEvent)
-	assert.NoError(t, err)
-
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
-		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
-	})
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
-		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
-	})).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**txInfoJSONRPC) = &txInfoJSONRPC{
-			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
-			Input: ethtypes.MustNewHexBytes0xPrefix("0xa9059cbb000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d09100000000000000000000000000000000000000000000000000000000000003e8"),
-		}
-	}).Once()
-
-	ethLogWithNegativeLogIndex := sampleTransferLog()
-	ethLogWithNegativeLogIndex.LogIndex = ethtypes.NewHexInteger64(-1)
-	_, ok, err := l.filterEnrichEthLog(context.Background(), l.config.filters[0], l.config.options.Methods, ethLogWithNegativeLogIndex) // cache miss
-	assert.False(t, ok)
-	assert.Regexp(t, "FF23055", err)
-
-}
-
 func TestFilterEnrichEthLogMethodInputsTxInfoWithErr(t *testing.T) {
 
 	l, mRPC, _ := newTestListener(t, true)
@@ -552,14 +521,14 @@ func TestFilterEnrichEthLogMethodInputsTxInfoWithErr(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
-		*args[1].(**txInfoJSONRPC) = &txInfoJSONRPC{
+		*args[1].(**ethrpc.TxInfoJSONRPC) = &ethrpc.TxInfoJSONRPC{
 			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
 			Input: ethtypes.MustNewHexBytes0xPrefix("0xa9059cbb000000000000000000000000d0f2f5103fd050739a9fb567251bc460cc24d09100000000000000000000000000000000000000000000000000000000000003e8"),
 		}
@@ -603,9 +572,9 @@ func TestFilterEnrichEthLogTXTimestampFail(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
@@ -628,14 +597,14 @@ func TestFilterEnrichEthLogMethodBadInputTooShort(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**txInfoJSONRPC) = &txInfoJSONRPC{
+		*args[1].(**ethrpc.TxInfoJSONRPC) = &ethrpc.TxInfoJSONRPC{
 			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
 			Input: ethtypes.MustNewHexBytes0xPrefix("0x"),
 		}
@@ -660,14 +629,14 @@ func TestFilterEnrichEthLogMethodBadInputTooMismatchFunctionID(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**txInfoJSONRPC) = &txInfoJSONRPC{
+		*args[1].(**ethrpc.TxInfoJSONRPC) = &ethrpc.TxInfoJSONRPC{
 			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
 			Input: ethtypes.MustNewHexBytes0xPrefix("0xfeedbeef"),
 		}
@@ -692,14 +661,14 @@ func TestFilterEnrichEthLogMethodBadInputABIData(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 		return bh == "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"
 	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
-		}
+		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionByHash", mock.MatchedBy(func(th ethtypes.HexBytes0xPrefix) bool {
 		return th.String() == "0x1a1f797ee000c529b6a2dd330cedd0d081417a30d16a4eecb3f863ab4657246f"
 	})).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**txInfoJSONRPC) = &txInfoJSONRPC{
+		*args[1].(**ethrpc.TxInfoJSONRPC) = &ethrpc.TxInfoJSONRPC{
 			From:  ethtypes.MustNewAddress("0x3968ef051b422d3d1cdc182a88bba8dd922e6fa4"),
 			Input: ethtypes.MustNewHexBytes0xPrefix("0xa9059cbb0000000000000000"),
 		}

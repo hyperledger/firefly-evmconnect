@@ -26,6 +26,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const testBlockFilterID1 = "block_filter_1"
+const testLogsFilterID1 = "log_filter_1"
+const testLogsFilterID2 = "log_filter_2"
+
 func TestNewBlockListenerOK(t *testing.T) {
 
 	ctx, c, mRPC, done := newTestConnector(t)

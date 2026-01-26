@@ -74,6 +74,7 @@
 |headers|Adds custom headers to HTTP requests|`map[string]string`|`<nil>`
 |hederaCompatibilityMode|Compatibility mode for Hedera, allowing non-standard block header hashes to be processed|`boolean`|`false`
 |idleTimeout|The max duration to hold a HTTP keepalive connection between calls|[`time.Duration`](https://pkg.go.dev/time#Duration)|`475ms`
+|maxAsyncBlockFetchConcurrency|Maximum concurrency when using asynchronous block downloading|`int`|`25`
 |maxConcurrentRequests|Maximum of concurrent requests to be submitted to the blockchain|`int`|`50`
 |maxConnsPerHost|The max number of connections, per unique hostname. Zero means no limit|`int`|`0`
 |maxIdleConns|The max number of idle connections to hold pooled|`int`|`100`
@@ -84,6 +85,7 @@
 |traceTXForRevertReason|Enable the use of transaction trace functions (e.g. debug_traceTransaction) to obtain transaction revert reasons. This can place a high load on the EVM client.|`boolean`|`false`
 |txCacheSize|Maximum of transactions to hold in the transaction info cache|`int`|`250`
 |url|URL of JSON/RPC endpoint for the Ethereum node/gateway|string|`<nil>`
+|useGetBlockReceipts|When true, the eth_getBlockReceipts call is available for this connector to use|`boolean`|`true`
 
 ## connector.auth
 
