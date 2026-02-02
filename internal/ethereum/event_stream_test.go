@@ -637,7 +637,7 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 	}
 	ctx, c, mRPC, done := newTestConnector(t)
 
-	var es *eventStream
+	esChl := make(chan *eventStream)
 	reestablishedFilter := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -645,6 +645,7 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
+			es := <-esChl
 			l2req.StreamID = es.id
 			_, _, err := c.EventListenerAdd(ctx, l2req)
 			assert.NoError(t, err)
@@ -665,8 +666,9 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 		*args[1].(*bool) = true
 	}).Maybe()
 
-	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
+	esChl <- es
 
 	<-reestablishedFilter
 

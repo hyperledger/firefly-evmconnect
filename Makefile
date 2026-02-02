@@ -32,9 +32,10 @@ mocks-$(strip $(1))-$(strip $(2)): ${MOCKERY} mockpaths
 	${MOCKERY} --case underscore --dir $(1) --name $(2) --outpkg $(3) --output mocks/$(strip $(3))
 endef
 
-$(eval $(call makemock, $$(FF_SIGNER_PATH),   Backend,      rpcbackendmocks))
-$(eval $(call makemock, $$(FF_SIGNER_PATH),   Subscription, rpcbackendmocks))
-$(eval $(call makemock, $$(FFTM_PATH),        Manager,      fftmmocks))
+$(eval $(call makemock, $$(FF_SIGNER_PATH),   Backend,       rpcbackendmocks))
+$(eval $(call makemock, $$(FF_SIGNER_PATH),   Subscription,  rpcbackendmocks))
+$(eval $(call makemock, $$(FFTM_PATH),        Manager,       fftmmocks))
+$(eval $(call makemock, pkg/ethblocklistener, BlockListener, ethblocklistenermocks))
 
 firefly-evmconnect: ${GOFILES}
 		$(VGO) build -o ./firefly-evmconnect -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v ./evmconnect
