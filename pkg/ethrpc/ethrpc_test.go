@@ -213,7 +213,7 @@ func TestFormatBlockInfo(t *testing.T) {
 }
 
 func TestFormatBlockFullWithHashes(t *testing.T) {
-	var block FullBlockWithTxHashesJSONRPC
+	var block EVMBlockWithTxHashesJSONRPC
 	err := json.Unmarshal([]byte(sampleBlock), &block)
 	require.NoError(t, err)
 
@@ -227,11 +227,11 @@ func TestFormatBlockFullWithHashes(t *testing.T) {
 	require.NotNil(t, block.ToBlockInfo(true))
 	require.NotNil(t, block.ToBlockInfo(true).ToFFCAPIMinimalBlockInfo())
 	require.True(t, block.ToBlockInfo(true).Equal(block.ToBlockInfo(true)))
-	require.Nil(t, (*FullBlockWithTxHashesJSONRPC)(nil).ToBlockInfo(true))
+	require.Nil(t, (*EVMBlockWithTxHashesJSONRPC)(nil).ToBlockInfo(true))
 }
 
 func TestFormatBlockFullWithTxns(t *testing.T) {
-	var block FullBlockWithTransactionsJSONRPC
+	var block EVMBlockWithTransactionsJSONRPC
 	err := json.Unmarshal([]byte(sampleBlockHeadersOnly), &block)
 	require.NoError(t, err)
 	var txn TxInfoJSONRPC
@@ -252,7 +252,7 @@ func TestFormatBlockFullWithTxns(t *testing.T) {
 	require.Equal(t, "58866", genericMap["transactions"].([]any)[0].(map[string]any)["blockNumber"])
 
 	require.NotNil(t, block.ToBlockInfo(true))
-	require.Nil(t, (*FullBlockWithTransactionsJSONRPC)(nil).ToBlockInfo(true))
+	require.Nil(t, (*EVMBlockWithTransactionsJSONRPC)(nil).ToBlockInfo(true))
 
 }
 

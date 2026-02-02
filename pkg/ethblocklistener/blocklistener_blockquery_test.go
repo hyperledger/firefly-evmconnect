@@ -38,7 +38,7 @@ func TestBlockCache(t *testing.T) {
 	block1001BHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, block1001AHash.String(), args[3].(string))
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     ethtypes.HexUint64(1001),
 			Hash:       block1001AHash,
 			ParentHash: block1000Hash,
@@ -46,7 +46,7 @@ func TestBlockCache(t *testing.T) {
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, ethtypes.NewHexInteger64(1001).String(), args[3].(string))
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     ethtypes.HexUint64(1001),
 			Hash:       block1001BHash,
 			ParentHash: block1000Hash,
@@ -69,7 +69,7 @@ func TestBlockCache(t *testing.T) {
 
 }
 
-func TestGetFullBlockWithTxHashesByHash(t *testing.T) {
+func TestGetEVMBlockWithTxHashesByHash(t *testing.T) {
 	ctx, bl, mRPC, done := newTestBlockListener(t)
 	defer done()
 
@@ -78,7 +78,7 @@ func TestGetFullBlockWithTxHashesByHash(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", block1001Hash.String(), false).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
@@ -87,18 +87,18 @@ func TestGetFullBlockWithTxHashesByHash(t *testing.T) {
 			}
 		}).
 		Once()
-	block, err := bl.GetFullBlockWithTxHashesByHash(ctx, block1001Hash.String())
+	block, err := bl.GetEVMBlockWithTxHashesByHash(ctx, block1001Hash.String())
 	require.NoError(t, err)
 	require.Equal(t, block1001Hash, block.Hash)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", block1000Hash.String(), false).
 		Return(rpcbackend.NewRPCError(ctx, rpcbackend.RPCCodeInternalError, i18n.Msg404NotFound)).
 		Once()
-	_, err = bl.GetFullBlockWithTxHashesByHash(ctx, block1000Hash.String())
+	_, err = bl.GetEVMBlockWithTxHashesByHash(ctx, block1000Hash.String())
 	require.Regexp(t, "FF00167", err)
 }
 
-func TestGetFullBlockWithTransactionsByHash(t *testing.T) {
+func TestGetEVMBlockWithTransactionsByHash(t *testing.T) {
 	ctx, bl, mRPC, done := newTestBlockListener(t)
 	defer done()
 
@@ -107,7 +107,7 @@ func TestGetFullBlockWithTransactionsByHash(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", block1001Hash.String(), true).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTransactionsJSONRPC) = &ethrpc.FullBlockWithTransactionsJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTransactionsJSONRPC) = &ethrpc.EVMBlockWithTransactionsJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
@@ -116,18 +116,18 @@ func TestGetFullBlockWithTransactionsByHash(t *testing.T) {
 			}
 		}).
 		Once()
-	block, err := bl.GetFullBlockWithTransactionsByHash(ctx, block1001Hash.String())
+	block, err := bl.GetEVMBlockWithTransactionsByHash(ctx, block1001Hash.String())
 	require.NoError(t, err)
 	require.Equal(t, block1001Hash, block.Hash)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", block1000Hash.String(), true).
 		Return(rpcbackend.NewRPCError(ctx, rpcbackend.RPCCodeInternalError, i18n.Msg404NotFound)).
 		Once()
-	_, err = bl.GetFullBlockWithTransactionsByHash(ctx, block1000Hash.String())
+	_, err = bl.GetEVMBlockWithTransactionsByHash(ctx, block1000Hash.String())
 	require.Regexp(t, "FF00167", err)
 }
 
-func TestGetFullBlockWithTxHashesByNumber(t *testing.T) {
+func TestGetEVMBlockWithTxHashesByNumber(t *testing.T) {
 	ctx, bl, mRPC, done := newTestBlockListener(t)
 	defer done()
 
@@ -136,7 +136,7 @@ func TestGetFullBlockWithTxHashesByNumber(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", ethtypes.NewHexInteger64(1001).String(), false).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
@@ -145,18 +145,18 @@ func TestGetFullBlockWithTxHashesByNumber(t *testing.T) {
 			}
 		}).
 		Once()
-	block, err := bl.GetFullBlockWithTxHashesByNumber(ctx, ethtypes.NewHexInteger64(1001).String())
+	block, err := bl.GetEVMBlockWithTxHashesByNumber(ctx, ethtypes.NewHexInteger64(1001).String())
 	require.NoError(t, err)
 	require.Equal(t, block1001Hash, block.Hash)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", ethtypes.NewHexInteger64(1000).String(), false).
 		Return(rpcbackend.NewRPCError(ctx, rpcbackend.RPCCodeInternalError, i18n.Msg404NotFound)).
 		Once()
-	_, err = bl.GetFullBlockWithTxHashesByNumber(ctx, ethtypes.NewHexInteger64(1000).String())
+	_, err = bl.GetEVMBlockWithTxHashesByNumber(ctx, ethtypes.NewHexInteger64(1000).String())
 	require.Regexp(t, "FF00167", err)
 }
 
-func TestGetFullBlockWithTransactionsByNumber(t *testing.T) {
+func TestGetEVMBlockWithTransactionsByNumber(t *testing.T) {
 	ctx, bl, mRPC, done := newTestBlockListener(t)
 	defer done()
 
@@ -165,7 +165,7 @@ func TestGetFullBlockWithTransactionsByNumber(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", ethtypes.NewHexInteger64(1001).String(), true).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTransactionsJSONRPC) = &ethrpc.FullBlockWithTransactionsJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTransactionsJSONRPC) = &ethrpc.EVMBlockWithTransactionsJSONRPC{
 				BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 					Number:     ethtypes.HexUint64(1001),
 					Hash:       block1001Hash,
@@ -174,13 +174,13 @@ func TestGetFullBlockWithTransactionsByNumber(t *testing.T) {
 			}
 		}).
 		Once()
-	block, err := bl.GetFullBlockWithTransactionsByNumber(ctx, ethtypes.NewHexInteger64(1001).String())
+	block, err := bl.GetEVMBlockWithTransactionsByNumber(ctx, ethtypes.NewHexInteger64(1001).String())
 	require.NoError(t, err)
 	require.Equal(t, block1001Hash, block.Hash)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", ethtypes.NewHexInteger64(1000).String(), true).
 		Return(rpcbackend.NewRPCError(ctx, rpcbackend.RPCCodeInternalError, i18n.Msg404NotFound)).
 		Once()
-	_, err = bl.GetFullBlockWithTransactionsByNumber(ctx, ethtypes.NewHexInteger64(1000).String())
+	_, err = bl.GetEVMBlockWithTransactionsByNumber(ctx, ethtypes.NewHexInteger64(1000).String())
 	require.Regexp(t, "FF00167", err)
 }

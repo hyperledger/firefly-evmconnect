@@ -264,13 +264,13 @@ func (b *BlockHeaderJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRP
 	return bi
 }
 
-// FullBlockWithTxHashesJSONRPC is the full JSON/RPC structure you get with "false" on eth_getBlockByNumber / eth_getBlockByHash
-type FullBlockWithTxHashesJSONRPC struct {
+// EVMBlockWithTxHashesJSONRPC is the full JSON/RPC structure you get with "false" on eth_getBlockByNumber / eth_getBlockByHash
+type EVMBlockWithTxHashesJSONRPC struct {
 	BlockHeaderJSONRPC
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
 }
 
-func (b *FullBlockWithTxHashesJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
+func (b *EVMBlockWithTxHashesJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
 	if b == nil {
 		return nil
 	}
@@ -279,13 +279,13 @@ func (b *FullBlockWithTxHashesJSONRPC) ToBlockInfo(includeLogsBloom bool) *Block
 	return bi
 }
 
-// FullBlockWithTransactionsJSONRPC is the full JSON/RPC structure you get with "true" on eth_getBlockByNumber / eth_getBlockByHash
-type FullBlockWithTransactionsJSONRPC struct {
+// EVMBlockWithTransactionsJSONRPC is the full JSON/RPC structure you get with "true" on eth_getBlockByNumber / eth_getBlockByHash
+type EVMBlockWithTransactionsJSONRPC struct {
 	BlockHeaderJSONRPC
 	Transactions []*TxInfoJSONRPC `json:"transactions"`
 }
 
-func (b *FullBlockWithTransactionsJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
+func (b *EVMBlockWithTransactionsJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
 	if b == nil {
 		return nil
 	}
@@ -297,7 +297,7 @@ func (b *FullBlockWithTransactionsJSONRPC) ToBlockInfo(includeLogsBloom bool) *B
 	return bi
 }
 
-func (b *FullBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
+func (b *EVMBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
 	txnHashArray := make([]any, len(b.Transactions))
 	for i, t := range b.Transactions {
 		txnHashArray[i] = ([]byte)(t)
@@ -307,7 +307,7 @@ func (b *FullBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opt
 	return jss.MarshalFormattedMap(formatMap, opts...)
 }
 
-func (b *FullBlockWithTransactionsJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
+func (b *EVMBlockWithTransactionsJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
 	txnsArray := make([]json.RawMessage, len(b.Transactions))
 	for i, l := range b.Transactions {
 		if err == nil {

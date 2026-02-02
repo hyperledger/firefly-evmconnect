@@ -114,24 +114,24 @@ func (_m *BlockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber u
 	return r0, r1
 }
 
-// GetFullBlockWithTransactionsByHash provides a mock function with given fields: ctx, hash0xString
-func (_m *BlockListener) GetFullBlockWithTransactionsByHash(ctx context.Context, hash0xString string) (*ethrpc.FullBlockWithTransactionsJSONRPC, error) {
+// GetEVMBlockWithTransactionsByHash provides a mock function with given fields: ctx, hash0xString
+func (_m *BlockListener) GetEVMBlockWithTransactionsByHash(ctx context.Context, hash0xString string) (*ethrpc.EVMBlockWithTransactionsJSONRPC, error) {
 	ret := _m.Called(ctx, hash0xString)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFullBlockWithTransactionsByHash")
+		panic("no return value specified for GetEVMBlockWithTransactionsByHash")
 	}
 
-	var r0 *ethrpc.FullBlockWithTransactionsJSONRPC
+	var r0 *ethrpc.EVMBlockWithTransactionsJSONRPC
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.FullBlockWithTransactionsJSONRPC, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.EVMBlockWithTransactionsJSONRPC, error)); ok {
 		return rf(ctx, hash0xString)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.FullBlockWithTransactionsJSONRPC); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.EVMBlockWithTransactionsJSONRPC); ok {
 		r0 = rf(ctx, hash0xString)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ethrpc.FullBlockWithTransactionsJSONRPC)
+			r0 = ret.Get(0).(*ethrpc.EVMBlockWithTransactionsJSONRPC)
 		}
 	}
 
@@ -144,24 +144,24 @@ func (_m *BlockListener) GetFullBlockWithTransactionsByHash(ctx context.Context,
 	return r0, r1
 }
 
-// GetFullBlockWithTransactionsByNumber provides a mock function with given fields: ctx, numberLookup
-func (_m *BlockListener) GetFullBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (*ethrpc.FullBlockWithTransactionsJSONRPC, error) {
+// GetEVMBlockWithTransactionsByNumber provides a mock function with given fields: ctx, numberLookup
+func (_m *BlockListener) GetEVMBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (*ethrpc.EVMBlockWithTransactionsJSONRPC, error) {
 	ret := _m.Called(ctx, numberLookup)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFullBlockWithTransactionsByNumber")
+		panic("no return value specified for GetEVMBlockWithTransactionsByNumber")
 	}
 
-	var r0 *ethrpc.FullBlockWithTransactionsJSONRPC
+	var r0 *ethrpc.EVMBlockWithTransactionsJSONRPC
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.FullBlockWithTransactionsJSONRPC, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.EVMBlockWithTransactionsJSONRPC, error)); ok {
 		return rf(ctx, numberLookup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.FullBlockWithTransactionsJSONRPC); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.EVMBlockWithTransactionsJSONRPC); ok {
 		r0 = rf(ctx, numberLookup)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ethrpc.FullBlockWithTransactionsJSONRPC)
+			r0 = ret.Get(0).(*ethrpc.EVMBlockWithTransactionsJSONRPC)
 		}
 	}
 
@@ -174,24 +174,24 @@ func (_m *BlockListener) GetFullBlockWithTransactionsByNumber(ctx context.Contex
 	return r0, r1
 }
 
-// GetFullBlockWithTxHashesByHash provides a mock function with given fields: ctx, hash0xString
-func (_m *BlockListener) GetFullBlockWithTxHashesByHash(ctx context.Context, hash0xString string) (*ethrpc.FullBlockWithTxHashesJSONRPC, error) {
+// GetEVMBlockWithTxHashesByHash provides a mock function with given fields: ctx, hash0xString
+func (_m *BlockListener) GetEVMBlockWithTxHashesByHash(ctx context.Context, hash0xString string) (*ethrpc.EVMBlockWithTxHashesJSONRPC, error) {
 	ret := _m.Called(ctx, hash0xString)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFullBlockWithTxHashesByHash")
+		panic("no return value specified for GetEVMBlockWithTxHashesByHash")
 	}
 
-	var r0 *ethrpc.FullBlockWithTxHashesJSONRPC
+	var r0 *ethrpc.EVMBlockWithTxHashesJSONRPC
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.FullBlockWithTxHashesJSONRPC, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.EVMBlockWithTxHashesJSONRPC, error)); ok {
 		return rf(ctx, hash0xString)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.FullBlockWithTxHashesJSONRPC); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.EVMBlockWithTxHashesJSONRPC); ok {
 		r0 = rf(ctx, hash0xString)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ethrpc.FullBlockWithTxHashesJSONRPC)
+			r0 = ret.Get(0).(*ethrpc.EVMBlockWithTxHashesJSONRPC)
 		}
 	}
 
@@ -204,24 +204,24 @@ func (_m *BlockListener) GetFullBlockWithTxHashesByHash(ctx context.Context, has
 	return r0, r1
 }
 
-// GetFullBlockWithTxHashesByNumber provides a mock function with given fields: ctx, numberLookup
-func (_m *BlockListener) GetFullBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (*ethrpc.FullBlockWithTxHashesJSONRPC, error) {
+// GetEVMBlockWithTxHashesByNumber provides a mock function with given fields: ctx, numberLookup
+func (_m *BlockListener) GetEVMBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (*ethrpc.EVMBlockWithTxHashesJSONRPC, error) {
 	ret := _m.Called(ctx, numberLookup)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFullBlockWithTxHashesByNumber")
+		panic("no return value specified for GetEVMBlockWithTxHashesByNumber")
 	}
 
-	var r0 *ethrpc.FullBlockWithTxHashesJSONRPC
+	var r0 *ethrpc.EVMBlockWithTxHashesJSONRPC
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.FullBlockWithTxHashesJSONRPC, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*ethrpc.EVMBlockWithTxHashesJSONRPC, error)); ok {
 		return rf(ctx, numberLookup)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.FullBlockWithTxHashesJSONRPC); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *ethrpc.EVMBlockWithTxHashesJSONRPC); ok {
 		r0 = rf(ctx, numberLookup)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ethrpc.FullBlockWithTxHashesJSONRPC)
+			r0 = ret.Get(0).(*ethrpc.EVMBlockWithTxHashesJSONRPC)
 		}
 	}
 

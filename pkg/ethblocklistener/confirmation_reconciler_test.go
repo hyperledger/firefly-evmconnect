@@ -184,7 +184,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	fakeParentHash := fftypes.NewRandB32().String()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     1977,
 			Hash:       generateTestHash(1977),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(fakeParentHash),
@@ -224,7 +224,7 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 		})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     1977,
 			Hash:       generateTestHash(1977),
 			ParentHash: generateTestHash(1976),
@@ -264,7 +264,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 		})
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number:     1977,
 			Hash:       generateTestHash(1977),
 			ParentHash: generateTestHash(1976),
@@ -831,7 +831,7 @@ func TestBuildConfirmationList_NilBlockInfo(t *testing.T) {
 	bl.blockCache, _ = lru.New(100)
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x"+strconv.FormatUint(105, 16), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = nil
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = nil
 	})
 
 	ctx := context.Background()
@@ -1294,7 +1294,7 @@ func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, sta
 		for _, blockNumber := range blocksToMock {
 			hexBlockNumber := ethtypes.HexUint64(blockNumber)
 			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexBlockNumber.String(), false).Return(nil).Run(func(args mock.Arguments) {
-				*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+				*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 					Number:     ethtypes.HexUint64(blockNumber),
 					Hash:       generateTestHash(blockNumber),
 					ParentHash: generateTestHash(blockNumber - 1),

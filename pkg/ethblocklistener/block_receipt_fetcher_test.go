@@ -134,7 +134,7 @@ func TestFetchBlockReceiptsAsyncNonOptimizedOk(t *testing.T) {
 	blockNumber := ethtypes.HexUint64(12346)
 	txHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
 
-	block := &ethrpc.FullBlockWithTxHashesJSONRPC{
+	block := &ethrpc.EVMBlockWithTxHashesJSONRPC{
 		BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: blockNumber,
 			Hash:   blockHash,
@@ -149,7 +149,7 @@ func TestFetchBlockReceiptsAsyncNonOptimizedOk(t *testing.T) {
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).Return(nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, blockHash.String(), args[3])
-		res := args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC)
+		res := args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC)
 		*res = block
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
