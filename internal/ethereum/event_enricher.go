@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inl.c.
+// Copyright © 2026 Kaleido, Inl.c.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -19,11 +19,13 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"math"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -34,12 +36,20 @@ type eventEnricher struct {
 	extractSigner bool
 }
 
-func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *logJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
+// We rely on -1 in our logic, so we don't actually support the full range of uint64
+func trimUint64(v uint64) int64 {
+	if v > math.MaxInt64 {
+		panic("block number too large to fit in int64")
+	}
+	return (int64)(v)
+}
+
+func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter, methods []*abi.Entry, ethLog *ethrpc.LogJSONRPC) (_ *ffcapi.Event, matched bool, decoded bool, err error) {
 
 	// Check the block for this event is at our high water mark, as we might have rewound for other listeners
-	blockNumber := ethLog.BlockNumber.BigInt().Int64()
-	transactionIndex := ethLog.TransactionIndex.BigInt().Int64()
-	logIndex := ethLog.LogIndex.BigInt().Int64()
+	blockNumber := trimUint64(ethLog.BlockNumber.Uint64())
+	transactionIndex := trimUint64(ethLog.TransactionIndex.Uint64())
+	logIndex := trimUint64(ethLog.LogIndex.Uint64())
 	protoID := getEventProtoID(blockNumber, transactionIndex, logIndex)
 
 	// Apply a post-filter check to the event
@@ -68,13 +78,13 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 	}
 
 	info := eventInfo{
-		logJSONRPC: *ethLog,
+		LogJSONRPC: *ethLog,
 		ChainID:    ee.connector.chainID,
 	}
 
 	var timestamp *fftypes.FFTime
 	if ee.connector.eventBlockTimestamps {
-		bi, err := ee.connector.blockListener.getBlockInfoByHash(ctx, ethLog.BlockHash.String())
+		bi, err := ee.connector.blockListener.GetBlockInfoByHash(ctx, ethLog.BlockHash.String())
 		if err != nil {
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': %v", ethLog.BlockHash, err)
 			return nil, matched, decoded, err // This is an error condition, rather than just something we cannot enrich
@@ -104,19 +114,15 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 		}
 	}
 
-	if blockNumber < 0 || transactionIndex < 0 || logIndex < 0 {
-		log.L(ctx).Errorf("Invalid block number, transaction index or log index for event '%s'", protoID)
-		return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgInvalidProtocolID, protoID)
-	}
 	signature := f.Signature
 	return &ffcapi.Event{
 		ID: ffcapi.EventID{
 			Signature:        signature,
 			BlockHash:        ethLog.BlockHash.String(),
 			TransactionHash:  ethLog.TransactionHash.String(),
-			BlockNumber:      fftypes.FFuint64(ethLog.BlockNumber.BigInt().Uint64()),
-			TransactionIndex: fftypes.FFuint64(ethLog.TransactionIndex.BigInt().Uint64()),
-			LogIndex:         fftypes.FFuint64(ethLog.LogIndex.BigInt().Uint64()),
+			BlockNumber:      fftypes.FFuint64(ethLog.BlockNumber),
+			TransactionIndex: fftypes.FFuint64(ethLog.TransactionIndex),
+			LogIndex:         fftypes.FFuint64(ethLog.LogIndex),
 			Timestamp:        timestamp,
 		},
 		Info: &info,
@@ -137,7 +143,7 @@ func (ee *eventEnricher) decodeLogData(ctx context.Context, event *abi.Entry, to
 	return fftypes.JSONAnyPtrBytes(b), true
 }
 
-func (ee *eventEnricher) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *txInfoJSONRPC, info *eventInfo) {
+func (ee *eventEnricher) matchMethod(ctx context.Context, methods []*abi.Entry, txInfo *ethrpc.TxInfoJSONRPC, info *eventInfo) {
 	if len(txInfo.Input) < 4 {
 		log.L(ctx).Debugf("No function selector available for TX '%s'", txInfo.Hash)
 		return

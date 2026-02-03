@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -83,7 +84,7 @@ func (c *ethConnector) gasEstimate(ctx context.Context, tx *ethsigner.Transactio
 		log.L(ctx).Errorf("Gas estimation failed for a non-revert reason: %s (call result: %v)", rpcErr.Message, errCall)
 		// Return the original error - as the eth_call did not give us a revert result (it might even
 		// have succeeded). So we need to fall back to the original error.
-		return nil, mapError(callRPCMethods, rpcErr.Error()), rpcErr.Error()
+		return nil, etherrors.MapError(etherrors.CallRPCMethods, rpcErr.Error()), rpcErr.Error()
 	}
 
 	// Multiply the gas estimate by the configured factor

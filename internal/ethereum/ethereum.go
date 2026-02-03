@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -33,6 +33,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/retry"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/internal/retryutil"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -47,9 +49,9 @@ type ethConnector struct {
 	catchupThreshold           int64
 	catchupDownscaleRegex      *regexp.Regexp
 	checkpointBlockGap         int64
-	retry                      *retry.Retry
+	retry                      retryutil.RetryWrapper
 	eventBlockTimestamps       bool
-	blockListener              *blockListener
+	blockListener              ethblocklistener.BlockListener
 	eventFilterPollingInterval time.Duration
 	traceTXForRevertReason     bool
 	chainID                    string
@@ -68,6 +70,9 @@ type Connector interface {
 	// WSRPC returns the websocket JSON/RPC client
 	// NOTE: websocket client will be nil if websockets are not enabled
 	WSRPC() rpcbackend.WebSocketRPCClient
+
+	// Get the high level block listener functionality, which provides a view of the head of the chain
+	BlockListener() ethblocklistener.BlockListener
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
@@ -79,7 +84,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
 		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
 		traceTXForRevertReason:     conf.GetBool(TraceTXForRevertReason),
-		retry:                      &retry.Retry{},
+		retry:                      retryutil.RetryWrapper{Retry: &retry.Retry{}},
 	}
 
 	c.retry.InitialDelay = withDeprecatedConfFallback(conf, conf.GetDuration, DeprecatedRetryInitDelay, RetryInitDelay)
@@ -150,7 +155,14 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		return name
 	})
 
-	if c.blockListener, err = newBlockListener(ctx, c, conf); err != nil {
+	if c.blockListener, err = ethblocklistener.NewBlockListenerSupplyBackend(ctx, c.retry.Retry, &ethblocklistener.BlockListenerConfig{
+		BlockPollingInterval:          conf.GetDuration(BlockPollingInterval),
+		MonitoredHeadLength:           int(c.checkpointBlockGap),
+		HederaCompatibilityMode:       conf.GetBool(HederaCompatibilityMode),
+		BlockCacheSize:                conf.GetInt(BlockCacheSize),
+		MaxAsyncBlockFetchConcurrency: conf.GetInt(MaxAsyncBlockFetchConcurrency),
+		UseGetBlockReceipts:           conf.GetBool(UseGetBlockReceipts),
+	}, c.backend, c.wsBackend); err != nil {
 		return nil, err
 	}
 
@@ -165,10 +177,14 @@ func (c *ethConnector) WSRPC() rpcbackend.WebSocketRPCClient {
 	return c.wsBackend
 }
 
+func (c *ethConnector) BlockListener() ethblocklistener.BlockListener {
+	return c.blockListener
+}
+
 // WaitClosed can be called after cancelling all the contexts, to wait for everything to close down
 func (c *ethConnector) WaitClosed() {
 	if c.blockListener != nil {
-		c.blockListener.waitClosed()
+		c.blockListener.WaitClosed()
 	}
 	for _, s := range c.eventStreams {
 		<-s.streamLoopDone
@@ -180,4 +196,16 @@ func withDeprecatedConfFallback[T any](conf config.Section, getter func(string) 
 		return getter(newKey)
 	}
 	return getter(deprecatedKey)
+}
+
+// ReconcileConfirmationsForTransaction is the public API for reconciling transaction confirmations.
+// It delegates to the blockListener's internal reconciliation logic.
+func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
+	// Now we can start the reconciliation process
+	res, ethReceipt, err := c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
+	if err == nil && res != nil && ethReceipt != nil {
+		// We enrich the
+		res.Receipt = c.enrichTransactionReceipt(ctx, ethReceipt)
+	}
+	return res, err
 }

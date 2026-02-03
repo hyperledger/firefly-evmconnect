@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -19,15 +19,16 @@ package ethereum
 import (
 	"context"
 
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func (c *ethConnector) NewBlockListener(ctx context.Context, req *ffcapi.NewBlockListenerRequest) (*ffcapi.NewBlockListenerResponse, ffcapi.ErrorReason, error) {
+func (c *ethConnector) NewBlockListener(_ context.Context, req *ffcapi.NewBlockListenerRequest) (*ffcapi.NewBlockListenerResponse, ffcapi.ErrorReason, error) {
 	// Add the block consumer
-	c.blockListener.addConsumer(req.ListenerContext, &blockUpdateConsumer{
-		id:      req.ID,
-		ctx:     req.ListenerContext,
-		updates: req.BlockListener,
+	c.blockListener.AddConsumer(req.ListenerContext, &ethblocklistener.BlockUpdateConsumer{
+		ID:      req.ID,
+		Ctx:     req.ListenerContext,
+		Updates: req.BlockListener,
 	})
 
 	return &ffcapi.NewBlockListenerResponse{}, "", nil

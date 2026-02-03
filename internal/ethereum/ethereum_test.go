@@ -26,8 +26,11 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/ffresty"
 	"github.com/hyperledger/firefly-common/pkg/fftls"
+	"github.com/hyperledger/firefly-evmconnect/mocks/ethblocklistenermocks"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -66,24 +69,12 @@ func newTestConnectorWithNoBlockerFilterDefaultMocks(t *testing.T, confSetup ...
 
 	c := cc.(*ethConnector)
 	c.backend = mRPC
-	c.blockListener.backend = mRPC
+	cc.BlockListener().UTSetBackend(mRPC)
 	return ctx, c, mRPC, func() {
 		done()
 		mRPC.AssertExpectations(t)
 		c.WaitClosed()
 	}
-}
-
-func conditionalMockOnce(call *mock.Call, predicate func() bool, thenRun func(args mock.Arguments)) {
-	call.Run(func(args mock.Arguments) {
-		if predicate() {
-			thenRun(args)
-		} else {
-			call.Run(func(args mock.Arguments) {
-				thenRun(args)
-			}).Once()
-		}
-	}).Once()
 }
 
 func TestConnectorInit(t *testing.T) {
@@ -234,6 +225,7 @@ func TestRetryDefaultsFor429(t *testing.T) {
 	cc, err := NewEthereumConnector(ctx, conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, cc.RPC())
+	assert.Nil(t, cc.WSRPC())
 	defer done()
 
 	// Start a simple HTTP server that always replies with 429 Too Many Requests
@@ -256,4 +248,19 @@ func TestRetryDefaultsFor429(t *testing.T) {
 	assert.Regexp(t, "429 Too Many Requests", rpcErr.Message)
 	// Default retry count is 5 + 1 for the initial call
 	assert.Equal(t, 6, count)
+}
+
+func TestReconcileConfirmationsForTransaction(t *testing.T) {
+	ctx, c, _, done := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	defer done()
+
+	mbl := ethblocklistenermocks.NewBlockListener(t)
+	c.blockListener = mbl
+	mbl.On("WaitClosed").Return()
+	mbl.On("ReconcileConfirmationsForTransaction", ctx, "hash1", []*ffcapi.MinimalBlockInfo{}, uint64(10)).
+		Return(&ffcapi.ConfirmationUpdateResult{}, &ethrpc.TxReceiptJSONRPC{}, nil)
+
+	_, err := c.ReconcileConfirmationsForTransaction(ctx, "hash1", []*ffcapi.MinimalBlockInfo{}, 10)
+	require.NoError(t, err)
+
 }

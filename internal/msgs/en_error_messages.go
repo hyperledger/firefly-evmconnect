@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -17,6 +17,8 @@
 package msgs
 
 import (
+	"net/http"
+
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"golang.org/x/text/language"
 )
@@ -79,4 +81,9 @@ var (
 	MsgTransactionNotFound                      = ffe("FF23061", "Transaction not found: %s")
 	MsgInMemoryPartialChainNotCaughtUp          = ffe("FF23062", "In-memory partial chain is waiting for the transaction block %d (%s) to be indexed")
 	MsgFailedToBuildExistingConfirmationInvalid = ffe("FF23063", "Failed to build confirmations, existing confirmations are not valid")
+	MsgFromBlockInvalid                         = ffe("FF23064", "From block invalid. Must be 'earliest', 'latest' or a decimal: %s", http.StatusBadRequest)
+	MsgInvalidJSONFormatOptions                 = ffe("FF23065", "The JSON formatting options must be a valid set of key=value pairs in URL query string format '%s'")
+	MsgUnknownJSONFormatOptions                 = ffe("FF23066", "JSON formatting option unknown %s=%s")
+	MsgObservedPanic                            = ffe("FF23067", "Observed panic: %v")
+	MsgReturnedBlockHashMismatch                = ffe("FF23068", "Returned block %d hash %s does not match requested hash %s")
 )

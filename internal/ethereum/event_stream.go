@@ -1,4 +1,4 @@
-// Copyright © 2025 Kaleido, Inc.
+// Copyright © 2026 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -29,6 +29,8 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-common/pkg/log"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-evmconnect/pkg/etherrors"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -44,7 +46,7 @@ type eventFilter struct {
 
 // eventInfo is the top-level structure we pass to applications for each event (through the FFCAPI framework)
 type eventInfo struct {
-	logJSONRPC
+	ethrpc.LogJSONRPC
 	InputMethod string                 `json:"inputMethod,omitempty"` // the method invoked, if it matched one of the signatures in the listener definition
 	InputArgs   *fftypes.JSONAny       `json:"inputArgs,omitempty"`   // the method parameters, if the method matched one of the signatures in the listener definition
 	InputSigner *ethtypes.Address0xHex `json:"inputSigner,omitempty"` // the signing `from` address of the transaction
@@ -226,12 +228,12 @@ func (es *eventStream) leadGroupCatchup() bool {
 	lastUpdate := -1
 	failCount := 0
 	for {
-		if es.c.doFailureDelay(es.ctx, failCount) {
+		if es.c.retry.DoFailureDelay(es.ctx, failCount) {
 			log.L(es.ctx).Debugf("Stream catchup loop exiting")
 			return true
 		}
 
-		chainHeadBlock, ok := es.c.blockListener.getHighestBlock(es.ctx)
+		chainHeadBlock, ok := es.c.blockListener.GetHighestBlock(es.ctx)
 		if !ok {
 			log.L(es.ctx).Debugf("Stream catchup exiting (closed checking block height)")
 			return true
@@ -305,7 +307,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 	filterResetRequired := false
 	filterRPCMethodToUse := ""
 	for {
-		if es.c.doFailureDelay(es.ctx, failCount) {
+		if es.c.retry.DoFailureDelay(es.ctx, failCount) {
 			log.L(es.ctx).Debugf("Stream loop exiting")
 			return true
 		}
@@ -318,7 +320,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 
 			// High water mark is a point safely behind the head of the chain in this case,
 			// where re-orgs are not expected.
-			bh, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
+			bh, _ := es.c.blockListener.GetHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
 			hwmBlock := int64(bh) - es.c.checkpointBlockGap     //nolint:gosec // convert to int64 to match the type of hwmBlock
 			if hwmBlock < 0 {
 				hwmBlock = 0
@@ -341,7 +343,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Check we're not outside of the steady state window, and need to fall back to catchup mode
-				chainHeadBlock, _ := es.c.blockListener.getHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
+				chainHeadBlock, _ := es.c.blockListener.GetHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
 				blockGapEstimate := (int64(chainHeadBlock) - fromBlock)         //nolint:gosec // convert to int64 to match the type of blockGapEstimate
 				if blockGapEstimate > es.c.catchupThreshold {
 					log.L(es.ctx).Warnf("Block gap estimate reached %d (above threshold of %d) - reverting to catchup mode", blockGapEstimate, es.c.catchupThreshold)
@@ -349,7 +351,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Create the new filter
-				err := es.c.backend.CallRPC(es.ctx, &filter, "eth_newFilter", &logFilterJSONRPC{
+				err := es.c.backend.CallRPC(es.ctx, &filter, "eth_newFilter", &ethrpc.LogFilterJSONRPC{
 					FromBlock: ethtypes.NewHexInteger64(fromBlock),
 					Topics: [][]ethtypes.HexBytes0xPrefix{
 						ag.signatureSet,
@@ -364,11 +366,11 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				log.L(es.ctx).Infof("Filter '%v' established", filter)
 			}
 			// Get the next batch of logs
-			var ethLogs []*logJSONRPC
+			var ethLogs []*ethrpc.LogJSONRPC
 			rpcErr := es.c.backend.CallRPC(es.ctx, &ethLogs, filterRPCMethodToUse, filter)
 			// If we fail to query we just retry - setting filter to nil if not found
 			if rpcErr != nil {
-				if mapError(filterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
+				if etherrors.MapError(etherrors.FilterRPCMethods, rpcErr.Error()) == ffcapi.ErrorReasonNotFound {
 					log.L(es.ctx).Infof("Filter '%v' reset: %s", filter, rpcErr.Message)
 					filter = ""
 				}
@@ -414,7 +416,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 
 func (es *eventStream) preStartProcessing() {
 	ctx := es.ctx
-	chainHead, ok := es.c.blockListener.getHighestBlock(ctx)
+	chainHead, ok := es.c.blockListener.GetHighestBlock(ctx)
 	if !ok {
 		log.L(ctx).Warnf("Event stream closed before establishing block height")
 		return
@@ -509,7 +511,7 @@ func getEventProtoID(blockNumber, transactionIndex, logIndex int64) string {
 	return fmt.Sprintf("%.12d/%.6d/%.6d", blockNumber, transactionIndex, logIndex)
 }
 
-func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListener, ethLogs []*logJSONRPC) (ffcapi.ListenerEvents, error) {
+func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListener, ethLogs []*ethrpc.LogJSONRPC) (ffcapi.ListenerEvents, error) {
 	updates := make(ffcapi.ListenerEvents, 0, len(ethLogs))
 	for _, ethLog := range ethLogs {
 		listeners := ag.listenersByTopic0[ethLog.Topics[0].String()]
@@ -531,8 +533,8 @@ func (es *eventStream) filterEnrichSort(ctx context.Context, ag *aggregatedListe
 }
 
 func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedListener, fromBlock, toBlock int64) (ffcapi.ListenerEvents, error) {
-	var ethLogs []*logJSONRPC
-	logFilterJSONRPCReq := &logFilterJSONRPC{
+	var ethLogs []*ethrpc.LogJSONRPC
+	logFilterJSONRPCReq := &ethrpc.LogFilterJSONRPC{
 		FromBlock: ethtypes.NewHexInteger64(fromBlock),
 		ToBlock:   ethtypes.NewHexInteger64(toBlock),
 		Topics: [][]ethtypes.HexBytes0xPrefix{
@@ -541,7 +543,7 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 	}
 
 	if len(ag.listeners) == 1 && len(ag.listeners[0].config.filters) == 1 {
-		logFilterJSONRPCReq.Address = ag.listeners[0].config.filters[0].Address
+		logFilterJSONRPCReq.Address = []*ethtypes.Address0xHex{ag.listeners[0].config.filters[0].Address}
 	}
 
 	rpcErr := es.c.backend.CallRPC(ctx, &ethLogs, "eth_getLogs", logFilterJSONRPCReq)

@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ethereum
+package ethblocklistener
 
 import (
 	"container/list"
@@ -27,6 +27,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -34,20 +35,54 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const sampleJSONRPCReceipt = `{
+	"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+	"blockNumber": "0x7b9",
+	"contractAddress": "0x87ae94ab290932c4e6269648bb47c86978af4436",
+	"cumulativeGasUsed": "0x8414",
+	"effectiveGasPrice": "0x0",
+	"from": "0x2b1c769ef5ad304a4889f2a07a6617cd935849ae",
+	"gasUsed": "0x8414",
+	"logs": [
+	{
+		"address": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
+		"topics": [
+			"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+			"0x0000000000000000000000000000000000000000000000000000000000000000",
+			"0x0000000000000000000000005dae1910885cde875de559333d12722357e69c42"
+		],
+		"data": "0x000000000000000000000000000000000000000000000000016345785d8a0000",
+		"blockNumber": "0x5",
+		"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+		"transactionIndex": "0x0",
+		"blockHash": "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+		"logIndex": "0x0",
+		"removed": false
+	}
+	],
+	"logsBloom": "0x00000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000100000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000",
+	"status": "0x1",
+	"to": "0x302259069aaa5b10dc6f29a9a3f72a8e52837cc3",
+	"transactionHash": "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2",
+	"transactionIndex": "0x1e",
+	"type": "0x0"
+}`
+
 // Tests of the reconcileConfirmationsForTransaction function
 
 func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	// Mock for TransactionReceipt call - return nil to simulate transaction not found
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", generateTestHash(100)).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", generateTestHash(100).String()).Return(nil).Run(func(args mock.Arguments) {
 		err := json.Unmarshal([]byte("null"), args[1])
 		assert.NoError(t, err)
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100), nil, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100).String(), nil, 5)
 
 	// Assertions - expect an error when transaction doesn't exist
 	assert.Error(t, err)
@@ -59,49 +94,48 @@ func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) 
 
 func TestReconcileConfirmationsForTransaction_ReceiptRPCCallError(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	// Mock for TransactionReceipt call - return error to simulate RPC call error
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", generateTestHash(100)).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", generateTestHash(100).String()).Return(&rpcbackend.RPCError{Message: "pop"}).Run(func(args mock.Arguments) {
 		err := json.Unmarshal([]byte("null"), args[1])
 		assert.NoError(t, err)
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100), []*ffcapi.MinimalBlockInfo{}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100).String(), []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect an error when RPC call fails
 	assert.Error(t, err)
 	assert.Nil(t, result)
 }
 
+const wrongBlockNumber uint64 = 88888888
+
 func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
 		err := json.Unmarshal([]byte("null"), args[1])
 		assert.NoError(t, err)
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
-		{BlockNumber: fftypes.FFuint64(1977), BlockHash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
-	}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+		ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+			{Number: 1977, Hash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
+		}), 5)
 
 	// Assertions - expect an error when transaction doesn't exist
 	assert.Error(t, err)
@@ -113,25 +147,20 @@ func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 
 func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect an error when RPC call fails
 	assert.Error(t, err)
@@ -140,16 +169,12 @@ func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 
 func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	bl := c.blockListener
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
@@ -158,18 +183,16 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 
 	fakeParentHash := fftypes.NewRandB32().String()
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number:     ethtypes.NewHexInteger64(1977),
-			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number:     1977,
+			Hash:       generateTestHash(1977),
 			ParentHash: ethtypes.MustNewHexBytes0xPrefix(fakeParentHash),
-		}
+		}}
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect the transaction block to be returned
 	// we trust the block retrieve by getBlockInfoContainsTxHash function more than the canonical chain
@@ -182,101 +205,90 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	assert.False(t, result.Confirmed)
 	assert.Len(t, result.Confirmations, 2)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-	assert.NotNil(t, result.Receipt)
+	assert.NotNil(t, receipt)
 	mRPC.AssertExpectations(t)
 }
 
 func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	bl := c.blockListener
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number:     ethtypes.NewHexInteger64(1977),
-			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
-			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
-		}
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number:     1977,
+			Hash:       generateTestHash(1977),
+			ParentHash: generateTestHash(1976),
+		}}
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect the existing confirmation queue to be returned because the tx block doesn't match the same block number in the canonical chain
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.False(t, result.NewFork)
 	assert.False(t, result.Confirmed)
-	assert.Equal(t, []*ffcapi.MinimalBlockInfo{
-		{BlockNumber: fftypes.FFuint64(1977), BlockHash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
-		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
-	}, result.Confirmations)
+	assert.Equal(t, ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+		{Number: 1977, Hash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
+		{Number: 1978, Hash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
+	}), result.Confirmations)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-	assert.NotNil(t, result.Receipt)
+	assert.NotNil(t, receipt)
 
 	mRPC.AssertExpectations(t)
 }
 
 func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 
-	_, c, mRPC, _ := newTestConnectorWithNoBlockerFilterDefaultMocks(t)
-	bl := c.blockListener
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
 	bl.canonicalChain = createTestChain(1976, 1978) // Single block at 50, tx is at 100
 
 	// Mock for TransactionReceipt call
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt",
-		mock.MatchedBy(func(txHash string) bool {
-			assert.Equal(t, "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", txHash)
-			return true
-		})).
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
 			assert.NoError(t, err)
 		})
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == "1977"
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number:     ethtypes.NewHexInteger64(1977),
-			Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1977)),
-			ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(1976)),
-		}
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number:     1977,
+			Hash:       generateTestHash(1977),
+			ParentHash: generateTestHash(1976),
+		}}
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, err := c.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{
-		{BlockNumber: fftypes.FFuint64(1979), BlockHash: generateTestHash(1979), ParentHash: generateTestHash(1978)},
-		{BlockNumber: fftypes.FFuint64(1980), BlockHash: generateTestHash(1980), ParentHash: generateTestHash(1979)},
-	}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
+		ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+			{Number: 1979, Hash: generateTestHash(1979), ParentHash: generateTestHash(1978)},
+			{Number: 1980, Hash: generateTestHash(1980), ParentHash: generateTestHash(1979)},
+		}), 5)
 
 	// Assertions - expect the existing confirmation queue to be returned because the tx block doesn't match the same block number in the canonical chain
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.True(t, result.NewFork)
 	assert.False(t, result.Confirmed)
-	assert.Equal(t, []*ffcapi.MinimalBlockInfo{
-		{BlockNumber: fftypes.FFuint64(1977), BlockHash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
-		{BlockNumber: fftypes.FFuint64(1978), BlockHash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
-	}, result.Confirmations)
+	assert.Equal(t, ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+		{Number: 1977, Hash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
+		{Number: 1978, Hash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
+	}), result.Confirmations)
 	assert.Equal(t, uint64(5), result.TargetConfirmationCount)
-	assert.NotNil(t, result.Receipt)
+	assert.NotNil(t, receipt)
 	mRPC.AssertExpectations(t)
 }
 
@@ -287,17 +299,17 @@ func TestBuildConfirmationList_GapInExistingConfirmationsShouldBeFilledIn(t *tes
 	ctx := context.Background()
 
 	// Create corrupted confirmation (gap in the existing confirmations list)
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
 		// gap in the existing confirmations list
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -325,18 +337,18 @@ func TestBuildConfirmationList_MismatchConfirmationBlockShouldBeReplaced(t *test
 	ctx := context.Background()
 
 	// Create corrupted confirmation (gap in the existing confirmations list)
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)}, // wrong hash and is a fork
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(999), Number: 101, ParentHash: generateTestHash(100)}, // wrong hash and is a fork
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+		{Hash: generateTestHash(103), Number: 103, ParentHash: generateTestHash(102)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -363,16 +375,16 @@ func TestBuildConfirmationList_ExistingTxBockInfoIsWrongShouldBeIgnored(t *testi
 	ctx := context.Background()
 
 	// Create corrupted confirmation (gap in the existing confirmations list)
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(999), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)}, // incorrect block number
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(999), Number: 100, ParentHash: generateTestHash(99)}, // incorrect block number
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -398,16 +410,16 @@ func TestReconcileConfirmationsForTransaction_ExistingConfirmationsWithLowerBloc
 	ctx := context.Background()
 
 	// Create corrupted confirmation (gap in the existing confirmations list)
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(99), ParentHash: generateTestHash(100)}, // somehow there is a lower block number
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 99, ParentHash: generateTestHash(100)}, // somehow there is a lower block number
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -436,16 +448,16 @@ func TestBuildConfirmationList_EmptyChain(t *testing.T) {
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
 
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(5)
 
 	// Execute
 	// Assert - should return early due to chain being too short
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ffcapi.MinimalBlockInfo{}, txBlockInfo, targetConfirmationCount)
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ethrpc.BlockInfoJSONRPC{}, txBlockInfo, targetConfirmationCount)
 	assert.Error(t, err)
 	assert.Regexp(t, "FF23062", err.Error())
 	assert.Nil(t, confirmationUpdateResult)
@@ -464,10 +476,10 @@ func TestBuildConfirmationQueueUsingInMemoryPartialChain_EmptyCanonicalChain(t *
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
 
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -493,10 +505,10 @@ func TestHandleZeroTargetConfirmationCount_EmptyCanonicalChain(t *testing.T) {
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
 
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 
 	// Execute - should return error when canonical chain is empty
@@ -518,15 +530,15 @@ func TestBuildConfirmationList_ChainTooShort(t *testing.T) {
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
 
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ffcapi.MinimalBlockInfo{}, txBlockInfo, targetConfirmationCount)
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ethrpc.BlockInfoJSONRPC{}, txBlockInfo, targetConfirmationCount)
 	assert.Error(t, err)
 	assert.Nil(t, confirmationUpdateResult)
 }
@@ -538,10 +550,10 @@ func TestBuildConfirmationList_NilConfirmationMap(t *testing.T) {
 	ctx := context.Background()
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -569,10 +581,10 @@ func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCount(t *testi
 	ctx := context.Background()
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(0)
 
@@ -595,10 +607,10 @@ func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCountError(t *
 	ctx := context.Background()
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(0)
 
@@ -616,10 +628,10 @@ func TestBuildConfirmationList_NilConfirmationMapUnconfirmed(t *testing.T) {
 	ctx := context.Background()
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -648,15 +660,15 @@ func TestBuildConfirmationList_EmptyConfirmationQueue(t *testing.T) {
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(txBlockNumber)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(txBlockNumber - 1),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 	targetConfirmationCount := uint64(5)
 
 	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ffcapi.MinimalBlockInfo{}, txBlockInfo, targetConfirmationCount)
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ethrpc.BlockInfoJSONRPC{}, txBlockInfo, targetConfirmationCount)
 	assert.NoError(t, err)
 	// Assert
 	assert.False(t, confirmationUpdateResult.NewFork)
@@ -677,16 +689,16 @@ func TestBuildConfirmationList_ExistingConfirmationsTooDistant(t *testing.T) {
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 145, 150, []uint64{102, 103, 104, 105})
 	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -712,16 +724,16 @@ func TestBuildConfirmationList_CorruptedExistingConfirmationDoNotAffectConfirmat
 
 	ctx := context.Background()
 	// Create corrupted confirmation (wrong parent hash)
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: "0xwrongparent"},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(wrongBlockNumber)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -745,18 +757,18 @@ func TestBuildConfirmationList_ConnectionNodeMismatch(t *testing.T) {
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
 	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: "0xblockwrong", BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(wrongBlockNumber), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+		{Hash: generateTestHash(103), Number: 103, ParentHash: generateTestHash(102)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -784,23 +796,21 @@ func TestBuildConfirmationList_FailedToFetchBlockInfo(t *testing.T) {
 	}
 	bl.blockCache, _ = lru.New(100)
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(105, 10)
-	}), false).Return(&rpcbackend.RPCError{Message: "pop"})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x69", false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblockwrong"},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(wrongBlockNumber)},
 	}
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -820,24 +830,22 @@ func TestBuildConfirmationList_NilBlockInfo(t *testing.T) {
 	}
 	bl.blockCache, _ = lru.New(100)
 
-	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-		return bn.BigInt().String() == strconv.FormatUint(105, 10)
-	}), false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = nil
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x"+strconv.FormatUint(105, 16), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = nil
 	})
 
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: "0xblockwrong"},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(wrongBlockNumber)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -854,17 +862,17 @@ func TestBuildConfirmationList_NewForkAfterFirstConfirmation(t *testing.T) {
 	defer done()
 
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: "fork1", BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(991 /* fork1 */), Number: 102, ParentHash: generateTestHash(101)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -882,18 +890,18 @@ func TestBuildConfirmationList_NewForkAfterFirstConfirmation_ZeroConfirmationCou
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
 	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: "fork1", BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(991 /* fork1 */), Number: 102, ParentHash: generateTestHash(101)},
 	}
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(0)
 
@@ -911,18 +919,18 @@ func TestBuildConfirmationList_NewForkAndNoConnectionToCanonicalChain(t *testing
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 103, 150, []uint64{101, 102})
 	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: "fork1", BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: "fork2", BlockNumber: fftypes.FFuint64(102), ParentHash: "fork1"},
-		{BlockHash: "fork3", BlockNumber: fftypes.FFuint64(103), ParentHash: "fork2"},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(991 /* fork1 */), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(992 /* fork2 */), Number: 102, ParentHash: generateTestHash(991)},
+		{Hash: generateTestHash(993 /* fork3 */), Number: 103, ParentHash: generateTestHash(992)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -942,16 +950,16 @@ func TestBuildConfirmationList_ConfirmWithNoFetches(t *testing.T) {
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(2)
 
@@ -974,20 +982,20 @@ func TestBuildConfirmationList_AlreadyConfirmable(t *testing.T) {
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-		{BlockHash: generateTestHash(104), BlockNumber: fftypes.FFuint64(104), ParentHash: generateTestHash(103)},
-		{BlockHash: generateTestHash(105), BlockNumber: fftypes.FFuint64(105), ParentHash: generateTestHash(104)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+		{Hash: generateTestHash(103), Number: 103, ParentHash: generateTestHash(102)},
+		{Hash: generateTestHash(104), Number: 104, ParentHash: generateTestHash(103)},
+		{Hash: generateTestHash(105), Number: 105, ParentHash: generateTestHash(104)},
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(2)
 
@@ -1010,22 +1018,22 @@ func TestBuildConfirmationList_AlreadyConfirmable_ZeroConfirmationCount(t *testi
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+		{Hash: generateTestHash(103), Number: 103, ParentHash: generateTestHash(102)},
 
 		// all blocks after the first block of the canonical chain are discarded in the final confirmation queue
-		{BlockHash: "0xblock104", BlockNumber: fftypes.FFuint64(104), ParentHash: generateTestHash(103)}, // discarded
-		{BlockHash: "0xblock105", BlockNumber: fftypes.FFuint64(105), ParentHash: "0xblock104"},          // discarded
+		{Hash: generateTestHash(104), Number: 104, ParentHash: generateTestHash(103)}, // discarded
+		{Hash: generateTestHash(105), Number: 105, ParentHash: generateTestHash(104)}, // discarded
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(0)
 
@@ -1046,19 +1054,19 @@ func TestBuildConfirmationList_AlreadyConfirmableConnectable(t *testing.T) {
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
 		// didn't have block 103, which is the first block of the canonical chain
 		// but we should still be able to validate the existing confirmations are valid using parent hash
 	}
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(1)
 
@@ -1082,18 +1090,18 @@ func TestBuildConfirmationList_HasSufficientConfirmationsButNoOverlapWithCanonic
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
 	}
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(1)
 
@@ -1118,20 +1126,20 @@ func TestBuildConfirmationList_ConfirmableWithLateList(t *testing.T) {
 	ctx := context.Background()
 	// Create confirmations that already meet the target
 	// and it connects to the canonical chain to validate they are still valid
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
-		{BlockHash: generateTestHash(103), BlockNumber: fftypes.FFuint64(103), ParentHash: generateTestHash(102)},
-		{BlockHash: generateTestHash(104), BlockNumber: fftypes.FFuint64(104), ParentHash: generateTestHash(103)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+		{Hash: generateTestHash(103), Number: 103, ParentHash: generateTestHash(102)},
+		{Hash: generateTestHash(104), Number: 104, ParentHash: generateTestHash(103)},
 	}
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -1157,18 +1165,18 @@ func TestBuildConfirmationList_ValidExistingConfirmations(t *testing.T) {
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
-		{BlockHash: generateTestHash(101), BlockNumber: fftypes.FFuint64(101), ParentHash: generateTestHash(100)},
-		{BlockHash: generateTestHash(102), BlockNumber: fftypes.FFuint64(102), ParentHash: generateTestHash(101)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
 	}
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -1192,16 +1200,16 @@ func TestBuildConfirmationList_ValidExistingTxBlock(t *testing.T) {
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 150, []uint64{})
 	defer done()
 	ctx := context.Background()
-	existingQueue := []*ffcapi.MinimalBlockInfo{
-		{BlockHash: generateTestHash(100), BlockNumber: fftypes.FFuint64(100), ParentHash: generateTestHash(99)},
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
 	}
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(5)
 
@@ -1228,15 +1236,15 @@ func TestBuildConfirmationList_ReachTargetConfirmation(t *testing.T) {
 
 	txBlockNumber := uint64(100)
 	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ffcapi.MinimalBlockInfo{
-		BlockNumber: fftypes.FFuint64(txBlockNumber),
-		BlockHash:   txBlockHash,
-		ParentHash:  generateTestHash(99),
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
 	}
 	targetConfirmationCount := uint64(3)
 
 	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ffcapi.MinimalBlockInfo{}, txBlockInfo, targetConfirmationCount)
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, []*ethrpc.BlockInfoJSONRPC{}, txBlockInfo, targetConfirmationCount)
 	assert.NoError(t, err)
 	// Assert
 	assert.True(t, confirmationUpdateResult.Confirmed)
@@ -1247,8 +1255,8 @@ func TestBuildConfirmationList_ReachTargetConfirmation(t *testing.T) {
 // Helper functions
 
 // generateTestHash creates a predictable hash for testing with consistent prefix and last 4 digits as index
-func generateTestHash(index uint64) string {
-	return fmt.Sprintf("0x%060x", index)
+func generateTestHash(index uint64) ethtypes.HexBytes0xPrefix {
+	return ethtypes.MustNewHexBytes0xPrefix(fmt.Sprintf("0x%060x", index))
 }
 
 func createTestChain(startBlock, endBlock uint64) *list.List {
@@ -1256,7 +1264,7 @@ func createTestChain(startBlock, endBlock uint64) *list.List {
 	for i := startBlock; i <= endBlock; i++ {
 		blockHash := generateTestHash(i)
 
-		var parentHash string
+		var parentHash ethtypes.HexBytes0xPrefix
 		if i > startBlock || i > 0 {
 			parentHash = generateTestHash(i - 1)
 		} else {
@@ -1264,10 +1272,10 @@ func createTestChain(startBlock, endBlock uint64) *list.List {
 			parentHash = generateTestHash(9999) // Use a high number to avoid conflicts
 		}
 
-		blockInfo := &ffcapi.MinimalBlockInfo{
-			BlockNumber: fftypes.FFuint64(i),
-			BlockHash:   blockHash,
-			ParentHash:  parentHash,
+		blockInfo := &ethrpc.BlockInfoJSONRPC{
+			Number:     ethtypes.HexUint64(i),
+			Hash:       blockHash,
+			ParentHash: parentHash,
 		}
 		chain.PushBack(blockInfo)
 	}
@@ -1284,14 +1292,13 @@ func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, sta
 
 	if len(blocksToMock) > 0 {
 		for _, blockNumber := range blocksToMock {
-			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn *ethtypes.HexInteger) bool {
-				return bn.BigInt().String() == strconv.FormatUint(blockNumber, 10)
-			}), false).Return(nil).Run(func(args mock.Arguments) {
-				*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-					Number:     ethtypes.NewHexInteger64(int64(blockNumber)),
-					Hash:       ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber)),
-					ParentHash: ethtypes.MustNewHexBytes0xPrefix(generateTestHash(blockNumber - 1)),
-				}
+			hexBlockNumber := ethtypes.HexUint64(blockNumber)
+			mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexBlockNumber.String(), false).Return(nil).Run(func(args mock.Arguments) {
+				*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+					Number:     ethtypes.HexUint64(blockNumber),
+					Hash:       generateTestHash(blockNumber),
+					ParentHash: generateTestHash(blockNumber - 1),
+				}}
 			})
 		}
 	}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -213,15 +214,15 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 	closed := false
 	listenerCaughtUp := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		ethLogs := make([]*logJSONRPC, 0)
-		filter := *args[3].(*logFilterJSONRPC)
+		ethLogs := make([]*ethrpc.LogJSONRPC, 0)
+		filter := *args[3].(*ethrpc.LogFilterJSONRPC)
 		fromBlock := filter.FromBlock.BigInt().Int64()
 		switch fromBlock {
 		case 1000:
-			ethLogs = append(ethLogs, &logJSONRPC{
-				BlockNumber:      ethtypes.NewHexInteger64(1024),
-				TransactionIndex: ethtypes.NewHexInteger64(64),
-				LogIndex:         ethtypes.NewHexInteger64(2),
+			ethLogs = append(ethLogs, &ethrpc.LogJSONRPC{
+				BlockNumber:      ethtypes.HexUint64(1024),
+				TransactionIndex: ethtypes.HexUint64(64),
+				LogIndex:         ethtypes.HexUint64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Topics: []ethtypes.HexBytes0xPrefix{
 					ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"),
@@ -238,13 +239,13 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		default:
 			<-listenerCaughtUp // hold the main group back until we've done the listener catchup
 		}
-		*args[1].(*[]*logJSONRPC) = ethLogs
+		*args[1].(*[]*ethrpc.LogJSONRPC) = ethLogs
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(1024),
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(1024),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
-		}
+		}}
 	})
 	es, events, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 
@@ -352,8 +353,8 @@ func TestExitDuringCatchup(t *testing.T) {
 
 	completed := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		ethLogs := make([]*logJSONRPC, 0)
-		filter := *args[3].(*logFilterJSONRPC)
+		ethLogs := make([]*ethrpc.LogJSONRPC, 0)
+		filter := *args[3].(*ethrpc.LogFilterJSONRPC)
 		fromBlock := filter.FromBlock.BigInt().Int64()
 		switch fromBlock {
 		default:
@@ -362,7 +363,7 @@ func TestExitDuringCatchup(t *testing.T) {
 				close(completed)
 			}()
 		}
-		*args[1].(*[]*logJSONRPC) = ethLogs
+		*args[1].(*[]*ethrpc.LogJSONRPC) = ethLogs
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Maybe()
 
@@ -394,14 +395,14 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 		}).Once()
 
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
 			{
-				BlockNumber:      ethtypes.NewHexInteger64(212122),
-				TransactionIndex: ethtypes.NewHexInteger64(64),
-				LogIndex:         ethtypes.NewHexInteger64(2),
+				BlockNumber:      ethtypes.HexUint64(212122),
+				TransactionIndex: ethtypes.HexUint64(64),
+				LogIndex:         ethtypes.HexUint64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Address:          ethtypes.MustNewAddress("0xc89E46EEED41b777ca6625d37E1Cc87C5c037828"),
 				Topics: []ethtypes.HexBytes0xPrefix{
@@ -414,13 +415,13 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 		}
 	}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**blockInfoJSONRPC) = &blockInfoJSONRPC{
-			Number: ethtypes.NewHexInteger64(212122),
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number: ethtypes.HexUint64(212122),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
-		}
+		}}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
@@ -464,11 +465,11 @@ func TestLeadGroupNearBlockZeroEnsureNonNegative(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
-			assert.Equal(t, int64(0), args[3].(*logFilterJSONRPC).FromBlock.BigInt().Int64())
+			assert.Equal(t, int64(0), args[3].(*ethrpc.LogFilterJSONRPC).FromBlock.BigInt().Int64())
 			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Once().Run(func(args mock.Arguments) {
 		close(filtered)
 	})
@@ -636,7 +637,7 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 	}
 	ctx, c, mRPC, done := newTestConnector(t)
 
-	var es *eventStream
+	esChl := make(chan *eventStream)
 	reestablishedFilter := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -644,6 +645,7 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
+			es := <-esChl
 			l2req.StreamID = es.id
 			_, _, err := c.EventListenerAdd(ctx, l2req)
 			assert.NoError(t, err)
@@ -655,17 +657,18 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 			close(reestablishedFilter)
 		})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
 	}).Maybe()
 
-	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
+	esChl <- es
 
 	<-reestablishedFilter
 
@@ -700,10 +703,10 @@ func TestStreamLoopFilterReset(t *testing.T) {
 		})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(&rpcbackend.RPCError{Message: "filter not found"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
@@ -741,11 +744,11 @@ func TestStreamLoopEnrichFail(t *testing.T) {
 			*args[1].(*string) = testLogsFilterID1
 		}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = []*logJSONRPC{
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
 			{
-				BlockNumber:      ethtypes.NewHexInteger64(212122),
-				TransactionIndex: ethtypes.NewHexInteger64(64),
-				LogIndex:         ethtypes.NewHexInteger64(2),
+				BlockNumber:      ethtypes.HexUint64(212122),
+				TransactionIndex: ethtypes.HexUint64(64),
+				LogIndex:         ethtypes.HexUint64(2),
 				BlockHash:        ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 				Address:          ethtypes.MustNewAddress("0x171AE0BDd882F7b4C84D5b7FBFA994E39C5a3129"),
 				Topics: []ethtypes.HexBytes0xPrefix{
@@ -763,7 +766,7 @@ func TestStreamLoopEnrichFail(t *testing.T) {
 		}).
 		Return(&rpcbackend.RPCError{Message: "pop"}).Once()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(*[]*logJSONRPC) = make([]*logJSONRPC, 0)
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(*bool) = true
