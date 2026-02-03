@@ -89,7 +89,7 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(HederaCompatibilityMode, false)
 	conf.AddKnownKey(TraceTXForRevertReason, false)
 	conf.AddKnownKey(MaxAsyncBlockFetchConcurrency, 25)
-	conf.AddKnownKey(UseGetBlockReceipts, true)
+	conf.AddKnownKey(UseGetBlockReceipts, false /* likely consumers of this package will want to set this default to true */)
 
 	// FireFly Common default for retry enabled is false,
 	// but we want to enable it by default

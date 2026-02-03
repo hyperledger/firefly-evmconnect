@@ -43,10 +43,10 @@ func TestEventEnricher_FilterEnrichEthLog_BasicMatch(t *testing.T) {
 		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		bi := &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.HexUint64(100),
 		}}
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = bi
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = bi
 	}).Maybe()
 
 	ee := &eventEnricher{
@@ -215,10 +215,10 @@ func TestEventEnricher_FilterEnrichEthLog_NoAddressFilter(t *testing.T) {
 		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		bi := &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.HexUint64(100),
 		}}
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = bi
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = bi
 	}).Maybe()
 
 	ee := &eventEnricher{
@@ -281,10 +281,10 @@ func TestEventEnricher_FilterEnrichEthLog_ChainIDNotSet(t *testing.T) {
 		*args[1].(**ethrpc.TxInfoJSONRPC) = bi
 	}).Maybe()
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		bi := &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		bi := &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.HexUint64(100),
 		}}
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = bi
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = bi
 	}).Maybe()
 
 	// Unset chainID to force IsReady call

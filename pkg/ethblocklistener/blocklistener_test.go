@@ -197,7 +197,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -206,7 +206,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001Hash,
@@ -215,7 +215,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002Hash,
@@ -390,7 +390,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -399,7 +399,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001Hash,
@@ -408,7 +408,7 @@ func TestBlockListenerOKDuplicates(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002Hash,
@@ -481,7 +481,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001HashA,
 				ParentHash: block1000Hash,
@@ -490,7 +490,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001HashB.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001HashB,
 				ParentHash: block1000Hash,
@@ -499,7 +499,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001HashB,
@@ -508,7 +508,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002Hash,
@@ -575,7 +575,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1001)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001HashB,
 				ParentHash: block1000Hash,
@@ -585,7 +585,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1002)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001HashB,
@@ -595,7 +595,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1003)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002Hash,
@@ -609,7 +609,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001HashA,
 				ParentHash: block1000Hash,
@@ -618,7 +618,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001HashB.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001HashB,
 				ParentHash: block1000Hash,
@@ -627,7 +627,7 @@ func TestBlockListenerReorgKeepLatestHeadInSameBatchValidHashFirst(t *testing.T)
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001HashB,
@@ -694,7 +694,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -703,7 +703,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashA,
 				ParentHash: block1001Hash,
@@ -712,7 +712,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002HashB.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashB,
 				ParentHash: block1001Hash,
@@ -722,7 +722,7 @@ func TestBlockListenerReorgKeepLatestMiddleInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002HashB,
@@ -790,7 +790,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -799,7 +799,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001Hash,
@@ -808,7 +808,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashA,
 				ParentHash: block1002Hash,
@@ -818,7 +818,7 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashB.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashB,
 				ParentHash: block1002Hash,
@@ -895,7 +895,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -904,7 +904,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002Hash,
 				ParentHash: block1001Hash,
@@ -913,7 +913,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashA,
 				ParentHash: block1002Hash,
@@ -922,7 +922,7 @@ func TestBlockListenerReorgReplaceTail(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashB.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashB,
 				ParentHash: block1002Hash,
@@ -1009,7 +1009,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -1018,7 +1018,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashA,
 				ParentHash: block1001Hash,
@@ -1027,7 +1027,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1004Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1004,
 				Hash:       block1004Hash,
 				ParentHash: block1003Hash,
@@ -1036,7 +1036,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1001)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -1045,7 +1045,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1002)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashB,
 				ParentHash: block1001Hash,
@@ -1054,7 +1054,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1003)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002HashB,
@@ -1063,7 +1063,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1004)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1004,
 				Hash:       block1004Hash,
 				ParentHash: block1003Hash,
@@ -1072,7 +1072,7 @@ func TestBlockListenerGap(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1005)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1005, // this one pops in while we're rebuilding
 				Hash:       block1005Hash,
 				ParentHash: block1004Hash,
@@ -1153,7 +1153,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1001Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -1162,7 +1162,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashA,
 				ParentHash: block1001Hash,
@@ -1171,7 +1171,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1001)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1001,
 				Hash:       block1001Hash,
 				ParentHash: block1000Hash,
@@ -1180,7 +1180,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1002)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashA,
 				ParentHash: block1001Hash,
@@ -1189,7 +1189,7 @@ func TestBlockListenerReorgWhileRebuilding(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1003)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashB, // this is a re-org'd block, so we stop here as if we've found the end of the chain
 				ParentHash: block1002HashB,
@@ -1262,7 +1262,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1002HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashA,
 				ParentHash: block1001Hash,
@@ -1271,7 +1271,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashA.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashA,
 				ParentHash: block1002HashA,
@@ -1280,7 +1280,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003HashB.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashB,
 				ParentHash: block1002HashB,
@@ -1289,7 +1289,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1002)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1002,
 				Hash:       block1002HashB,
 				ParentHash: block1001Hash,
@@ -1298,7 +1298,7 @@ func TestBlockListenerReorgReplaceWholeCanonicalChain(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", mock.MatchedBy(func(bn string) bool {
 			return bn == hexNumber(1003)
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003HashB,
 				ParentHash: block1002HashB,
@@ -1368,7 +1368,7 @@ func TestBlockListenerClosed(t *testing.T) {
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.MatchedBy(func(bh string) bool {
 			return bh == block1003Hash.String()
 		}), false).Return(nil).Run(func(args mock.Arguments) {
-			*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002Hash,

@@ -242,7 +242,7 @@ func TestCatchupThenRejoinLeadGroup(t *testing.T) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = ethLogs
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.HexUint64(1024),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		}}
@@ -418,7 +418,7 @@ func TestLeadGroupDeliverEvents(t *testing.T) {
 		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", "0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c", false).Return(nil).Run(func(args mock.Arguments) {
-		*args[1].(**ethrpc.FullBlockWithTxHashesJSONRPC) = &ethrpc.FullBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
 			Number: ethtypes.HexUint64(212122),
 			Hash:   ethtypes.MustNewHexBytes0xPrefix("0x6b012339fbb85b70c58ecfd97b31950c4a28bcef5226e12dbe551cb1abaf3b4c"),
 		}}
@@ -637,7 +637,7 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 	}
 	ctx, c, mRPC, done := newTestConnector(t)
 
-	var es *eventStream
+	esChl := make(chan *eventStream)
 	reestablishedFilter := make(chan struct{})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 		hbh := args[1].(*ethtypes.HexInteger)
@@ -645,6 +645,7 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 	})
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
+			es := <-esChl
 			l2req.StreamID = es.id
 			_, _, err := c.EventListenerAdd(ctx, l2req)
 			assert.NoError(t, err)
@@ -665,8 +666,9 @@ func TestStreamLoopChangeFilter(t *testing.T) {
 		*args[1].(*bool) = true
 	}).Maybe()
 
-	es, _, mRPC, done = testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	es, _, mRPC, done := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
 	defer done()
+	esChl <- es
 
 	<-reestablishedFilter
 
