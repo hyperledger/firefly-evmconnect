@@ -372,6 +372,64 @@ func TestExitDuringCatchup(t *testing.T) {
 	<-completed
 }
 
+// TestGetBlockRangeEventsFilterNoAddress ensures eth_getLogs is not sent with address:[null]
+// when the listener has one event filter (e.g. Transfer) and no contract address.
+func TestGetBlockRangeEventsFilterNoAddress(t *testing.T) {
+	transferTopic0 := ethtypes.MustNewHexBytes0xPrefix("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+
+	l1req := &ffcapi.EventListenerAddRequest{
+		ListenerID: fftypes.NewUUID(),
+		EventListenerOptions: ffcapi.EventListenerOptions{
+			Filters: []fftypes.JSONAny{
+				*fftypes.JSONAnyPtr(`{"event":` + abiTransferEvent + `}`), // no "address" in filter
+			},
+			Options:   fftypes.JSONAnyPtr(`{}`),
+			FromBlock: "1000",
+		},
+	}
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	mockStreamLoopEmpty(mRPC)
+
+	ethGetLogsCalled := make(chan *ethrpc.LogFilterJSONRPC, 1)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.MatchedBy(func(filter *ethrpc.LogFilterJSONRPC) bool {
+		// Must not send address with a nil entry (would serialize as [null] and cause "Invalid filter params")
+		if len(filter.Address) > 0 {
+			for _, a := range filter.Address {
+				assert.NotNil(t, a, "eth_getLogs filter must not contain address:[null] when filter has no address")
+				if a == nil {
+					return false
+				}
+			}
+		}
+		// Must filter by Transfer topic0
+		assert.Len(t, filter.Topics, 1, "topics should have one element (topic0)")
+		if len(filter.Topics) == 1 {
+			assert.Contains(t, filter.Topics[0], transferTopic0, "topic0 should contain Transfer signature")
+		}
+		select {
+		case ethGetLogsCalled <- filter:
+		default:
+		}
+		return true
+	})).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*ethrpc.LogJSONRPC) = make([]*ethrpc.LogJSONRPC, 0)
+	})
+
+	_, _, _, done2 := testEventStreamExistingConnector(t, ctx, done, c, mRPC, l1req)
+	defer done2()
+
+	// Wait until we've seen at least one eth_getLogs call with the expected filter shape
+	var captured *ethrpc.LogFilterJSONRPC
+	select {
+	case captured = <-ethGetLogsCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("eth_getLogs was not called with the expected filter")
+	}
+	assert.NotNil(t, captured)
+	assert.Empty(t, captured.Address, "address should be omitted or empty when listener has no address filter")
+}
+
 func TestLeadGroupDeliverEvents(t *testing.T) {
 
 	l1req := &ffcapi.EventListenerAddRequest{
