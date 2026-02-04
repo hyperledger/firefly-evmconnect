@@ -542,7 +542,7 @@ func (es *eventStream) getBlockRangeEvents(ctx context.Context, ag *aggregatedLi
 		},
 	}
 
-	if len(ag.listeners) == 1 && len(ag.listeners[0].config.filters) == 1 {
+	if len(ag.listeners) == 1 && len(ag.listeners[0].config.filters) == 1 && ag.listeners[0].config.filters[0].Address != nil {
 		logFilterJSONRPCReq.Address = []*ethtypes.Address0xHex{ag.listeners[0].config.filters[0].Address}
 	}
 
