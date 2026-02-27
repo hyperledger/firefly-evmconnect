@@ -19,6 +19,7 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -169,7 +170,7 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
 			if err == nil && len(errorInfo.Children) == 1 {
 				if strError, ok := errorInfo.Children[0].Value.(string); ok {
-					return strError
+					return unwrapNestedRevertReasons(ctx, strError, 0, errorAbis)
 				}
 			}
 			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
@@ -193,6 +194,73 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 		return outputData.String()
 	}
 	return ""
+}
+
+const maxNestedRevertDepth = 10
+
+// unwrapNestedRevertReasons handles Solidity contracts that catch a revert's raw bytes
+// and re-throw them inside a new Error(string) by doing string(reason). This produces
+// an Error(string) whose decoded "string" contains raw ABI-encoded error data
+// (including null bytes from ABI padding). We scan for all known error selectors
+// (Error(string) plus any custom errors from the ABI), decode the earliest match,
+// and recurse for nested Error(string) chains.
+func unwrapNestedRevertReasons(ctx context.Context, s string, depth int, errorAbis []*abi.Entry) string {
+	if depth >= maxNestedRevertDepth {
+		return sanitizeBinaryString([]byte(s))
+	}
+
+	raw := []byte(s)
+
+	// Find the earliest occurrence of any known error selector
+	bestIdx := -1
+	var bestEntry *abi.Entry
+	if idx := bytes.Index(raw, defaultErrorID); idx >= 0 {
+		bestIdx = idx
+		bestEntry = defaultError
+	}
+	for _, e := range errorAbis {
+		sel := e.FunctionSelectorBytes()
+		if idx := bytes.Index(raw, sel); idx >= 0 && (bestIdx < 0 || idx < bestIdx) {
+			bestIdx = idx
+			bestEntry = e
+		}
+	}
+
+	if bestIdx < 0 {
+		return sanitizeBinaryString(raw)
+	}
+
+	prefix := sanitizeBinaryString(raw[:bestIdx])
+	embedded := raw[bestIdx:]
+
+	if bestEntry == defaultError {
+		errorInfo, err := defaultError.DecodeCallDataCtx(ctx, embedded)
+		if err == nil && len(errorInfo.Children) == 1 {
+			if nested, ok := errorInfo.Children[0].Value.(string); ok {
+				return prefix + unwrapNestedRevertReasons(ctx, nested, depth+1, errorAbis)
+			}
+		}
+	} else {
+		formatted := formatCustomError(ctx, bestEntry, embedded)
+		if formatted != "" {
+			return prefix + formatted
+		}
+	}
+
+	log.L(ctx).Debugf("Could not decode nested revert at depth %d, hex-encoding remaining %d bytes", depth, len(embedded))
+	return prefix + "0x" + hex.EncodeToString(embedded)
+}
+
+// sanitizeBinaryString returns the input as a text string if it is entirely
+// printable ASCII, or hex-encodes the entire input otherwise. This all-or-nothing
+// approach avoids guessing where "readable" ends in an ambiguous binary blob.
+func sanitizeBinaryString(raw []byte) string {
+	for _, b := range raw {
+		if b < 32 || b >= 127 {
+			return "0x" + hex.EncodeToString(raw)
+		}
+	}
+	return string(raw)
 }
 
 func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) string {
