@@ -6,7 +6,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hyperledger/firefly-common v1.5.9
-	github.com/davecrighton/firefly-signer v1.1.23-0.20260302140017-4d4b9e7da065
+	github.com/hyperledger/firefly-signer v1.1.23-0.20260302140017-4d4b9e7da065
 	github.com/hyperledger/firefly-transaction-manager v1.4.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
@@ -101,3 +101,4 @@ require (
 )
 
 replace github.com/hyperledger/firefly-signer => github.com/davecrighton/firefly-signer v1.1.23-0.20260302140017-4d4b9e7da065
+replace github.com/hyperlegder/evmconnect => github.com/davecrighton/firefly-evmconnect v1.4.3-0.20260302140737-2a995804706b
