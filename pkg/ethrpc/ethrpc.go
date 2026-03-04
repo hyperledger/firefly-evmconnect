@@ -89,8 +89,8 @@ type TxInfoJSONRPC struct {
 	Input                ethtypes.HexBytes0xPrefix `json:"input"`
 	Nonce                *ethtypes.HexInteger      `json:"nonce"`
 	To                   *ethtypes.Address0xHex    `json:"to"`
-	TransactionIndex     *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
-	Type                 *ethtypes.HexInteger      `json:"type"`
+	TransactionIndex     *ethtypes.HexUint64       `json:"transactionIndex"` // null if pending
+	Type                 *ethtypes.HexUint64       `json:"type"`
 	Value                *ethtypes.HexInteger      `json:"value"`
 	V                    *ethtypes.HexInteger      `json:"v"`
 	R                    *ethtypes.HexInteger      `json:"r"`
@@ -114,8 +114,8 @@ func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalO
 		"input":                ([]byte)(txi.Input),
 		"nonce":                (*big.Int)(txi.Nonce),
 		"to":                   (*[20]byte)(txi.To),
-		"transactionIndex":     (*big.Int)(txi.TransactionIndex),
-		"type":                 (*big.Int)(txi.Type),
+		"transactionIndex":     (*uint64)(txi.TransactionIndex),
+		"type":                 (*uint64)(txi.Type),
 		"value":                (*big.Int)(txi.Value),
 		"v":                    (*big.Int)(txi.V),
 		"r":                    (*big.Int)(txi.R),
