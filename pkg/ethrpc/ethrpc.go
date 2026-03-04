@@ -39,8 +39,8 @@ type TxReceiptJSONRPC struct {
 	ContractAddress   *ethtypes.Address0xHex    `json:"contractAddress"`
 	Logs              []*LogJSONRPC             `json:"logs"`
 	LogsBloom         ethtypes.HexBytes0xPrefix `json:"logsBloom"`
-	Type              *ethtypes.HexInteger      `json:"type"`
-	Status            *ethtypes.HexInteger      `json:"status"`
+	Type              *ethtypes.HexUint64       `json:"type"`
+	Status            *ethtypes.HexUint64       `json:"status"`
 	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason"`
 }
 
@@ -65,8 +65,8 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 			"contractAddress":   (*[20]byte)(txr.ContractAddress),
 			"logs":              logsArray,
 			"logsBloom":         ([]byte)(txr.LogsBloom),
-			"status":            (*big.Int)(txr.Status),
-			"type":              (*big.Int)(txr.Type),
+			"status":            (*uint64)(txr.Status),
+			"type":              (*uint64)(txr.Type),
 			"revertReason":      ([]byte)(txr.RevertReason),
 		}, append(opts, MarshalOption{
 			OmitNullFields: []string{"revertReason"},
@@ -77,43 +77,50 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 
 // TxInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
 type TxInfoJSONRPC struct {
-	BlockHash        ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
-	BlockNumber      ethtypes.HexUint64        `json:"blockNumber"` // null if pending
-	ChainID          *ethtypes.HexInteger      `json:"chainId"`
-	From             *ethtypes.Address0xHex    `json:"from"`
-	Gas              *ethtypes.HexInteger      `json:"gas"`
-	GasPrice         *ethtypes.HexInteger      `json:"gasPrice"`
-	Hash             ethtypes.HexBytes0xPrefix `json:"hash"`
-	Input            ethtypes.HexBytes0xPrefix `json:"input"`
-	Nonce            *ethtypes.HexInteger      `json:"nonce"`
-	To               *ethtypes.Address0xHex    `json:"to"`
-	TransactionIndex *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
-	Type             *ethtypes.HexInteger      `json:"type"`
-	Value            *ethtypes.HexInteger      `json:"value"`
-	V                *ethtypes.HexInteger      `json:"v"`
-	R                *ethtypes.HexInteger      `json:"r"`
-	S                *ethtypes.HexInteger      `json:"s"`
+	BlockHash            ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
+	BlockNumber          ethtypes.HexUint64        `json:"blockNumber"` // null if pending
+	ChainID              *ethtypes.HexInteger      `json:"chainId"`
+	From                 *ethtypes.Address0xHex    `json:"from"`
+	Gas                  *ethtypes.HexInteger      `json:"gas"`
+	GasPrice             *ethtypes.HexInteger      `json:"gasPrice"`
+	MaxFeePerGas         *ethtypes.HexInteger      `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *ethtypes.HexInteger      `json:"maxPriorityFeePerGas"`
+	Hash                 ethtypes.HexBytes0xPrefix `json:"hash"`
+	Input                ethtypes.HexBytes0xPrefix `json:"input"`
+	Nonce                *ethtypes.HexInteger      `json:"nonce"`
+	To                   *ethtypes.Address0xHex    `json:"to"`
+	TransactionIndex     *ethtypes.HexInteger      `json:"transactionIndex"` // null if pending
+	Type                 *ethtypes.HexInteger      `json:"type"`
+	Value                *ethtypes.HexInteger      `json:"value"`
+	V                    *ethtypes.HexInteger      `json:"v"`
+	R                    *ethtypes.HexInteger      `json:"r"`
+	S                    *ethtypes.HexInteger      `json:"s"`
 }
 
 func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
+	optsWithNulls := make([]MarshalOption, 0, len(opts)+1)
+	optsWithNulls = append(optsWithNulls, MarshalOption{OmitNullFields: []string{"maxFeePerGas", "maxPriorityFeePerGas", "gasPrice"}})
+	optsWithNulls = append(optsWithNulls, opts...)
 	return jss.MarshalFormattedMap(map[string]any{
-		"blockHash":        ([]byte)(txi.BlockHash),
-		"blockNumber":      (*uint64)(&txi.BlockNumber),
-		"chainId":          (*big.Int)(txi.ChainID),
-		"from":             (*[20]byte)(txi.From),
-		"gas":              (*big.Int)(txi.Gas),
-		"gasPrice":         (*big.Int)(txi.GasPrice),
-		"hash":             ([]byte)(txi.Hash),
-		"input":            ([]byte)(txi.Input),
-		"nonce":            (*big.Int)(txi.Nonce),
-		"to":               (*[20]byte)(txi.To),
-		"transactionIndex": (*big.Int)(txi.TransactionIndex),
-		"type":             (*big.Int)(txi.Type),
-		"value":            (*big.Int)(txi.Value),
-		"v":                (*big.Int)(txi.V),
-		"r":                (*big.Int)(txi.R),
-		"s":                (*big.Int)(txi.S),
-	}, opts...)
+		"blockHash":            ([]byte)(txi.BlockHash),
+		"blockNumber":          (*uint64)(&txi.BlockNumber),
+		"chainId":              (*big.Int)(txi.ChainID),
+		"from":                 (*[20]byte)(txi.From),
+		"gas":                  (*big.Int)(txi.Gas),
+		"gasPrice":             (*big.Int)(txi.GasPrice),
+		"maxFeePerGas":         (*big.Int)(txi.MaxFeePerGas),
+		"maxPriorityFeePerGas": (*big.Int)(txi.MaxPriorityFeePerGas),
+		"hash":                 ([]byte)(txi.Hash),
+		"input":                ([]byte)(txi.Input),
+		"nonce":                (*big.Int)(txi.Nonce),
+		"to":                   (*[20]byte)(txi.To),
+		"transactionIndex":     (*big.Int)(txi.TransactionIndex),
+		"type":                 (*big.Int)(txi.Type),
+		"value":                (*big.Int)(txi.Value),
+		"v":                    (*big.Int)(txi.V),
+		"r":                    (*big.Int)(txi.R),
+		"s":                    (*big.Int)(txi.S),
+	}, optsWithNulls...)
 }
 
 // See https://ethereum.org/hr/developers/docs/apis/json-rpc/#eth_newfilter
@@ -161,7 +168,7 @@ type BlockInfoJSONRPC struct {
 	Number       ethtypes.HexUint64          `json:"number"`
 	Hash         ethtypes.HexBytes0xPrefix   `json:"hash"`
 	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash"`
-	Timestamp    *ethtypes.HexInteger        `json:"timestamp"`
+	Timestamp    ethtypes.HexUint64          `json:"timestamp"`
 	LogsBloom    ethtypes.HexBytes0xPrefix   `json:"logsBloom"`
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
 }
@@ -175,7 +182,7 @@ func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsha
 		"number":       (*uint64)(&bi.Number),
 		"hash":         ([]byte)(bi.Hash),
 		"parentHash":   ([]byte)(bi.ParentHash),
-		"timestamp":    (*big.Int)(bi.Timestamp),
+		"timestamp":    (*uint64)(&bi.Timestamp),
 		"logsBloom":    ([]byte)(bi.LogsBloom),
 		"transactions": txnArray,
 	}, opts...)
@@ -218,7 +225,7 @@ type BlockHeaderJSONRPC struct {
 	Size             *ethtypes.HexInteger        `json:"size"`
 	GasLimit         *ethtypes.HexInteger        `json:"gasLimit"`
 	GasUsed          *ethtypes.HexInteger        `json:"gasUsed"`
-	Timestamp        *ethtypes.HexInteger        `json:"timestamp"`
+	Timestamp        ethtypes.HexUint64          `json:"timestamp"`
 	Uncles           []ethtypes.HexBytes0xPrefix `json:"uncles"`
 }
 
@@ -246,7 +253,7 @@ func (b *BlockHeaderJSONRPC) getFormatMap() map[string]any {
 		"size":             (*big.Int)(b.Size),
 		"gasLimit":         (*big.Int)(b.GasLimit),
 		"gasUsed":          (*big.Int)(b.GasUsed),
-		"timestamp":        (*big.Int)(b.Timestamp),
+		"timestamp":        (*uint64)(&b.Timestamp),
 		"uncles":           unclesArray,
 	}
 }

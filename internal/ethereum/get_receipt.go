@@ -224,7 +224,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 // enrichTransactionReceipt tries to get the error information
 func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt *ethrpc.TxReceiptJSONRPC) *ffcapi.TransactionReceiptResponse {
 
-	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
+	isSuccess := (ethReceipt.Status != nil && *ethReceipt.Status > 0)
 
 	var returnDataString *string
 	var transactionErrorMessage *string
@@ -233,13 +233,17 @@ func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt 
 		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, ethReceipt.TransactionHash.String(), ethReceipt.RevertReason)
 	}
 
+	var status *big.Int
+	if ethReceipt.Status != nil {
+		status = new(big.Int).SetUint64(ethReceipt.Status.Uint64())
+	}
 	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
 		ContractAddress:   ethReceipt.ContractAddress,
 		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
 		From:              ethReceipt.From,
 		To:                ethReceipt.To,
 		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
-		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		Status:            (*fftypes.FFBigInt)(status),
 		ReturnValue:       returnDataString,
 		ErrorMessage:      transactionErrorMessage,
 	})
