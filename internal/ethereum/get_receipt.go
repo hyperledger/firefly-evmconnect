@@ -45,7 +45,7 @@ type receiptExtraInfo struct {
 	From              *ethtypes.Address0xHex `json:"from"`
 	To                *ethtypes.Address0xHex `json:"to"`
 	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
-	Status            *fftypes.FFBigInt      `json:"status"`
+	Status            *uint64                `json:"status"`
 	ErrorMessage      *string                `json:"errorMessage"`
 	ReturnValue       *string                `json:"returnValue,omitempty"`
 }
@@ -233,17 +233,13 @@ func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt 
 		returnDataString, transactionErrorMessage = c.getErrorInfo(ctx, ethReceipt.TransactionHash.String(), ethReceipt.RevertReason)
 	}
 
-	var status *big.Int
-	if ethReceipt.Status != nil {
-		status = new(big.Int).SetUint64(ethReceipt.Status.Uint64())
-	}
 	fullReceipt, _ := json.Marshal(&receiptExtraInfo{
 		ContractAddress:   ethReceipt.ContractAddress,
 		CumulativeGasUsed: (*fftypes.FFBigInt)(ethReceipt.CumulativeGasUsed),
 		From:              ethReceipt.From,
 		To:                ethReceipt.To,
 		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
-		Status:            (*fftypes.FFBigInt)(status),
+		Status:            (*uint64)(ethReceipt.Status),
 		ReturnValue:       returnDataString,
 		ErrorMessage:      transactionErrorMessage,
 	})
