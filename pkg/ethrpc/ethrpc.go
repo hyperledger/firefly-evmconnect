@@ -27,21 +27,21 @@ import (
 
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
 type TxReceiptJSONRPC struct {
-	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash"`
-	TransactionIndex  ethtypes.HexUint64        `json:"transactionIndex"`
-	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash"`
-	BlockNumber       ethtypes.HexUint64        `json:"blockNumber"`
-	From              *ethtypes.Address0xHex    `json:"from"`
-	To                *ethtypes.Address0xHex    `json:"to"`
-	CumulativeGasUsed *ethtypes.HexInteger      `json:"cumulativeGasUsed"`
-	EffectiveGasPrice *ethtypes.HexInteger      `json:"effectiveGasPrice"`
-	GasUsed           *ethtypes.HexInteger      `json:"gasUsed"`
-	ContractAddress   *ethtypes.Address0xHex    `json:"contractAddress"`
-	Logs              []*LogJSONRPC             `json:"logs"`
-	LogsBloom         ethtypes.HexBytes0xPrefix `json:"logsBloom"`
-	Type              *ethtypes.HexUint64       `json:"type"`
-	Status            *ethtypes.HexUint64       `json:"status"`
-	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason"`
+	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash" ffstruct:"TxReceiptJSONRPC"`
+	TransactionIndex  ethtypes.HexUint64        `json:"transactionIndex" ffstruct:"TxReceiptJSONRPC"`
+	BlockHash         ethtypes.HexBytes0xPrefix `json:"blockHash" ffstruct:"TxReceiptJSONRPC"`
+	BlockNumber       ethtypes.HexUint64        `json:"blockNumber" ffstruct:"TxReceiptJSONRPC"`
+	From              *ethtypes.Address0xHex    `json:"from" ffstruct:"TxReceiptJSONRPC"`
+	To                *ethtypes.Address0xHex    `json:"to" ffstruct:"TxReceiptJSONRPC"`
+	CumulativeGasUsed *ethtypes.HexInteger      `json:"cumulativeGasUsed" ffstruct:"TxReceiptJSONRPC"`
+	EffectiveGasPrice *ethtypes.HexInteger      `json:"effectiveGasPrice" ffstruct:"TxReceiptJSONRPC"`
+	GasUsed           *ethtypes.HexInteger      `json:"gasUsed" ffstruct:"TxReceiptJSONRPC"`
+	ContractAddress   *ethtypes.Address0xHex    `json:"contractAddress" ffstruct:"TxReceiptJSONRPC"`
+	Logs              []*LogJSONRPC             `json:"logs" ffstruct:"TxReceiptJSONRPC"`
+	LogsBloom         ethtypes.HexBytes0xPrefix `json:"logsBloom" ffstruct:"TxReceiptJSONRPC"`
+	Type              *ethtypes.HexUint64       `json:"type" ffstruct:"TxReceiptJSONRPC"`
+	Status            *ethtypes.HexUint64       `json:"status" ffstruct:"TxReceiptJSONRPC"`
+	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason" ffstruct:"TxReceiptJSONRPC"`
 }
 
 func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
@@ -77,24 +77,24 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 
 // TxInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
 type TxInfoJSONRPC struct {
-	BlockHash            ethtypes.HexBytes0xPrefix `json:"blockHash"`   // null if pending
-	BlockNumber          ethtypes.HexUint64        `json:"blockNumber"` // null if pending
-	ChainID              *ethtypes.HexInteger      `json:"chainId"`
-	From                 *ethtypes.Address0xHex    `json:"from"`
-	Gas                  *ethtypes.HexInteger      `json:"gas"`
-	GasPrice             *ethtypes.HexInteger      `json:"gasPrice"`
-	MaxFeePerGas         *ethtypes.HexInteger      `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *ethtypes.HexInteger      `json:"maxPriorityFeePerGas"`
-	Hash                 ethtypes.HexBytes0xPrefix `json:"hash"`
-	Input                ethtypes.HexBytes0xPrefix `json:"input"`
-	Nonce                *ethtypes.HexInteger      `json:"nonce"`
-	To                   *ethtypes.Address0xHex    `json:"to"`
-	TransactionIndex     *ethtypes.HexUint64       `json:"transactionIndex"` // null if pending
-	Type                 *ethtypes.HexUint64       `json:"type"`
-	Value                *ethtypes.HexInteger      `json:"value"`
-	V                    *ethtypes.HexInteger      `json:"v"`
-	R                    *ethtypes.HexInteger      `json:"r"`
-	S                    *ethtypes.HexInteger      `json:"s"`
+	BlockHash            ethtypes.HexBytes0xPrefix `json:"blockHash" ffstruct:"TxInfoJSONRPC"`   // null if pending
+	BlockNumber          ethtypes.HexUint64        `json:"blockNumber" ffstruct:"TxInfoJSONRPC"` // null if pending
+	ChainID              *ethtypes.HexInteger      `json:"chainId" ffstruct:"TxInfoJSONRPC"`
+	From                 *ethtypes.Address0xHex    `json:"from" ffstruct:"TxInfoJSONRPC"`
+	Gas                  *ethtypes.HexInteger      `json:"gas" ffstruct:"TxInfoJSONRPC"`
+	GasPrice             *ethtypes.HexInteger      `json:"gasPrice" ffstruct:"TxInfoJSONRPC"`
+	MaxFeePerGas         *ethtypes.HexInteger      `json:"maxFeePerGas" ffstruct:"TxInfoJSONRPC"`
+	MaxPriorityFeePerGas *ethtypes.HexInteger      `json:"maxPriorityFeePerGas" ffstruct:"TxInfoJSONRPC"`
+	Hash                 ethtypes.HexBytes0xPrefix `json:"hash" ffstruct:"TxInfoJSONRPC"`
+	Input                ethtypes.HexBytes0xPrefix `json:"input" ffstruct:"TxInfoJSONRPC"`
+	Nonce                *ethtypes.HexInteger      `json:"nonce" ffstruct:"TxInfoJSONRPC"`
+	To                   *ethtypes.Address0xHex    `json:"to" ffstruct:"TxInfoJSONRPC"`
+	TransactionIndex     *ethtypes.HexUint64       `json:"transactionIndex" ffstruct:"TxInfoJSONRPC"` // null if pending
+	Type                 *ethtypes.HexUint64       `json:"type" ffstruct:"TxInfoJSONRPC"`
+	Value                *ethtypes.HexInteger      `json:"value" ffstruct:"TxInfoJSONRPC"`
+	V                    *ethtypes.HexInteger      `json:"v" ffstruct:"TxInfoJSONRPC"`
+	R                    *ethtypes.HexInteger      `json:"r" ffstruct:"TxInfoJSONRPC"`
+	S                    *ethtypes.HexInteger      `json:"s" ffstruct:"TxInfoJSONRPC"`
 }
 
 func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
@@ -127,22 +127,22 @@ func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalO
 // The address, as well as the entries in the topic array, can be DATA|Array.
 // We just use array in all cases.
 type LogFilterJSONRPC struct {
-	FromBlock *ethtypes.HexInteger          `json:"fromBlock,omitempty"`
-	ToBlock   *ethtypes.HexInteger          `json:"toBlock,omitempty"`
-	Address   []*ethtypes.Address0xHex      `json:"address,omitempty"`
-	Topics    [][]ethtypes.HexBytes0xPrefix `json:"topics,omitempty"`
+	FromBlock *ethtypes.HexInteger          `json:"fromBlock,omitempty" ffstruct:"LogFilterJSONRPC"`
+	ToBlock   *ethtypes.HexInteger          `json:"toBlock,omitempty" ffstruct:"LogFilterJSONRPC"`
+	Address   []*ethtypes.Address0xHex      `json:"address,omitempty" ffstruct:"LogFilterJSONRPC"`
+	Topics    [][]ethtypes.HexBytes0xPrefix `json:"topics,omitempty" ffstruct:"LogFilterJSONRPC"`
 }
 
 type LogJSONRPC struct {
-	Removed          bool                        `json:"removed"`
-	LogIndex         ethtypes.HexUint64          `json:"logIndex"`
-	TransactionIndex ethtypes.HexUint64          `json:"transactionIndex"`
-	BlockNumber      ethtypes.HexUint64          `json:"blockNumber"`
-	TransactionHash  ethtypes.HexBytes0xPrefix   `json:"transactionHash"`
-	BlockHash        ethtypes.HexBytes0xPrefix   `json:"blockHash"`
-	Address          *ethtypes.Address0xHex      `json:"address"`
-	Data             ethtypes.HexBytes0xPrefix   `json:"data"`
-	Topics           []ethtypes.HexBytes0xPrefix `json:"topics"`
+	Removed          bool                        `json:"removed" ffstruct:"LogJSONRPC"`
+	LogIndex         ethtypes.HexUint64          `json:"logIndex" ffstruct:"LogJSONRPC"`
+	TransactionIndex ethtypes.HexUint64          `json:"transactionIndex" ffstruct:"LogJSONRPC"`
+	BlockNumber      ethtypes.HexUint64          `json:"blockNumber" ffstruct:"LogJSONRPC"`
+	TransactionHash  ethtypes.HexBytes0xPrefix   `json:"transactionHash" ffstruct:"LogJSONRPC"`
+	BlockHash        ethtypes.HexBytes0xPrefix   `json:"blockHash" ffstruct:"LogJSONRPC"`
+	Address          *ethtypes.Address0xHex      `json:"address" ffstruct:"LogJSONRPC"`
+	Data             ethtypes.HexBytes0xPrefix   `json:"data" ffstruct:"LogJSONRPC"`
+	Topics           []ethtypes.HexBytes0xPrefix `json:"topics" ffstruct:"LogJSONRPC"`
 }
 
 func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
@@ -165,12 +165,12 @@ func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption
 
 // BlockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
 type BlockInfoJSONRPC struct {
-	Number       ethtypes.HexUint64          `json:"number"`
-	Hash         ethtypes.HexBytes0xPrefix   `json:"hash"`
-	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash"`
-	Timestamp    ethtypes.HexUint64          `json:"timestamp"`
-	LogsBloom    ethtypes.HexBytes0xPrefix   `json:"logsBloom"`
-	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
+	Number       ethtypes.HexUint64          `json:"number" ffstruct:"BlockInfoJSONRPC"`
+	Hash         ethtypes.HexBytes0xPrefix   `json:"hash" ffstruct:"BlockInfoJSONRPC"`
+	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash" ffstruct:"BlockInfoJSONRPC"`
+	Timestamp    ethtypes.HexUint64          `json:"timestamp" ffstruct:"BlockInfoJSONRPC"`
+	LogsBloom    ethtypes.HexBytes0xPrefix   `json:"logsBloom" ffstruct:"BlockInfoJSONRPC"`
+	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions" ffstruct:"BlockInfoJSONRPC"`
 }
 
 func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
@@ -207,26 +207,26 @@ func (bi *BlockInfoJSONRPC) ToFFCAPIMinimalBlockInfo() *ffcapi.MinimalBlockInfo 
 }
 
 type BlockHeaderJSONRPC struct {
-	Number           ethtypes.HexUint64          `json:"number"`
-	Hash             ethtypes.HexBytes0xPrefix   `json:"hash"`
-	MixHash          ethtypes.HexBytes0xPrefix   `json:"mixHash"`
-	ParentHash       ethtypes.HexBytes0xPrefix   `json:"parentHash"`
-	Nonce            ethtypes.HexBytes0xPrefix   `json:"nonce"`
-	SHA3Uncles       ethtypes.HexBytes0xPrefix   `json:"sha3Uncles"`
-	LogsBloom        ethtypes.HexBytes0xPrefix   `json:"logsBloom"`
-	TransactionsRoot ethtypes.HexBytes0xPrefix   `json:"transactionsRoot"`
-	StateRoot        ethtypes.HexBytes0xPrefix   `json:"stateRoot"`
-	ReceiptsRoot     ethtypes.HexBytes0xPrefix   `json:"receiptsRoot"`
-	Miner            *ethtypes.Address0xHex      `json:"miner"`
-	Difficulty       *ethtypes.HexInteger        `json:"difficulty"`
-	TotalDifficulty  *ethtypes.HexInteger        `json:"totalDifficulty"`
-	ExtraData        ethtypes.HexBytes0xPrefix   `json:"extraData"`
-	BaseFeePerGas    *ethtypes.HexInteger        `json:"baseFeePerGas"`
-	Size             *ethtypes.HexInteger        `json:"size"`
-	GasLimit         *ethtypes.HexInteger        `json:"gasLimit"`
-	GasUsed          *ethtypes.HexInteger        `json:"gasUsed"`
-	Timestamp        ethtypes.HexUint64          `json:"timestamp"`
-	Uncles           []ethtypes.HexBytes0xPrefix `json:"uncles"`
+	Number           ethtypes.HexUint64          `json:"number" ffstruct:"BlockInfoJSONRPC"`
+	Hash             ethtypes.HexBytes0xPrefix   `json:"hash" ffstruct:"BlockInfoJSONRPC"`
+	MixHash          ethtypes.HexBytes0xPrefix   `json:"mixHash" ffstruct:"BlockInfoJSONRPC"`
+	ParentHash       ethtypes.HexBytes0xPrefix   `json:"parentHash" ffstruct:"BlockInfoJSONRPC"`
+	Nonce            ethtypes.HexBytes0xPrefix   `json:"nonce" ffstruct:"BlockInfoJSONRPC"`
+	SHA3Uncles       ethtypes.HexBytes0xPrefix   `json:"sha3Uncles" ffstruct:"BlockInfoJSONRPC"`
+	LogsBloom        ethtypes.HexBytes0xPrefix   `json:"logsBloom" ffstruct:"BlockInfoJSONRPC"`
+	TransactionsRoot ethtypes.HexBytes0xPrefix   `json:"transactionsRoot" ffstruct:"BlockInfoJSONRPC"`
+	StateRoot        ethtypes.HexBytes0xPrefix   `json:"stateRoot" ffstruct:"BlockInfoJSONRPC"`
+	ReceiptsRoot     ethtypes.HexBytes0xPrefix   `json:"receiptsRoot" ffstruct:"BlockInfoJSONRPC"`
+	Miner            *ethtypes.Address0xHex      `json:"miner" ffstruct:"BlockInfoJSONRPC"`
+	Difficulty       *ethtypes.HexInteger        `json:"difficulty" ffstruct:"BlockInfoJSONRPC"`
+	TotalDifficulty  *ethtypes.HexInteger        `json:"totalDifficulty" ffstruct:"BlockInfoJSONRPC"`
+	ExtraData        ethtypes.HexBytes0xPrefix   `json:"extraData" ffstruct:"BlockInfoJSONRPC"`
+	BaseFeePerGas    *ethtypes.HexInteger        `json:"baseFeePerGas" ffstruct:"BlockInfoJSONRPC"`
+	Size             *ethtypes.HexInteger        `json:"size" ffstruct:"BlockInfoJSONRPC"`
+	GasLimit         *ethtypes.HexInteger        `json:"gasLimit" ffstruct:"BlockInfoJSONRPC"`
+	GasUsed          *ethtypes.HexInteger        `json:"gasUsed" ffstruct:"BlockInfoJSONRPC"`
+	Timestamp        ethtypes.HexUint64          `json:"timestamp" ffstruct:"BlockInfoJSONRPC"`
+	Uncles           []ethtypes.HexBytes0xPrefix `json:"uncles" ffstruct:"BlockInfoJSONRPC"`
 }
 
 func (b *BlockHeaderJSONRPC) getFormatMap() map[string]any {
@@ -274,7 +274,7 @@ func (b *BlockHeaderJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRP
 // EVMBlockWithTxHashesJSONRPC is the full JSON/RPC structure you get with "false" on eth_getBlockByNumber / eth_getBlockByHash
 type EVMBlockWithTxHashesJSONRPC struct {
 	BlockHeaderJSONRPC
-	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions"`
+	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions" ffstruct:"BlockInfoJSONRPC"`
 }
 
 func (b *EVMBlockWithTxHashesJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
@@ -289,7 +289,7 @@ func (b *EVMBlockWithTxHashesJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockI
 // EVMBlockWithTransactionsJSONRPC is the full JSON/RPC structure you get with "true" on eth_getBlockByNumber / eth_getBlockByHash
 type EVMBlockWithTransactionsJSONRPC struct {
 	BlockHeaderJSONRPC
-	Transactions []*TxInfoJSONRPC `json:"transactions"`
+	Transactions []*TxInfoJSONRPC `json:"transactions" ffstruct:"BlockInfoJSONRPC"`
 }
 
 func (b *EVMBlockWithTransactionsJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRPC {
