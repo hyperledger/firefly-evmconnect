@@ -45,7 +45,7 @@ type receiptExtraInfo struct {
 	From              *ethtypes.Address0xHex `json:"from"`
 	To                *ethtypes.Address0xHex `json:"to"`
 	GasUsed           *fftypes.FFBigInt      `json:"gasUsed"`
-	Status            *fftypes.FFBigInt      `json:"status"`
+	Status            *uint64                `json:"status"`
 	ErrorMessage      *string                `json:"errorMessage"`
 	ReturnValue       *string                `json:"returnValue,omitempty"`
 }
@@ -224,7 +224,7 @@ func (c *ethConnector) TransactionReceipt(ctx context.Context, req *ffcapi.Trans
 // enrichTransactionReceipt tries to get the error information
 func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt *ethrpc.TxReceiptJSONRPC) *ffcapi.TransactionReceiptResponse {
 
-	isSuccess := (ethReceipt.Status != nil && ethReceipt.Status.BigInt().Int64() > 0)
+	isSuccess := (ethReceipt.Status != nil && *ethReceipt.Status > 0)
 
 	var returnDataString *string
 	var transactionErrorMessage *string
@@ -239,7 +239,7 @@ func (c *ethConnector) enrichTransactionReceipt(ctx context.Context, ethReceipt 
 		From:              ethReceipt.From,
 		To:                ethReceipt.To,
 		GasUsed:           (*fftypes.FFBigInt)(ethReceipt.GasUsed),
-		Status:            (*fftypes.FFBigInt)(ethReceipt.Status),
+		Status:            (*uint64)(ethReceipt.Status),
 		ReturnValue:       returnDataString,
 		ErrorMessage:      transactionErrorMessage,
 	})

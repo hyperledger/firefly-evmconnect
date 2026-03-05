@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/hyperledger/firefly-common/pkg/ffapi"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/stretchr/testify/require"
 )
@@ -269,4 +270,15 @@ func TestBlockInfoIsParent(t *testing.T) {
 	}
 	require.True(t, bi1.IsParentOf(bi2))
 	require.False(t, bi2.IsParentOf(bi1))
+}
+
+func TestABIDocumented(t *testing.T) {
+	ffapi.CheckObjectDocumented(&TxReceiptJSONRPC{})
+	ffapi.CheckObjectDocumented(&TxInfoJSONRPC{})
+	ffapi.CheckObjectDocumented(&LogFilterJSONRPC{})
+	ffapi.CheckObjectDocumented(&LogJSONRPC{})
+	ffapi.CheckObjectDocumented(&BlockInfoJSONRPC{})
+	ffapi.CheckObjectDocumented(&BlockHeaderJSONRPC{})
+	ffapi.CheckObjectDocumented(&EVMBlockWithTxHashesJSONRPC{})
+	ffapi.CheckObjectDocumented(&EVMBlockWithTransactionsJSONRPC{})
 }

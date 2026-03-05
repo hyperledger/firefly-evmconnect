@@ -93,7 +93,7 @@ func (ee *eventEnricher) filterEnrichEthLog(ctx context.Context, f *eventFilter,
 			log.L(ctx).Errorf("Failed to get block info timestamp for block '%s': block not found", ethLog.BlockHash)
 			return nil, matched, decoded, i18n.NewError(ctx, msgs.MsgBlockNotAvailable)
 		}
-		timestamp = fftypes.UnixTime(bi.Timestamp.BigInt().Int64())
+		timestamp = fftypes.UnixTime(int64(bi.Timestamp.Uint64())) // nolint:gosec // this is what it is - we don't accept negative time, and unix doesn't support full uint64 range
 	}
 
 	if len(methods) > 0 || ee.extractSigner {
