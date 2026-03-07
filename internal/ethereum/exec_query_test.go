@@ -17,12 +17,15 @@
 package ethereum
 
 import (
+	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
+	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
@@ -164,7 +167,7 @@ func TestExecQueryCustomErrorRevertData(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `GreaterThanTen("20", "20")`)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `GreaterThanTen("20","20")`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
@@ -388,6 +391,352 @@ func TestExecQueryFailBadToAddress(t *testing.T) {
 	_, _, err = c.QueryInvoke(ctx, &req)
 	assert.Regexp(t, "FF23020", err)
 
+}
+
+func TestProcessRevertReasonNestedErrorString(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Outer Error(string) wrapping "outer: " + raw inner Error(string) ABI bytes.
+	// Simulates: catch (bytes memory reason) { revert(string.concat("outer: ", string(reason))); }
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a00000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000006b" +
+			"6f757465723a20" +
+			"08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"0000000000000000000000000000000000000000000000000000000000000013" +
+			"696e6e6572206572726f72206d65737361676500000000000000000000000000" +
+			"000000000000000000000000000000000000000000")
+
+	result := processRevertReason(ctx, revertData, nil)
+	assert.Equal(t, "outer: inner error message", result)
+}
+
+func TestProcessRevertReasonDoubleNestedErrorString(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Three levels: Error("level1: " + Error("level2: " + Error("deepest error")))
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"00000000000000000000000000000000000000000000000000000000000000cc" +
+			"6c6576656c313a20" + // "level1: "
+			"08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000006c" +
+			"6c6576656c323a20" + // "level2: "
+			"08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000000d" +
+			"64656570657374206572726f720000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+	result := processRevertReason(ctx, revertData, nil)
+	assert.Equal(t, "level1: level2: deepest error", result)
+}
+
+func TestProcessRevertReasonNestedCustomError(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Define the custom error ABI first so we can use its real selector
+	customErr := &abi.Entry{
+		Type: abi.Error,
+		Name: "MyCustomError",
+		Inputs: abi.ParameterArray{
+			{Type: "bytes"},
+		},
+	}
+	customSelector := hex.EncodeToString(customErr.FunctionSelectorBytes())
+
+	// Error("[404]01d - caught bytes:" + MyCustomError(0xdeadbeef) raw ABI bytes)
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000007c" +
+			"5b3430345d303164202d206361756768742062797465733a" + // "[404]01d - caught bytes:"
+			customSelector +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"0000000000000000000000000000000000000000000000000000000000000004" +
+			"deadbeef00000000000000000000000000000000000000000000000000000000" +
+			"00000000")
+
+	// With no error ABIs, the custom error can't be decoded —
+	// the entire nested section is hex-encoded
+	result := processRevertReason(ctx, revertData, nil)
+	assert.True(t, strings.HasPrefix(result, "0x"))
+	assert.NotContains(t, result, "\x00")
+
+	// Now provide the custom error ABI so it CAN be decoded
+	result = processRevertReason(ctx, revertData, []*abi.Entry{customErr})
+	assert.Equal(t, `[404]01d - caught bytes:MyCustomError("0xdeadbeef")`, result)
+}
+
+func TestProcessRevertReasonUnknownNestedBinaryFallback(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Error("[404]01d - caught bytes:" + unknown error selector + binary payload)
+	// The embedded selector ac8ae0 is NOT in our error ABIs, so the function
+	// falls back to readable prefix + hex-encoded binary remainder.
+	revertData := ethtypes.MustNewHexBytes0xPrefix("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000007b5b3430345d303164202d2063617567687420627974" +
+		"65733aac8ae000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004deadbeef000000000000000000000000000000000000000000000000000000000000000000")
+
+	result := processRevertReason(ctx, revertData, nil)
+
+	// Entire nested section is hex-encoded since no selector could be decoded
+	assert.True(t, strings.HasPrefix(result, "0x"))
+	assert.Contains(t, result, "deadbeef")
+	assert.NotContains(t, result, "\x00")
+}
+
+func TestProcessRevertReasonPlainStringUnchanged(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// A normal Error(string) with no nested binary data should pass through unchanged
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000001a" +
+			"4e6f7420656e6f7567682045746865722070726f76696465642e000000000000")
+
+	result := processRevertReason(ctx, revertData, nil)
+	assert.Equal(t, "Not enough Ether provided.", result)
+}
+
+// ---- processRevertReason behavioral tests ----
+
+func TestProcessRevertReasonNonRevertData(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Data whose length is a multiple of 32 is NOT revert data
+	data32 := ethtypes.MustNewHexBytes0xPrefix("0x" + strings.Repeat("ab", 32))
+	assert.Equal(t, "", processRevertReason(ctx, data32, nil))
+
+	data64 := ethtypes.MustNewHexBytes0xPrefix("0x" + strings.Repeat("ab", 64))
+	assert.Equal(t, "", processRevertReason(ctx, data64, nil))
+}
+
+func TestProcessRevertReasonEmptyData(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	assert.Equal(t, "", processRevertReason(ctx, ethtypes.HexBytes0xPrefix{}, nil))
+	assert.Equal(t, "", processRevertReason(ctx, nil, nil))
+}
+
+func TestProcessRevertReasonBareSelector(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Just 4 bytes — valid error selector but no params to decode
+	data := ethtypes.MustNewHexBytes0xPrefix("0x08c379a0")
+	result := processRevertReason(ctx, data, nil)
+	assert.Equal(t, "0x08c379a0", result)
+}
+
+func TestProcessRevertReasonCustomErrorStringParam(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	customErr := &abi.Entry{
+		Type:   abi.Error,
+		Name:   "LessThanOne",
+		Inputs: abi.ParameterArray{{Name: "x", Type: "string"}},
+	}
+	errData, err := customErr.EncodeCallDataValues([]string{"bad value"})
+	assert.NoError(t, err)
+
+	result := processRevertReason(ctx, errData, []*abi.Entry{customErr})
+	assert.Equal(t, `LessThanOne("bad value")`, result)
+}
+
+func TestProcessRevertReasonCustomErrorAddressParam(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	customErr := &abi.Entry{
+		Type:   abi.Error,
+		Name:   "Unauthorized",
+		Inputs: abi.ParameterArray{{Name: "caller", Type: "address"}},
+	}
+	errData, err := customErr.EncodeCallDataJSON([]byte(`{"caller":"0x03706Ff580119B130E7D26C5e816913123C24d89"}`))
+	assert.NoError(t, err)
+
+	result := processRevertReason(ctx, errData, []*abi.Entry{customErr})
+	assert.Equal(t, `Unauthorized("0x03706ff580119b130e7d26c5e816913123c24d89")`, result)
+}
+
+func TestProcessRevertReasonMultipleCustomErrorsCorrectMatch(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	errA := &abi.Entry{
+		Type:   abi.Error,
+		Name:   "ErrAlpha",
+		Inputs: abi.ParameterArray{{Type: "uint256"}},
+	}
+	errB := &abi.Entry{
+		Type:   abi.Error,
+		Name:   "ErrBeta",
+		Inputs: abi.ParameterArray{{Type: "string"}},
+	}
+
+	// Encode errB and verify errA doesn't accidentally match
+	errData, err := errB.EncodeCallDataValues([]string{"beta triggered"})
+	assert.NoError(t, err)
+	result := processRevertReason(ctx, errData, []*abi.Entry{errA, errB})
+	assert.Equal(t, `ErrBeta("beta triggered")`, result)
+
+	// Now encode errA and verify it matches
+	errData, err = errA.EncodeCallDataValues([]string{"42"})
+	assert.NoError(t, err)
+	result = processRevertReason(ctx, errData, []*abi.Entry{errA, errB})
+	assert.Equal(t, `ErrAlpha("42")`, result)
+}
+
+func TestProcessRevertReasonUnknownSelectorFallsThrough(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Selector that doesn't match any known error — returns raw hex
+	data := ethtypes.MustNewHexBytes0xPrefix(
+		"0xdeadbeef" + strings.Repeat("00", 32))
+
+	result := processRevertReason(ctx, data, nil)
+	assert.Equal(t, "0xdeadbeef"+strings.Repeat("00", 32), result)
+}
+
+func TestProcessRevertReasonErrorSelectorMalformedData(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Error(string) selector but ABI data is garbage — should fall through to hex
+	data := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"00000000000000000000000000000000000000000000000000000000baadf00d")
+
+	result := processRevertReason(ctx, data, nil)
+	assert.Equal(t, "0x08c379a000000000000000000000000000000000000000000000000000000000baadf00d", result)
+}
+
+func TestProcessRevertReasonCustomErrorTruncatedData(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	customErr := &abi.Entry{
+		Type:   abi.Error,
+		Name:   "NeedsTwoWords",
+		Inputs: abi.ParameterArray{{Type: "uint256"}, {Type: "uint256"}},
+	}
+
+	// Only 1 word of data — not enough for the error's 2 params
+	data := ethtypes.MustNewHexBytes0xPrefix(
+		"0x" + hex.EncodeToString(customErr.FunctionSelectorBytes()) +
+			strings.Repeat("00", 32))
+
+	result := processRevertReason(ctx, data, []*abi.Entry{customErr})
+	assert.True(t, strings.HasPrefix(result, "0x"))
+}
+
+func TestProcessRevertReasonNilErrorAbis(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// "hello world!" = 12 bytes, padded to 32.
+	// Total: 4 (sel) + 32 (offset) + 32 (len) + 32 (data) = 100. 100%32 = 4 ✓
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000000c" +
+			"68656c6c6f20776f726c64210000000000000000000000000000000000000000")
+
+	assert.Equal(t, "hello world!", processRevertReason(ctx, revertData, nil))
+}
+
+func TestProcessRevertReasonEmptyErrorAbis(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"000000000000000000000000000000000000000000000000000000000000000c" +
+			"68656c6c6f20776f726c64210000000000000000000000000000000000000000")
+
+	assert.Equal(t, "hello world!", processRevertReason(ctx, revertData, []*abi.Entry{}))
+}
+
+func TestProcessRevertReasonRealWorldNestedData(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// Real revert data from the original bug report (the hex from logs).
+	// This contains deeply nested Error(string) chains from Solidity catch-and-rethrow
+	// with string(reason). The outer Error(string) declares string length 0x73=115 bytes,
+	// which captures the first-level prefix "[OCPE]404/98 - " plus the START of the
+	// inner Error(string) ABI encoding. The inner encoding declares length 0x212=530 but
+	// only ~32 bytes fit in the outer string, so the inner decode correctly fails and
+	// the remainder is hex-encoded.
+	//
+	// The critical requirement: the output must NOT contain null bytes (\x00) which
+	// was the root cause of the PostgreSQL "invalid byte sequence" bug.
+	revertData := ethtypes.MustNewHexBytes0xPrefix("0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000735b4f4350455d3430342f3938202d2008c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000002125b544d4d5d3430342f3136653a2008c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001b45b4c544d4d525d3430342f3236713a2008c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001435b4b44574c5d3430342f313061202d205b4350485d3430342f5b3078616638333233336638626462323834333235386235653234663261326464636133356666323738625d3339613a205b4c4f43435d3430342f3137613a205b4350485d3430342f5b3078393638343634366535383033313539623061396338623163396538646237316361373062643236615d3239633a5b4c4f43535d3430342f32333a08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000555b44574c5d3430342f3737633a205b4b4841415d3430342f303161202d205b4350485d3430332f30343a2030786633363438306137643036356137366666623366366531633939613137313232353464656538353500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+	result := processRevertReason(ctx, revertData, nil)
+
+	// Critical: must not contain null bytes (the original bug)
+	assert.NotContains(t, result, "\x00")
+
+	// First level is decoded to readable text
+	assert.Contains(t, result, "[OCPE]404/98")
+
+	// The inner nested data (which the ABI decoder can't fully decode because
+	// the outer encoding truncates it) is hex-encoded as a safe fallback
+	assert.True(t, strings.Contains(result, "0x08c379a0"))
+}
+
+func TestProcessRevertReasonCustomErrorWithMultipleParams(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	customErr := &abi.Entry{
+		Type: abi.Error,
+		Name: "DetailedError",
+		Inputs: abi.ParameterArray{
+			{Name: "code", Type: "uint256"},
+			{Name: "message", Type: "string"},
+		},
+	}
+	errData, err := customErr.EncodeCallDataJSON([]byte(`{"code":404,"message":"not found"}`))
+	assert.NoError(t, err)
+
+	result := processRevertReason(ctx, errData, []*abi.Entry{customErr})
+	assert.Equal(t, `DetailedError("404","not found")`, result)
+}
+
+func TestProcessRevertReasonDefaultErrorTakesPriorityOverCustom(t *testing.T) {
+	ctx, _, _, done := newTestConnector(t)
+	defer done()
+
+	// "default error msg" = 17 bytes, padded to 32.
+	// Total: 4 + 32 + 32 + 32 = 100. 100%32 = 4 ✓
+	revertData := ethtypes.MustNewHexBytes0xPrefix(
+		"0x08c379a0" +
+			"0000000000000000000000000000000000000000000000000000000000000020" +
+			"0000000000000000000000000000000000000000000000000000000000000011" +
+			"64656661756c74206572726f72206d7367000000000000000000000000000000")
+
+	customErr := &abi.Entry{
+		Type:   abi.Error,
+		Name:   "SomeOtherError",
+		Inputs: abi.ParameterArray{{Type: "uint256"}},
+	}
+	result := processRevertReason(ctx, revertData, []*abi.Entry{customErr})
+	assert.Equal(t, "default error msg", result)
 }
 
 func TestExecQueryFailBadToParams(t *testing.T) {
