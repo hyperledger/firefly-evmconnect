@@ -34,7 +34,8 @@ type blockReceiptRequest struct {
 }
 
 // Initiates a background request to get all the receipts in a block.
-// Blocks if throttled
+// Blocks if throttled.
+// Delivers an error if the block is not found.
 func (bl *blockListener) FetchBlockReceiptsAsync(blockNumber uint64, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error)) {
 	brr := &blockReceiptRequest{
 		bl:          bl,
@@ -65,9 +66,12 @@ func (brr *blockReceiptRequest) run() {
 	if brr.bl.UseGetBlockReceipts {
 		// just need to make a single call to get all the receipts
 		rpcErr := rpc.CallRPC(brr.bl.ctx, &receipts, "eth_getBlockReceipts", brr.blockNumber)
-		if rpcErr != nil {
+		switch {
+		case rpcErr != nil:
 			err = rpcErr.Error()
-		} else {
+		case receipts == nil:
+			err = i18n.NewError(brr.bl.ctx, msgs.MsgBlockNotAvailable)
+		default:
 			// check the hash in all the receipts
 			for _, r := range receipts {
 				if brr.blockHash != nil && !r.BlockHash.Equals(brr.blockHash) {
@@ -82,7 +86,11 @@ func (brr *blockReceiptRequest) run() {
 		// parallelization or batching of eth_getTransactionReceipt calls.
 
 		// Get the block by hash first
-		blockInfo, err := brr.bl.GetBlockInfoByHash(brr.bl.ctx, brr.blockHash.String())
+		var blockInfo *ethrpc.BlockInfoJSONRPC
+		blockInfo, err = brr.bl.GetBlockInfoByHash(brr.bl.ctx, brr.blockHash.String())
+		if err == nil && blockInfo == nil {
+			err = i18n.NewError(brr.bl.ctx, msgs.MsgBlockNotAvailable)
+		}
 		if err == nil {
 			// Then get each receipt
 			receipts = make([]*ethrpc.TxReceiptJSONRPC, len(blockInfo.Transactions))

@@ -59,6 +59,25 @@ func TestFetchBlockReceiptsAsyncOptimizedOk(t *testing.T) {
 	<-fetched
 }
 
+func TestFetchBlockReceiptsAsyncOptimizedNotFound(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
+		conf.UseGetBlockReceipts = true
+	})
+	defer done()
+
+	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	blockNumber := ethtypes.HexUint64(12346)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockReceipts", mock.Anything).Return(nil)
+
+	fetched := make(chan struct{})
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+		defer close(fetched)
+		assert.Regexp(t, "FF23011", err)
+	})
+	<-fetched
+}
+
 func TestFetchBlockReceiptsAsyncOptimizedBlockMismatch(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
 		conf.UseGetBlockReceipts = true
@@ -163,6 +182,23 @@ func TestFetchBlockReceiptsAsyncNonOptimizedOk(t *testing.T) {
 		defer close(fetched)
 		assert.NoError(t, err)
 		assert.Equal(t, []*ethrpc.TxReceiptJSONRPC{receipt}, receipts)
+	})
+	<-fetched
+}
+
+func TestFetchBlockReceiptsAsyncNonOptimizedNotFound(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
+
+	blockHash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	blockNumber := ethtypes.HexUint64(12346)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByHash", mock.Anything, false).Return(nil)
+
+	fetched := make(chan struct{})
+	bl.FetchBlockReceiptsAsync(blockNumber.Uint64(), blockHash, func(receipts []*ethrpc.TxReceiptJSONRPC, err error) {
+		defer close(fetched)
+		assert.Regexp(t, "FF23011", err)
 	})
 	<-fetched
 }
