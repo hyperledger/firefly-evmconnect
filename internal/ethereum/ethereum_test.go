@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/firefly-common/pkg/fftls"
 	"github.com/hyperledger/firefly-evmconnect/mocks/ethblocklistenermocks"
 	"github.com/hyperledger/firefly-evmconnect/mocks/rpcbackendmocks"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -257,10 +258,21 @@ func TestReconcileConfirmationsForTransaction(t *testing.T) {
 	mbl := ethblocklistenermocks.NewBlockListener(t)
 	c.blockListener = mbl
 	mbl.On("WaitClosed").Return()
-	mbl.On("ReconcileConfirmationsForTransaction", ctx, "hash1", []*ffcapi.MinimalBlockInfo{}, uint64(10)).
-		Return(&ffcapi.ConfirmationUpdateResult{}, &ethrpc.TxReceiptJSONRPC{}, nil)
+	mbl.On("ReconcileConfirmationsForTransaction", ctx, "hash1", []*ethrpc.MinimalBlockInfo{
+		{BlockNumber: 12345},
+	}, uint64(10)).
+		Return(
+			&ethblocklistener.ConfirmationUpdateResult{
+				Confirmations: []*ethrpc.MinimalBlockInfo{
+					{BlockNumber: 12345},
+				},
+			},
+			&ethrpc.TxReceiptJSONRPC{},
+			nil)
 
-	_, err := c.ReconcileConfirmationsForTransaction(ctx, "hash1", []*ffcapi.MinimalBlockInfo{}, 10)
+	_, err := c.ReconcileConfirmationsForTransaction(ctx, "hash1", []*ffcapi.MinimalBlockInfo{
+		{BlockNumber: 12345},
+	}, 10)
 	require.NoError(t, err)
 
 }

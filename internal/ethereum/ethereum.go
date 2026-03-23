@@ -35,6 +35,7 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-evmconnect/internal/retryutil"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
@@ -200,12 +201,44 @@ func withDeprecatedConfFallback[T any](conf config.Section, getter func(string) 
 
 // ReconcileConfirmationsForTransaction is the public API for reconciling transaction confirmations.
 // It delegates to the blockListener's internal reconciliation logic.
-func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
+func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (res *ffcapi.ConfirmationUpdateResult, err error) {
 	// Now we can start the reconciliation process
-	res, ethReceipt, err := c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, existingConfirmations, targetConfirmationCount)
-	if err == nil && res != nil && ethReceipt != nil {
-		// We enrich the
-		res.Receipt = c.enrichTransactionReceipt(ctx, ethReceipt)
+	ethrpcRes, ethReceipt, err := c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, ffcapiToEthRPCConfirmations(existingConfirmations), targetConfirmationCount)
+	if err == nil && ethrpcRes != nil {
+		res = &ffcapi.ConfirmationUpdateResult{
+			Confirmations:           ethRPCtoFFCAPIConfirmations(ethrpcRes.Confirmations),
+			Rebuilt:                 ethrpcRes.Rebuilt,
+			NewFork:                 ethrpcRes.NewFork,
+			Confirmed:               ethrpcRes.Confirmed,
+			TargetConfirmationCount: ethrpcRes.TargetConfirmationCount,
+		}
+		if ethReceipt != nil {
+			res.Receipt = c.enrichTransactionReceipt(ctx, ethReceipt)
+		}
 	}
 	return res, err
+}
+
+func ffcapiToEthRPCConfirmations(ffcapiEC []*ffcapi.MinimalBlockInfo) []*ethrpc.MinimalBlockInfo {
+	ec := make([]*ethrpc.MinimalBlockInfo, len(ffcapiEC))
+	for i, c := range ffcapiEC {
+		ec[i] = &ethrpc.MinimalBlockInfo{
+			BlockNumber: c.BlockNumber,
+			BlockHash:   c.BlockHash,
+			ParentHash:  c.ParentHash,
+		}
+	}
+	return ec
+}
+
+func ethRPCtoFFCAPIConfirmations(ffcapiEC []*ethrpc.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
+	ec := make([]*ffcapi.MinimalBlockInfo, len(ffcapiEC))
+	for i, c := range ffcapiEC {
+		ec[i] = &ffcapi.MinimalBlockInfo{
+			BlockNumber: c.BlockNumber,
+			BlockHash:   c.BlockHash,
+			ParentHash:  c.ParentHash,
+		}
+	}
+	return ec
 }

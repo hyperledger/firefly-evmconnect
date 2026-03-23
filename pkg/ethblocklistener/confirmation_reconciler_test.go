@@ -30,7 +30,6 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -104,7 +103,7 @@ func TestReconcileConfirmationsForTransaction_ReceiptRPCCallError(t *testing.T) 
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100).String(), []*ffcapi.MinimalBlockInfo{}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), generateTestHash(100).String(), []*ethrpc.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect an error when RPC call fails
 	assert.Error(t, err)
@@ -133,7 +132,7 @@ func TestReconcileConfirmationsForTransaction_BlockNotFound(t *testing.T) {
 
 	// Execute the reconcileConfirmationsForTransaction function
 	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
-		ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+		toMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
 			{Number: 1977, Hash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
 		}), 5)
 
@@ -160,7 +159,7 @@ func TestReconcileConfirmationsForTransaction_BlockRPCCallError(t *testing.T) {
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x7b9", false).Return(&rpcbackend.RPCError{Message: "pop"})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ethrpc.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect an error when RPC call fails
 	assert.Error(t, err)
@@ -192,7 +191,7 @@ func TestReconcileConfirmationsForTransaction_TxBlockNotInCanonicalChain(t *test
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ethrpc.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect the transaction block to be returned
 	// we trust the block retrieve by getBlockInfoContainsTxHash function more than the canonical chain
@@ -232,14 +231,14 @@ func TestReconcileConfirmationsForTransaction_NewConfirmation(t *testing.T) {
 	})
 
 	// Execute the reconcileConfirmationsForTransaction function
-	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ffcapi.MinimalBlockInfo{}, 5)
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", []*ethrpc.MinimalBlockInfo{}, 5)
 
 	// Assertions - expect the existing confirmation queue to be returned because the tx block doesn't match the same block number in the canonical chain
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.False(t, result.NewFork)
 	assert.False(t, result.Confirmed)
-	assert.Equal(t, ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+	assert.Equal(t, toMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
 		{Number: 1977, Hash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
 		{Number: 1978, Hash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
 	}), result.Confirmations)
@@ -273,7 +272,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 
 	// Execute the reconcileConfirmationsForTransaction function
 	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6",
-		ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+		toMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
 			{Number: 1979, Hash: generateTestHash(1979), ParentHash: generateTestHash(1978)},
 			{Number: 1980, Hash: generateTestHash(1980), ParentHash: generateTestHash(1979)},
 		}), 5)
@@ -283,7 +282,7 @@ func TestReconcileConfirmationsForTransaction_DifferentTxBlock(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.True(t, result.NewFork)
 	assert.False(t, result.Confirmed)
-	assert.Equal(t, ffcapiMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
+	assert.Equal(t, toMinimalBlockInfoList([]*ethrpc.BlockInfoJSONRPC{
 		{Number: 1977, Hash: generateTestHash(1977), ParentHash: generateTestHash(1976)},
 		{Number: 1978, Hash: generateTestHash(1978), ParentHash: generateTestHash(1977)},
 	}), result.Confirmations)

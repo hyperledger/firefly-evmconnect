@@ -24,10 +24,9 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
-func ffcapiToBlockInfoList(ffcapiBlocks []*ffcapi.MinimalBlockInfo) (blocks []*ethrpc.BlockInfoJSONRPC, err error) {
+func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.BlockInfoJSONRPC, err error) {
 	blocks = make([]*ethrpc.BlockInfoJSONRPC, len(ffcapiBlocks))
 	for i, b := range ffcapiBlocks {
 		blocks[i] = &ethrpc.BlockInfoJSONRPC{Number: ethtypes.HexUint64(b.BlockNumber)}
@@ -41,12 +40,9 @@ func ffcapiToBlockInfoList(ffcapiBlocks []*ffcapi.MinimalBlockInfo) (blocks []*e
 	return blocks, err
 }
 
-// reconcileConfirmationsForTransaction reconciles the confirmation queue for a transaction
-//
-// For historical reasons this interface is FFCAPI derived MinimalBlockInfo in/out, rather than direct.
-func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, ffcapiExistingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
+func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
 
-	existingConfirmations, err := ffcapiToBlockInfoList(ffcapiExistingConfirmations)
+	blockInfoExistingConfirmations, err := toBlockInfoList(existingConfirmations)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,7 +58,7 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 		log.L(ctx).Debugf("Transaction %s not found in any block", txHash)
 		return nil, nil, i18n.NewError(ctx, msgs.MsgTransactionNotFound, txHash)
 	}
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingConfirmations, txBlockInfo, targetConfirmationCount)
+	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, blockInfoExistingConfirmations, txBlockInfo, targetConfirmationCount)
 	if confirmationUpdateResult != nil {
 		confirmationUpdateResult.TargetConfirmationCount = targetConfirmationCount
 		// NOTE: This function does not do the full receipt decoding, for which there is a complex function for.
@@ -71,7 +67,7 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 	return confirmationUpdateResult, txReceipt, err
 }
 
-func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, error) {
+func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, targetConfirmationCount uint64) (*ConfirmationUpdateResult, error) {
 	// Primary objective of this algorithm is to build a contiguous, linked list of `MinimalBlockInfo` structs, starting from the transaction block and ending as far as our current knowledge of the in-memory partial canonical chain allows.
 	// Secondary objective is to report whether any fork was detected (and corrected) during this analysis
 
@@ -84,7 +80,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 	}
 
 	// Initialize the result with the target confirmation count
-	reconcileResult := &ffcapi.ConfirmationUpdateResult{}
+	reconcileResult := &ConfirmationUpdateResult{}
 
 	// We start by constructing 2 lists of blocks:
 	// - The `earlyList`.  This is the set of earliest blocks we are interested in.  At the least, it starts with the transaction block
@@ -135,7 +131,7 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 		if confirmations != nil {
 			// we have a contiguous list that starts with the transaction block and ends with the last block in the canonical chain
 			// so we can return the result
-			reconcileResult.Confirmations = ffcapiMinimalBlockInfoList(confirmations)
+			reconcileResult.Confirmations = toMinimalBlockInfoList(confirmations)
 			break
 		}
 
@@ -236,7 +232,7 @@ func (s *splice) toSingleLinkedList() []*ethrpc.BlockInfoJSONRPC {
 
 // createEarlyList will return a list of blocks that starts with the latest transaction block and followed by any blocks in the existing confirmations list that are still valid
 // any blocks that are not contiguous will be discarded
-func createEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, reconcileResult *ffcapi.ConfirmationUpdateResult) (earlyList []*ethrpc.BlockInfoJSONRPC) {
+func createEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, reconcileResult *ConfirmationUpdateResult) (earlyList []*ethrpc.BlockInfoJSONRPC) {
 	if len(existingConfirmations) > 0 {
 		if !existingConfirmations[0].Equal(txBlockInfo) {
 			// we discard the existing confirmations list if the transaction block doesn't match
@@ -340,7 +336,7 @@ func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx con
 	return newConfirmationsWithoutTxBlock, nil
 }
 
-func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, txBlockInfo *ethrpc.BlockInfoJSONRPC) (*ffcapi.ConfirmationUpdateResult, error) {
+func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, txBlockInfo *ethrpc.BlockInfoJSONRPC) (*ConfirmationUpdateResult, error) {
 	bl.canonicalChainLock.RLock()
 	defer bl.canonicalChainLock.RUnlock()
 	// if the target confirmation count is 0, and the transaction blocks is before the last block in the in-memory partial chain,
@@ -351,14 +347,14 @@ func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, 
 		return nil, err
 	}
 
-	return &ffcapi.ConfirmationUpdateResult{
+	return &ConfirmationUpdateResult{
 		Confirmed:     true,
-		Confirmations: []*ffcapi.MinimalBlockInfo{txBlockInfo.ToFFCAPIMinimalBlockInfo()},
+		Confirmations: []*ethrpc.MinimalBlockInfo{txBlockInfo.ToMinimalBlockInfo()},
 	}, nil
 
 }
 
-func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, targetConfirmationCount uint64) *ffcapi.ConfirmationUpdateResult {
+func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, targetConfirmationCount uint64) *ConfirmationUpdateResult {
 	bl.canonicalChainLock.RLock()
 	defer bl.canonicalChainLock.RUnlock()
 	nextInMemoryBlock := bl.canonicalChain.Front()
@@ -375,9 +371,9 @@ func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations
 
 	if nextInMemoryBlockInfo != nil && lastExistingConfirmation.IsParentOf(nextInMemoryBlockInfo) {
 		// the existing confirmation are connected to the in memory partial chain so we can return them without fetching any more blocks
-		return &ffcapi.ConfirmationUpdateResult{
+		return &ConfirmationUpdateResult{
 			Confirmed:     true,
-			Confirmations: ffcapiMinimalBlockInfoList(existingConfirmations[:targetConfirmationCount+1]),
+			Confirmations: toMinimalBlockInfoList(existingConfirmations[:targetConfirmationCount+1]),
 		}
 	}
 	return nil
