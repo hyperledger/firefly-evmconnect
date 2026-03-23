@@ -198,25 +198,25 @@ func (bi *BlockInfoJSONRPC) IsParentOf(other *BlockInfoJSONRPC) bool {
 }
 
 type MinimalBlockInfo struct { // duplicate of apitypes.Confirmation due to circular dependency
-	BlockNumber fftypes.FFuint64 `json:"blockNumber"`
-	BlockHash   string           `json:"blockHash"`
-	ParentHash  string           `json:"parentHash"`
+	BlockNumber fftypes.FFuint64          `json:"blockNumber"`
+	BlockHash   ethtypes.HexBytes0xPrefix `json:"blockHash"`
+	ParentHash  ethtypes.HexBytes0xPrefix `json:"parentHash"`
 }
 
 func (bi *BlockInfoJSONRPC) ToMinimalBlockInfo() *MinimalBlockInfo {
 	return &MinimalBlockInfo{
 		BlockNumber: fftypes.FFuint64(bi.Number.Uint64()),
-		BlockHash:   bi.Hash.String(),
-		ParentHash:  bi.ParentHash.String(),
+		BlockHash:   bi.Hash,
+		ParentHash:  bi.ParentHash,
 	}
 }
 
 func (c *MinimalBlockInfo) Equal(other *MinimalBlockInfo) bool {
-	return c.BlockNumber == other.BlockNumber && c.BlockHash == other.BlockHash && c.ParentHash == other.ParentHash
+	return c.BlockNumber == other.BlockNumber && c.BlockHash.Equals(other.BlockHash) && c.ParentHash.Equals(other.ParentHash)
 }
 
 func (c *MinimalBlockInfo) IsParentOf(other *MinimalBlockInfo) bool {
-	return c.BlockHash == other.ParentHash && c.BlockNumber+1 == other.BlockNumber
+	return c.BlockHash.Equals(other.ParentHash) && c.BlockNumber+1 == other.BlockNumber
 }
 
 type BlockHeaderJSONRPC struct {

@@ -26,26 +26,21 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 )
 
-func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.BlockInfoJSONRPC, err error) {
+func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.BlockInfoJSONRPC) {
 	blocks = make([]*ethrpc.BlockInfoJSONRPC, len(ffcapiBlocks))
 	for i, b := range ffcapiBlocks {
-		blocks[i] = &ethrpc.BlockInfoJSONRPC{Number: ethtypes.HexUint64(b.BlockNumber)}
-		if err == nil {
-			blocks[i].Hash, err = ethtypes.NewHexBytes0xPrefix(b.BlockHash)
-		}
-		if err == nil {
-			blocks[i].ParentHash, err = ethtypes.NewHexBytes0xPrefix(b.ParentHash)
+		blocks[i] = &ethrpc.BlockInfoJSONRPC{
+			Number:     ethtypes.HexUint64(b.BlockNumber),
+			Hash:       b.BlockHash,
+			ParentHash: b.ParentHash,
 		}
 	}
-	return blocks, err
+	return blocks
 }
 
 func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
 
-	blockInfoExistingConfirmations, err := toBlockInfoList(existingConfirmations)
-	if err != nil {
-		return nil, nil, err
-	}
+	blockInfoExistingConfirmations := toBlockInfoList(existingConfirmations)
 
 	// Fetch the block containing the transaction first so that we can use it to build the confirmation list
 	txBlockInfo, txReceipt, err := bl.getBlockInfoContainsTxHash(ctx, txHash)

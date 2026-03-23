@@ -259,12 +259,14 @@ func TestReconcileConfirmationsForTransaction(t *testing.T) {
 	c.blockListener = mbl
 	mbl.On("WaitClosed").Return()
 	mbl.On("ReconcileConfirmationsForTransaction", ctx, "hash1", []*ethrpc.MinimalBlockInfo{
-		{BlockNumber: 12345},
+		{BlockNumber: 12345, BlockHash: []byte{}, ParentHash: []byte{}},
 	}, uint64(10)).
 		Return(
 			&ethblocklistener.ConfirmationUpdateResult{
 				Confirmations: []*ethrpc.MinimalBlockInfo{
-					{BlockNumber: 12345},
+					{
+						BlockNumber: 12345,
+					},
 				},
 			},
 			&ethrpc.TxReceiptJSONRPC{},

@@ -37,6 +37,7 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
+	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
@@ -203,7 +204,12 @@ func withDeprecatedConfFallback[T any](conf config.Section, getter func(string) 
 // It delegates to the blockListener's internal reconciliation logic.
 func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (res *ffcapi.ConfirmationUpdateResult, err error) {
 	// Now we can start the reconciliation process
-	ethrpcRes, ethReceipt, err := c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, ffcapiToEthRPCConfirmations(existingConfirmations), targetConfirmationCount)
+	var ethrpcRes *ethblocklistener.ConfirmationUpdateResult
+	var ethrpcReceipt *ethrpc.TxReceiptJSONRPC
+	ethrpcEC, err := ffcapiToEthRPCConfirmations(existingConfirmations)
+	if err == nil {
+		ethrpcRes, ethrpcReceipt, err = c.blockListener.ReconcileConfirmationsForTransaction(ctx, txHash, ethrpcEC, targetConfirmationCount)
+	}
 	if err == nil && ethrpcRes != nil {
 		res = &ffcapi.ConfirmationUpdateResult{
 			Confirmations:           ethRPCtoFFCAPIConfirmations(ethrpcRes.Confirmations),
@@ -212,23 +218,25 @@ func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context,
 			Confirmed:               ethrpcRes.Confirmed,
 			TargetConfirmationCount: ethrpcRes.TargetConfirmationCount,
 		}
-		if ethReceipt != nil {
-			res.Receipt = c.enrichTransactionReceipt(ctx, ethReceipt)
+		if ethrpcReceipt != nil {
+			res.Receipt = c.enrichTransactionReceipt(ctx, ethrpcReceipt)
 		}
 	}
 	return res, err
 }
 
-func ffcapiToEthRPCConfirmations(ffcapiEC []*ffcapi.MinimalBlockInfo) []*ethrpc.MinimalBlockInfo {
-	ec := make([]*ethrpc.MinimalBlockInfo, len(ffcapiEC))
+func ffcapiToEthRPCConfirmations(ffcapiEC []*ffcapi.MinimalBlockInfo) (ec []*ethrpc.MinimalBlockInfo, err error) {
+	ec = make([]*ethrpc.MinimalBlockInfo, len(ffcapiEC))
 	for i, c := range ffcapiEC {
-		ec[i] = &ethrpc.MinimalBlockInfo{
-			BlockNumber: c.BlockNumber,
-			BlockHash:   c.BlockHash,
-			ParentHash:  c.ParentHash,
+		ec[i] = &ethrpc.MinimalBlockInfo{BlockNumber: c.BlockNumber}
+		if err == nil {
+			ec[i].BlockHash, err = ethtypes.NewHexBytes0xPrefix(c.BlockHash)
+		}
+		if err == nil {
+			ec[i].ParentHash, err = ethtypes.NewHexBytes0xPrefix(c.ParentHash)
 		}
 	}
-	return ec
+	return ec, err
 }
 
 func ethRPCtoFFCAPIConfirmations(ffcapiEC []*ethrpc.MinimalBlockInfo) []*ffcapi.MinimalBlockInfo {
@@ -236,8 +244,8 @@ func ethRPCtoFFCAPIConfirmations(ffcapiEC []*ethrpc.MinimalBlockInfo) []*ffcapi.
 	for i, c := range ffcapiEC {
 		ec[i] = &ffcapi.MinimalBlockInfo{
 			BlockNumber: c.BlockNumber,
-			BlockHash:   c.BlockHash,
-			ParentHash:  c.ParentHash,
+			BlockHash:   c.BlockHash.String(),
+			ParentHash:  c.ParentHash.String(),
 		}
 	}
 	return ec
