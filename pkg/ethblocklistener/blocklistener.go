@@ -38,16 +38,17 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
+// a linked list of accumulated confirmations for a transaction
+// the list is sorted by block number
+//   - the first block is the block that contains the transaction hash
+//   - the last block is the most recent confirmation
+//
+// this list can be used as input to the future reconcile request to avoid re-fetching the blocks if they are no longer
+// in the in-memory partial chain
+// WARNING: mutation to this list is not expected, invalid modifications will cause inefficiencies in the reconciliation process
+//
+//	`rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
 type ConfirmationUpdateResult struct {
-	Receipt *ethrpc.TxReceiptJSONRPC `json:"receipt,omitempty"` // receipt for the transaction
-	// a linked list of accumulated confirmations for a transaction
-	// the list is sorted by block number
-	//    - the first block is the block that contains the transaction hash
-	//    - the last block is the most recent confirmation
-	// this list can be used as input to the future reconcile request to avoid re-fetching the blocks if they are no longer
-	// in the in-memory partial chain
-	// WARNING: mutation to this list is not expected, invalid modifications will cause inefficiencies in the reconciliation process
-	//          `rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
 	Confirmations           []*ethrpc.MinimalBlockInfo `json:"confirmations,omitempty"`
 	Rebuilt                 bool                       `json:"rebuilt,omitempty"`       // when true, it means the existing confirmations contained invalid blocks, the new confirmations are rebuilt from scratch
 	NewFork                 bool                       `json:"newFork,omitempty"`       // when true, it means a new fork was detected based on the existing confirmations
