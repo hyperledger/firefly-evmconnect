@@ -10,8 +10,6 @@ import (
 
 	ethtypes "github.com/hyperledger/firefly-signer/pkg/ethtypes"
 
-	ffcapi "github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
-
 	fftypes "github.com/hyperledger/firefly-common/pkg/fftypes"
 
 	mock "github.com/stretchr/testify/mock"
@@ -281,28 +279,28 @@ func (_m *BlockListener) GetMonitoredHeadLength() int {
 }
 
 // ReconcileConfirmationsForTransaction provides a mock function with given fields: ctx, txHash, existingConfirmations, targetConfirmationCount
-func (_m *BlockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
+func (_m *BlockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ethblocklistener.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
 	ret := _m.Called(ctx, txHash, existingConfirmations, targetConfirmationCount)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReconcileConfirmationsForTransaction")
 	}
 
-	var r0 *ffcapi.ConfirmationUpdateResult
+	var r0 *ethblocklistener.ConfirmationUpdateResult
 	var r1 *ethrpc.TxReceiptJSONRPC
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, []*ethrpc.MinimalBlockInfo, uint64) (*ethblocklistener.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)); ok {
 		return rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) *ffcapi.ConfirmationUpdateResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, []*ethrpc.MinimalBlockInfo, uint64) *ethblocklistener.ConfirmationUpdateResult); ok {
 		r0 = rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ffcapi.ConfirmationUpdateResult)
+			r0 = ret.Get(0).(*ethblocklistener.ConfirmationUpdateResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) *ethrpc.TxReceiptJSONRPC); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, []*ethrpc.MinimalBlockInfo, uint64) *ethrpc.TxReceiptJSONRPC); ok {
 		r1 = rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	} else {
 		if ret.Get(1) != nil {
@@ -310,7 +308,7 @@ func (_m *BlockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, []*ffcapi.MinimalBlockInfo, uint64) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, string, []*ethrpc.MinimalBlockInfo, uint64) error); ok {
 		r2 = rf(ctx, txHash, existingConfirmations, targetConfirmationCount)
 	} else {
 		r2 = ret.Error(2)

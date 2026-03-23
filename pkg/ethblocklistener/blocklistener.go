@@ -38,6 +38,24 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
+// a linked list of accumulated confirmations for a transaction
+// the list is sorted by block number
+//   - the first block is the block that contains the transaction hash
+//   - the last block is the most recent confirmation
+//
+// this list can be used as input to the future reconcile request to avoid re-fetching the blocks if they are no longer
+// in the in-memory partial chain
+// WARNING: mutation to this list is not expected, invalid modifications will cause inefficiencies in the reconciliation process
+//
+//	`rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
+type ConfirmationUpdateResult struct {
+	Confirmations           []*ethrpc.MinimalBlockInfo `json:"confirmations,omitempty"`
+	Rebuilt                 bool                       `json:"rebuilt,omitempty"`       // when true, it means the existing confirmations contained invalid blocks, the new confirmations are rebuilt from scratch
+	NewFork                 bool                       `json:"newFork,omitempty"`       // when true, it means a new fork was detected based on the existing confirmations
+	Confirmed               bool                       `json:"confirmed,omitempty"`     // when true, it means the confirmation list is complete and the transaction is confirmed
+	TargetConfirmationCount uint64                     `json:"targetConfirmationCount"` // the target number of confirmations for this reconcile request
+}
+
 type BlockListenerConfig struct {
 	MonitoredHeadLength           int           `json:"monitoredHeadLength"`
 	BlockPollingInterval          time.Duration `json:"blockPollingInterval"`
@@ -49,7 +67,7 @@ type BlockListenerConfig struct {
 }
 
 type BlockListener interface {
-	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
+	ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error)
 	GetMonitoredHeadLength() int // provides a getter on the configuration for unstable head length - as this information is important to consumers (might be multiple from this block listener)
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
 	RemoveConsumer(ctx context.Context, id *fftypes.UUID)
@@ -67,10 +85,10 @@ type BlockListener interface {
 	UTSetBackend(rpcbackend.RPC)
 }
 
-func ffcapiMinimalBlockInfoList(blocks []*ethrpc.BlockInfoJSONRPC) []*ffcapi.MinimalBlockInfo {
-	res := make([]*ffcapi.MinimalBlockInfo, len(blocks))
+func toMinimalBlockInfoList(blocks []*ethrpc.BlockInfoJSONRPC) []*ethrpc.MinimalBlockInfo {
+	res := make([]*ethrpc.MinimalBlockInfo, len(blocks))
 	for i, b := range blocks {
-		res[i] = b.ToFFCAPIMinimalBlockInfo()
+		res[i] = b.ToMinimalBlockInfo()
 	}
 	return res
 }

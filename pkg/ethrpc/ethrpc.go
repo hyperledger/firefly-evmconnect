@@ -22,7 +22,6 @@ import (
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
-	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
@@ -198,12 +197,26 @@ func (bi *BlockInfoJSONRPC) IsParentOf(other *BlockInfoJSONRPC) bool {
 	return bi.Hash.Equals(other.ParentHash) && (bi.Number.Uint64()+1) == other.Number.Uint64()
 }
 
-func (bi *BlockInfoJSONRPC) ToFFCAPIMinimalBlockInfo() *ffcapi.MinimalBlockInfo {
-	return &ffcapi.MinimalBlockInfo{
+type MinimalBlockInfo struct { // duplicate of apitypes.Confirmation due to circular dependency
+	BlockNumber fftypes.FFuint64          `json:"blockNumber"`
+	BlockHash   ethtypes.HexBytes0xPrefix `json:"blockHash"`
+	ParentHash  ethtypes.HexBytes0xPrefix `json:"parentHash"`
+}
+
+func (bi *BlockInfoJSONRPC) ToMinimalBlockInfo() *MinimalBlockInfo {
+	return &MinimalBlockInfo{
 		BlockNumber: fftypes.FFuint64(bi.Number.Uint64()),
-		BlockHash:   bi.Hash.String(),
-		ParentHash:  bi.ParentHash.String(),
+		BlockHash:   bi.Hash,
+		ParentHash:  bi.ParentHash,
 	}
+}
+
+func (c *MinimalBlockInfo) Equal(other *MinimalBlockInfo) bool {
+	return c.BlockNumber == other.BlockNumber && c.BlockHash.Equals(other.BlockHash) && c.ParentHash.Equals(other.ParentHash)
+}
+
+func (c *MinimalBlockInfo) IsParentOf(other *MinimalBlockInfo) bool {
+	return c.BlockHash.Equals(other.ParentHash) && c.BlockNumber+1 == other.BlockNumber
 }
 
 type BlockHeaderJSONRPC struct {
