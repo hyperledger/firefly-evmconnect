@@ -43,7 +43,7 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 	blockInfoExistingConfirmations := toBlockInfoList(existingConfirmations)
 
 	// Fetch the block containing the transaction first so that we can use it to build the confirmation list
-	txBlockInfo, txReceipt, err := bl.getBlockInfoContainsTxHash(ctx, txHash)
+	txBlockInfo, txReceipt, err := bl.getReceiptAndBlock(ctx, txHash)
 	if err != nil {
 		log.L(ctx).Errorf("Failed to fetch block info using tx hash %s: %v", txHash, err)
 		return nil, nil, err
@@ -84,10 +84,10 @@ func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConf
 	//    The chain may have been re-organized since we discovered the blocks in that list.
 	// - The `lateList`. This is the most recent set of blocks that we are interesting in and we believe are accurate for the current state of the chain
 
-	earlyList := createEarlyList(existingConfirmations, txBlockInfo, reconcileResult)
+	earlyList := createPreSpliceEarlyList(existingConfirmations, txBlockInfo, reconcileResult) // ensured to have at least one entry
 
 	// if early list is sufficient to meet the target confirmation count, we handle this as a special case as well
-	if len(earlyList) > 0 && earlyList[len(earlyList)-1].Number.Uint64() >= txBlockInfo.Number.Uint64()+targetConfirmationCount {
+	if earlyList[len(earlyList)-1].Number.Uint64() >= txBlockInfo.Number.Uint64()+targetConfirmationCount {
 		reconcileResult := bl.handleTargetCountMetWithEarlyList(earlyList, targetConfirmationCount)
 		if reconcileResult != nil {
 			return reconcileResult, nil
@@ -172,6 +172,7 @@ func newSplice(earlyList []*ethrpc.BlockInfoJSONRPC, lateList []*ethrpc.BlockInf
 			}
 		}
 
+		// We're in a if-block that confirms this will be at least one entry (no we never trim early list to zero)
 		s.earlyList = s.earlyList[:firstLateBlockNumber-txBlockNumber]
 	}
 	return s, detectedFork
@@ -225,9 +226,9 @@ func (s *splice) toSingleLinkedList() []*ethrpc.BlockInfoJSONRPC {
 
 }
 
-// createEarlyList will return a list of blocks that starts with the latest transaction block and followed by any blocks in the existing confirmations list that are still valid
+// createPreSpliceEarlyList will return a list of blocks that starts with the latest transaction block and followed by any blocks in the existing confirmations list that are still valid
 // any blocks that are not contiguous will be discarded
-func createEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, reconcileResult *ConfirmationUpdateResult) (earlyList []*ethrpc.BlockInfoJSONRPC) {
+func createPreSpliceEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, reconcileResult *ConfirmationUpdateResult) (earlyList []*ethrpc.BlockInfoJSONRPC) {
 	if len(existingConfirmations) > 0 {
 		if !existingConfirmations[0].Equal(txBlockInfo) {
 			// we discard the existing confirmations list if the transaction block doesn't match

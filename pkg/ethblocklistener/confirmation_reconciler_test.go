@@ -329,6 +329,106 @@ func TestBuildConfirmationList_GapInExistingConfirmationsShouldBeFilledIn(t *tes
 
 }
 
+func TestBuildConfirmationList_EarlyListDrainsToEmptyDueToMismatch(t *testing.T) {
+	ctx := context.Background()
+
+	const altBlock = 0xffff
+
+	chain := list.New()
+	chain.PushBack(&ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(100),
+		Hash:       generateTestHash(100),
+		ParentHash: generateTestHash(99),
+	})
+	mRPC, bl := newFakedChainBlockListener(t, chain)
+	mockBlockRange(mRPC, 100, 105, altBlock)
+
+	// Create corrupted confirmation (gap in the existing confirmations list)
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{}
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
+	}
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	_, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.Regexp(t, "FF23060", err)
+}
+
+func TestBuildConfirmationList_EarlyFillInFail(t *testing.T) {
+	ctx := context.Background()
+
+	chain := list.New()
+	chain.PushBack(&ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(100),
+		Hash:       generateTestHash(100),
+		ParentHash: generateTestHash(99),
+	})
+	mRPC, bl := newFakedChainBlockListener(t, chain)
+	mockBlockRange(mRPC, 102, 105)
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", "0x65", false).
+		Return(&rpcbackend.RPCError{Message: "pop"})
+
+	// Create corrupted confirmation (gap in the existing confirmations list)
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		// gap in the existing confirmations list
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+	}
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
+	}
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	_, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.Regexp(t, "pop", err)
+}
+
+func TestBuildConfirmationList_EarlyFillInInvalid(t *testing.T) {
+	ctx := context.Background()
+
+	chain := list.New()
+	chain.PushBack(&ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(100),
+		Hash:       generateTestHash(100),
+		ParentHash: generateTestHash(99),
+	})
+	mRPC, bl := newFakedChainBlockListener(t, chain)
+	mockBlockRange(mRPC, 102, 105)
+
+	var altBlock uint64 = 0xffff
+	mockBlockRange(mRPC, 101, 101, altBlock)
+
+	// Create corrupted confirmation (gap in the existing confirmations list)
+	existingQueue := []*ethrpc.BlockInfoJSONRPC{
+		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
+		// gap in the existing confirmations list
+		{Hash: generateTestHash(102), Number: 102, ParentHash: generateTestHash(101)},
+	}
+	txBlockNumber := uint64(100)
+	txBlockHash := generateTestHash(100)
+	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
+		Number:     ethtypes.HexUint64(txBlockNumber),
+		Hash:       txBlockHash,
+		ParentHash: generateTestHash(99),
+	}
+	targetConfirmationCount := uint64(5)
+
+	// Execute
+	_, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
+	assert.Regexp(t, "FF23060", err)
+}
+
 func TestBuildConfirmationList_MismatchConfirmationBlockShouldBeReplaced(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 102, 150, []uint64{101})
@@ -1254,8 +1354,12 @@ func TestBuildConfirmationList_ReachTargetConfirmation(t *testing.T) {
 // Helper functions
 
 // generateTestHash creates a predictable hash for testing with consistent prefix and last 4 digits as index
-func generateTestHash(index uint64) ethtypes.HexBytes0xPrefix {
-	return ethtypes.MustNewHexBytes0xPrefix(fmt.Sprintf("0x%060x", index))
+func generateTestHash(index uint64, mods ...uint64) ethtypes.HexBytes0xPrefix {
+	val := index
+	for _, mod := range mods {
+		val += mod * 10000000000 // tweaks the number, while still recognizable
+	}
+	return ethtypes.MustNewHexBytes0xPrefix(fmt.Sprintf("0x%060x", val))
 }
 
 func createTestChain(startBlock, endBlock uint64) *list.List {
@@ -1281,13 +1385,19 @@ func createTestChain(startBlock, endBlock uint64) *list.List {
 	return chain
 }
 
-func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, startCanonicalBlock, endCanonicalBlock uint64, blocksToMock []uint64) (*blockListener, func()) {
-	mRPC := &rpcbackendmocks.Backend{}
+func newFakedChainBlockListener(t *testing.T, chain *list.List) (*rpcbackendmocks.Backend, *blockListener) {
+	mRPC := rpcbackendmocks.NewBackend(t)
+	blockCache, _ := lru.New(100)
 	bl := &blockListener{
-		canonicalChain: createTestChain(startCanonicalBlock, endCanonicalBlock),
+		canonicalChain: chain,
 		backend:        mRPC,
+		blockCache:     blockCache,
 	}
-	bl.blockCache, _ = lru.New(100)
+	return mRPC, bl
+}
+
+func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, startCanonicalBlock, endCanonicalBlock uint64, blocksToMock []uint64) (*blockListener, func()) {
+	mRPC, bl := newFakedChainBlockListener(t, createTestChain(startCanonicalBlock, endCanonicalBlock))
 
 	if len(blocksToMock) > 0 {
 		for _, blockNumber := range blocksToMock {
@@ -1303,5 +1413,18 @@ func newBlockListenerWithTestChain(t *testing.T, txBlock, confirmationCount, sta
 	}
 	return bl, func() {
 		mRPC.AssertExpectations(t)
+	}
+}
+
+func mockBlockRange(mRPC *rpcbackendmocks.Backend, start, end uint64, mods ...uint64) {
+	for blockNumber := start; blockNumber <= end; blockNumber++ {
+		hexBlockNumber := ethtypes.HexUint64(blockNumber)
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexBlockNumber.String(), false).Return(nil).Run(func(args mock.Arguments) {
+			*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+				Number:     ethtypes.HexUint64(blockNumber),
+				Hash:       generateTestHash(blockNumber, mods...),
+				ParentHash: generateTestHash(blockNumber-1, mods...),
+			}}
+		}).Maybe()
 	}
 }
