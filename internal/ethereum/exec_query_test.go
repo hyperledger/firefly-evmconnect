@@ -188,7 +188,7 @@ func TestExecQueryCustomErrorRevertDataExceedsBalance(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `ERC20: transfer amount exceeds balance`)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `Error("ERC20: transfer amount exceeds balance")`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
@@ -209,7 +209,7 @@ func TestExecQueryCustomErrorRevertDataNotEnoughEther(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `Not enough Ether provided.`)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `Error("Not enough Ether provided.")`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
@@ -230,7 +230,7 @@ func TestExecQueryCustomErrorRevertDataTransferFromZeroAddress(t *testing.T) {
 	assert.NoError(t, err)
 	_, reason, err := c.QueryInvoke(ctx, &req)
 	assert.Equal(t, ffcapi.ErrorReasonTransactionReverted, reason)
-	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `ERC20: transfer from the zero address`)
+	expectedError := i18n.NewError(ctx, msgs.MsgReverted, `Error("ERC20: transfer from the zero address")`)
 	assert.Equal(t, expectedError.Error(), err.Error())
 
 }
@@ -410,7 +410,7 @@ func TestProcessRevertReasonNestedErrorString(t *testing.T) {
 			"000000000000000000000000000000000000000000")
 
 	result := processRevertReason(ctx, revertData, nil)
-	assert.Equal(t, "outer: inner error message", result)
+	assert.Equal(t, `outer: Error("inner error message")`, result)
 }
 
 func TestProcessRevertReasonDoubleNestedErrorString(t *testing.T) {
@@ -433,7 +433,7 @@ func TestProcessRevertReasonDoubleNestedErrorString(t *testing.T) {
 			"64656570657374206572726f720000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
 
 	result := processRevertReason(ctx, revertData, nil)
-	assert.Equal(t, "level1: level2: deepest error", result)
+	assert.Equal(t, `level1: level2: Error("deepest error")`, result)
 }
 
 func TestProcessRevertReasonNestedCustomError(t *testing.T) {
@@ -462,10 +462,10 @@ func TestProcessRevertReasonNestedCustomError(t *testing.T) {
 			"deadbeef00000000000000000000000000000000000000000000000000000000" +
 			"00000000")
 
-	// With no error ABIs, the custom error can't be decoded —
-	// the entire nested section is hex-encoded
+	// With no error ABIs, the custom error can't be decoded — the outer Error(string)
+	// is formatted directly (binary content JSON-escaped inside the string).
 	result := processRevertReason(ctx, revertData, nil)
-	assert.True(t, strings.HasPrefix(result, "0x"))
+	assert.True(t, strings.HasPrefix(result, `Error("[404]01d`))
 	assert.NotContains(t, result, "\x00")
 
 	// Now provide the custom error ABI so it CAN be decoded
@@ -485,9 +485,8 @@ func TestProcessRevertReasonUnknownNestedBinaryFallback(t *testing.T) {
 
 	result := processRevertReason(ctx, revertData, nil)
 
-	// Entire nested section is hex-encoded since no selector could be decoded
-	assert.True(t, strings.HasPrefix(result, "0x"))
-	assert.Contains(t, result, "deadbeef")
+	// Unknown nested selector: outer Error(string) is still decoded; binary tail is JSON-escaped.
+	assert.True(t, strings.HasPrefix(result, `Error("[404]01d`))
 	assert.NotContains(t, result, "\x00")
 }
 
@@ -503,7 +502,7 @@ func TestProcessRevertReasonPlainStringUnchanged(t *testing.T) {
 			"4e6f7420656e6f7567682045746865722070726f76696465642e000000000000")
 
 	result := processRevertReason(ctx, revertData, nil)
-	assert.Equal(t, "Not enough Ether provided.", result)
+	assert.Equal(t, `Error("Not enough Ether provided.")`, result)
 }
 
 // ---- processRevertReason behavioral tests ----
@@ -654,7 +653,7 @@ func TestProcessRevertReasonNilErrorAbis(t *testing.T) {
 			"000000000000000000000000000000000000000000000000000000000000000c" +
 			"68656c6c6f20776f726c64210000000000000000000000000000000000000000")
 
-	assert.Equal(t, "hello world!", processRevertReason(ctx, revertData, nil))
+	assert.Equal(t, `Error("hello world!")`, processRevertReason(ctx, revertData, nil))
 }
 
 func TestProcessRevertReasonEmptyErrorAbis(t *testing.T) {
@@ -667,7 +666,7 @@ func TestProcessRevertReasonEmptyErrorAbis(t *testing.T) {
 			"000000000000000000000000000000000000000000000000000000000000000c" +
 			"68656c6c6f20776f726c64210000000000000000000000000000000000000000")
 
-	assert.Equal(t, "hello world!", processRevertReason(ctx, revertData, []*abi.Entry{}))
+	assert.Equal(t, `Error("hello world!")`, processRevertReason(ctx, revertData, []*abi.Entry{}))
 }
 
 func TestProcessRevertReasonRealWorldNestedData(t *testing.T) {
@@ -680,7 +679,7 @@ func TestProcessRevertReasonRealWorldNestedData(t *testing.T) {
 	// which captures the first-level prefix "[OCPE]404/98 - " plus the START of the
 	// inner Error(string) ABI encoding. The inner encoding declares length 0x212=530 but
 	// only ~32 bytes fit in the outer string, so the inner decode correctly fails and
-	// the remainder is hex-encoded.
+	// the remainder is represented as JSON-escaped bytes inside Error(string).
 	//
 	// The critical requirement: the output must NOT contain null bytes (\x00) which
 	// was the root cause of the PostgreSQL "invalid byte sequence" bug.
@@ -694,9 +693,8 @@ func TestProcessRevertReasonRealWorldNestedData(t *testing.T) {
 	// First level is decoded to readable text
 	assert.Contains(t, result, "[OCPE]404/98")
 
-	// The inner nested data (which the ABI decoder can't fully decode because
-	// the outer encoding truncates it) is hex-encoded as a safe fallback
-	assert.True(t, strings.Contains(result, "0x08c379a0"))
+	// Inner nested fragments appear inside the formatted Error(string) (binary JSON-escaped).
+	assert.Contains(t, result, "[TMM]404")
 }
 
 func TestProcessRevertReasonCustomErrorWithMultipleParams(t *testing.T) {
@@ -736,7 +734,7 @@ func TestProcessRevertReasonDefaultErrorTakesPriorityOverCustom(t *testing.T) {
 		Inputs: abi.ParameterArray{{Type: "uint256"}},
 	}
 	result := processRevertReason(ctx, revertData, []*abi.Entry{customErr})
-	assert.Equal(t, "default error msg", result)
+	assert.Equal(t, `Error("default error msg")`, result)
 }
 
 func TestExecQueryFailBadToParams(t *testing.T) {
