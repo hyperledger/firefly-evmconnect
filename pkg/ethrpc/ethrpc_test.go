@@ -226,9 +226,11 @@ func TestFormatBlockFullWithHashes(t *testing.T) {
 	require.JSONEq(t, sampleBlock, string(ethSerialized))
 
 	require.NotNil(t, block.ToBlockInfo(true))
-	require.NotNil(t, block.ToBlockInfo(true).ToFFCAPIMinimalBlockInfo())
+	require.NotNil(t, block.ToBlockInfo(true).ToMinimalBlockInfo())
 	require.True(t, block.ToBlockInfo(true).Equal(block.ToBlockInfo(true)))
+	require.True(t, block.ToBlockInfo(true).ToMinimalBlockInfo().Equal(block.ToBlockInfo(true).ToMinimalBlockInfo()))
 	require.Nil(t, (*EVMBlockWithTxHashesJSONRPC)(nil).ToBlockInfo(true))
+	require.False(t, block.ToBlockInfo(true).ToMinimalBlockInfo().IsParentOf(block.ToBlockInfo(true).ToMinimalBlockInfo()))
 }
 
 func TestFormatBlockFullWithTxns(t *testing.T) {

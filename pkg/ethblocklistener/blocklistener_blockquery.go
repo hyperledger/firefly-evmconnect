@@ -31,7 +31,7 @@ func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Number.String(), blockInfo)
 }
 
-func (bl *blockListener) getBlockInfoContainsTxHash(ctx context.Context, txHash string) (*ethrpc.BlockInfoJSONRPC, *ethrpc.TxReceiptJSONRPC, error) {
+func (bl *blockListener) getReceiptAndBlock(ctx context.Context, txHash string) (*ethrpc.BlockInfoJSONRPC, *ethrpc.TxReceiptJSONRPC, error) {
 
 	// Query the chain to find the transaction block
 	receipt, receiptErr := bl.GetTransactionReceipt(ctx, txHash)
