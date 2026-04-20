@@ -38,14 +38,30 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
+type BlockListenerMode string
+
+const (
+	// BlockListenerModeCanonical ensures the listener builds and maintains the canonical chain
+	// in memory, fetching full block receipts and headers to verify chain integrity and adapt
+	// to potential re-orgs before notifying event streams and reconciling transaction confirmations.
+	BlockListenerModeCanonical BlockListenerMode = "canonical"
+
+	// BlockListenerModeTrusted runs the listener in a minimal fashion for a permissioned BFT chain where
+	// finality is immediate, and re-orgs are not possible (or at least not expected). The latest block heigt
+	// from nodes is trusted, and only block headers are received via filters, allowing for running against limited
+	// access (prividium) JSONRPC endpoints.
+	BlockListenerModeTrusted BlockListenerMode = "trusted"
+)
+
 type BlockListenerConfig struct {
-	MonitoredHeadLength           int           `json:"monitoredHeadLength"`
-	BlockPollingInterval          time.Duration `json:"blockPollingInterval"`
-	HederaCompatibilityMode       bool          `json:"hederaCompatibilityMode"`
-	BlockCacheSize                int           `json:"blockCacheSize"`
-	IncludeLogsBloom              bool          `json:"includeLogsBloom"`
-	UseGetBlockReceipts           bool          `json:"useGetBlockReceipts"`
-	MaxAsyncBlockFetchConcurrency int           `json:"maxAsyncBlockFetchConcurrency"`
+	Mode                          BlockListenerMode `json:"mode"`
+	MonitoredHeadLength           int               `json:"monitoredHeadLength"`
+	BlockPollingInterval          time.Duration     `json:"blockPollingInterval"`
+	HederaCompatibilityMode       bool              `json:"hederaCompatibilityMode"`
+	BlockCacheSize                int               `json:"blockCacheSize"`
+	IncludeLogsBloom              bool              `json:"includeLogsBloom"`
+	UseGetBlockReceipts           bool              `json:"useGetBlockReceipts"`
+	MaxAsyncBlockFetchConcurrency int               `json:"maxAsyncBlockFetchConcurrency"`
 }
 
 type BlockListener interface {
@@ -562,7 +578,11 @@ func (bl *blockListener) checkAndStartListenerLoop() {
 	defer bl.consumerMux.Unlock()
 	if bl.listenLoopDone == nil {
 		bl.listenLoopDone = make(chan struct{})
-		go bl.listenLoop()
+		if bl.Mode == BlockListenerModeTrusted {
+			go bl.trustedListenLoop()
+		} else {
+			go bl.listenLoop()
+		}
 	}
 }
 

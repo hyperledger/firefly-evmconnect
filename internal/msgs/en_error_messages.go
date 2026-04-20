@@ -86,4 +86,5 @@ var (
 	MsgUnknownJSONFormatOptions                 = ffe("FF23066", "JSON formatting option unknown %s=%s")
 	MsgObservedPanic                            = ffe("FF23067", "Observed panic: %v")
 	MsgReturnedBlockHashMismatch                = ffe("FF23068", "Returned block %d hash %s does not match requested hash %s")
+	MsgMethodNotAvailableInTrustedMode          = ffe("FF23069", "%s is not available in trusted block listener mode")
 )
