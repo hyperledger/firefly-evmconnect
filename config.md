@@ -94,6 +94,12 @@
 |password|Password|`string`|`<nil>`
 |username|Username|`string`|`<nil>`
 
+## connector.blockListener
+
+|Key|Description|Type|Default Value|
+|---|-----------|----|-------------|
+|mode|The mode in which the block listener should run, either canonical or trusted (default: canonical).|`string`|`canonical`
+
 ## connector.events
 
 |Key|Description|Type|Default Value|

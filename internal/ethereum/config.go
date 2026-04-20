@@ -19,6 +19,7 @@ package ethereum
 import (
 	"github.com/hyperledger/firefly-common/pkg/config"
 	"github.com/hyperledger/firefly-common/pkg/wsclient"
+	"github.com/hyperledger/firefly-evmconnect/pkg/ethblocklistener"
 )
 
 const (
@@ -47,6 +48,7 @@ const (
 	HederaCompatibilityMode       = "hederaCompatibilityMode"
 	TraceTXForRevertReason        = "traceTXForRevertReason"
 	WebSocketsEnabled             = "ws.enabled"
+	BlockListenerMode             = "blockListener.mode"
 	MaxAsyncBlockFetchConcurrency = "maxAsyncBlockFetchConcurrency"
 	UseGetBlockReceipts           = "useGetBlockReceipts"
 )
@@ -88,6 +90,7 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(TxCacheSize, 250)
 	conf.AddKnownKey(HederaCompatibilityMode, false)
 	conf.AddKnownKey(TraceTXForRevertReason, false)
+	conf.AddKnownKey(BlockListenerMode, string(ethblocklistener.BlockListenerModeCanonical))
 	conf.AddKnownKey(MaxAsyncBlockFetchConcurrency, 25)
 	conf.AddKnownKey(UseGetBlockReceipts, false /* likely consumers of this package will want to set this default to true */)
 

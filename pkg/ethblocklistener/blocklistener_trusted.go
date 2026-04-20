@@ -49,17 +49,18 @@ func (bl *blockListener) trustedListenLoop() {
 	gapPotential := true
 	firstIteration := true
 	for {
-		if failCount > 0 {
+		switch {
+		case failCount > 0:
 			if bl.retry.DoFailureDelay(bl.ctx, failCount) {
 				log.L(bl.ctx).Debugf("Trusted block listener loop exiting")
 				return
 			}
-		} else if !firstIteration {
+		case !firstIteration:
 			if !bl.waitNextIteration() {
 				log.L(bl.ctx).Debugf("Trusted block listener loop stopping")
 				return
 			}
-		} else {
+		default:
 			firstIteration = false
 		}
 

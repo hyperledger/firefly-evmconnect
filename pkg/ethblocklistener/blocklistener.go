@@ -665,4 +665,3 @@ func (bl *blockListener) WaitClosed() {
 		}
 	}
 }
-

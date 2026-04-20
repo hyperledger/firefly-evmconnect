@@ -156,6 +156,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 	})
 
 	if c.blockListener, err = ethblocklistener.NewBlockListenerSupplyBackend(ctx, c.retry.Retry, &ethblocklistener.BlockListenerConfig{
+		Mode:                          ethblocklistener.BlockListenerMode(conf.GetString(BlockListenerMode)),
 		BlockPollingInterval:          conf.GetDuration(BlockPollingInterval),
 		MonitoredHeadLength:           int(c.checkpointBlockGap),
 		HederaCompatibilityMode:       conf.GetBool(HederaCompatibilityMode),
