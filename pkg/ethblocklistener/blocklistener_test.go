@@ -850,6 +850,71 @@ func TestBlockListenerReorgKeepLatestTailInSameBatch(t *testing.T) {
 	mRPC.AssertExpectations(t)
 }
 
+// TestTrimToLastValidBlockRemovesOnlyInvalidSuffix covers the case where the in-memory tail
+// diverges from the node but an older prefix still matches. The suffix must be removed without
+// dropping the last matching block (regression for incorrect removal variable in the trim loop).
+func TestTrimToLastValidBlockRemovesInvalidTail(t *testing.T) {
+	h98 := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	h99 := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	h100 := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	h101Stale := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	h102Stale := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	h101 := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+	h102 := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())
+
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexNumber(102), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number:     102,
+			Hash:       h102,
+			ParentHash: h101,
+		}}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexNumber(101), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number:     101,
+			Hash:       h101,
+			ParentHash: h100,
+		}}
+	}).Once()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexNumber(100), false).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
+			Number:     100,
+			Hash:       h100,
+			ParentHash: h99,
+		}}
+	}).Once()
+
+	b99 := &ethrpc.BlockInfoJSONRPC{Number: ethtypes.HexUint64(99), Hash: h99, ParentHash: h98}
+	b100 := &ethrpc.BlockInfoJSONRPC{Number: ethtypes.HexUint64(100), Hash: h100, ParentHash: h99}
+	b101 := &ethrpc.BlockInfoJSONRPC{Number: ethtypes.HexUint64(101), Hash: h101Stale, ParentHash: h100}
+	b102 := &ethrpc.BlockInfoJSONRPC{Number: ethtypes.HexUint64(102), Hash: h102Stale, ParentHash: h101Stale}
+
+	bl.canonicalChainLock.Lock()
+	bl.canonicalChain.PushBack(b99)
+	bl.canonicalChain.PushBack(b100)
+	bl.canonicalChain.PushBack(b101)
+	bl.canonicalChain.PushBack(b102)
+
+	lastValid := bl.trimToLastValidBlock()
+	bl.canonicalChainLock.Unlock()
+
+	require.NotNil(t, lastValid)
+	require.Equal(t, uint64(100), lastValid.Number.Uint64())
+	require.True(t, lastValid.Hash.Equals(h100))
+	require.Equal(t, 2, bl.canonicalChain.Len())
+
+	front := bl.canonicalChain.Front().Value.(*ethrpc.BlockInfoJSONRPC)
+	require.Equal(t, uint64(99), front.Number.Uint64())
+	require.True(t, front.Hash.Equals(h99))
+	tail := bl.canonicalChain.Back().Value.(*ethrpc.BlockInfoJSONRPC)
+	require.Equal(t, uint64(100), tail.Number.Uint64())
+	require.True(t, tail.Hash.Equals(h100))
+
+	mRPC.AssertExpectations(t)
+}
 func TestBlockListenerReorgReplaceTail(t *testing.T) {
 
 	block1000Hash := ethtypes.MustNewHexBytes0xPrefix(fftypes.NewRandB32().String())

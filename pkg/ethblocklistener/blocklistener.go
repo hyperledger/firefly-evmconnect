@@ -545,7 +545,7 @@ func (bl *blockListener) trimToLastValidBlock() (lastValidBlock *ethrpc.BlockInf
 			// Trim everything after this point, as it's invalidated
 			nextElem := lastElem.Next()
 			for nextElem != nil {
-				toRemove := lastElem
+				toRemove := nextElem
 				nextElem = nextElem.Next()
 				_ = bl.canonicalChain.Remove(toRemove)
 			}
