@@ -37,6 +37,10 @@ type blockReceiptRequest struct {
 // Blocks if throttled.
 // Delivers an error if the block is not found.
 func (bl *blockListener) FetchBlockReceiptsAsync(blockNumber uint64, blockHash ethtypes.HexBytes0xPrefix, cb func([]*ethrpc.TxReceiptJSONRPC, error)) {
+	if bl.Mode == BlockListenerModeTrusted {
+		cb(nil, i18n.NewError(bl.ctx, msgs.MsgMethodNotAvailableInTrustedMode, "FetchBlockReceiptsAsync"))
+		return
+	}
 	brr := &blockReceiptRequest{
 		bl:          bl,
 		blockNumber: ethtypes.HexUint64(blockNumber),

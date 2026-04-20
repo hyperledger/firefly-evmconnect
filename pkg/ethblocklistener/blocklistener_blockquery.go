@@ -26,6 +26,13 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 )
 
+func (bl *blockListener) checkTrustedModeGuard(ctx context.Context, methodName string) error {
+	if bl.Mode == BlockListenerModeTrusted {
+		return i18n.NewError(ctx, msgs.MsgMethodNotAvailableInTrustedMode, methodName)
+	}
+	return nil
+}
+
 func (bl *blockListener) addToBlockCache(blockInfo *ethrpc.BlockInfoJSONRPC) {
 	bl.blockCache.Add(blockInfo.Hash.String(), blockInfo)
 	bl.blockCache.Add(blockInfo.Number.String(), blockInfo)
@@ -69,6 +76,9 @@ func (bl *blockListener) GetTransactionReceipt(ctx context.Context, txHash strin
 }
 
 func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error) {
+	if err := bl.checkTrustedModeGuard(ctx, "GetBlockInfoByNumber"); err != nil {
+		return nil, err
+	}
 	hexBlockNumber := ethtypes.HexUint64(blockNumber)
 	var blockInfo *ethrpc.BlockInfoJSONRPC
 	if allowCache {
@@ -94,6 +104,9 @@ func (bl *blockListener) GetBlockInfoByNumber(ctx context.Context, blockNumber u
 }
 
 func (bl *blockListener) GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error) {
+	if err := bl.checkTrustedModeGuard(ctx, "GetBlockInfoByHash"); err != nil {
+		return nil, err
+	}
 	var blockInfo *ethrpc.BlockInfoJSONRPC // the minimal set we cache
 	cached, ok := bl.blockCache.Get(hash0xString)
 	if ok {
@@ -113,6 +126,9 @@ func (bl *blockListener) GetBlockInfoByHash(ctx context.Context, hash0xString st
 
 // Does not use cache, but will add to cache
 func (bl *blockListener) GetEVMBlockWithTxHashesByHash(ctx context.Context, hash0xString string) (b *ethrpc.EVMBlockWithTxHashesJSONRPC, err error) {
+	if err := bl.checkTrustedModeGuard(ctx, "GetEVMBlockWithTxHashesByHash"); err != nil {
+		return nil, err
+	}
 	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByHash", hash0xString, false /* only the txn hashes */)
 	if rpcErr != nil {
 		return nil, rpcErr.Error()
@@ -125,6 +141,9 @@ func (bl *blockListener) GetEVMBlockWithTxHashesByHash(ctx context.Context, hash
 
 // Does not use cache, but will add to cache
 func (bl *blockListener) GetEVMBlockWithTransactionsByHash(ctx context.Context, hash0xString string) (b *ethrpc.EVMBlockWithTransactionsJSONRPC, err error) {
+	if err := bl.checkTrustedModeGuard(ctx, "GetEVMBlockWithTransactionsByHash"); err != nil {
+		return nil, err
+	}
 	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByHash", hash0xString, true /* full blocks */)
 	if rpcErr != nil {
 		return nil, rpcErr.Error()
@@ -137,6 +156,9 @@ func (bl *blockListener) GetEVMBlockWithTransactionsByHash(ctx context.Context, 
 
 // Does not use cache, but will add to cache
 func (bl *blockListener) GetEVMBlockWithTxHashesByNumber(ctx context.Context, numberLookup string) (b *ethrpc.EVMBlockWithTxHashesJSONRPC, err error) {
+	if err := bl.checkTrustedModeGuard(ctx, "GetEVMBlockWithTxHashesByNumber"); err != nil {
+		return nil, err
+	}
 	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByNumber", numberLookup, false /* only the txn hashes */)
 	if rpcErr != nil {
 		return nil, rpcErr.Error()
@@ -149,6 +171,9 @@ func (bl *blockListener) GetEVMBlockWithTxHashesByNumber(ctx context.Context, nu
 
 // Does not use cache, but will add to cache
 func (bl *blockListener) GetEVMBlockWithTransactionsByNumber(ctx context.Context, numberLookup string) (b *ethrpc.EVMBlockWithTransactionsJSONRPC, err error) {
+	if err := bl.checkTrustedModeGuard(ctx, "GetEVMBlockWithTransactionsByNumber"); err != nil {
+		return nil, err
+	}
 	rpcErr := bl.backend.CallRPC(ctx, &b, "eth_getBlockByNumber", numberLookup, true /* full blocks */)
 	if rpcErr != nil {
 		return nil, rpcErr.Error()

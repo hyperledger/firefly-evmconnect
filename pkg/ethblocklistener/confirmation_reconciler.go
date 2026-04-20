@@ -45,6 +45,9 @@ func ffcapiToBlockInfoList(ffcapiBlocks []*ffcapi.MinimalBlockInfo) (blocks []*e
 //
 // For historical reasons this interface is FFCAPI derived MinimalBlockInfo in/out, rather than direct.
 func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, ffcapiExistingConfirmations []*ffcapi.MinimalBlockInfo, targetConfirmationCount uint64) (*ffcapi.ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
+	if err := bl.checkTrustedModeGuard(ctx, "ReconcileConfirmationsForTransaction"); err != nil {
+		return nil, nil, err
+	}
 
 	existingConfirmations, err := ffcapiToBlockInfoList(ffcapiExistingConfirmations)
 	if err != nil {
