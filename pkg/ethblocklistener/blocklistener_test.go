@@ -1751,6 +1751,10 @@ func TestBlockListenerWaitUntilStartedOnlyReturnsAfterEstablishingBlockFilter(t 
 // eth_blockNumber refresh updates currentChainHead and dispatches BlockHashEvent with HeadBlockNumber;
 // when the RPC head is unchanged, no event is sent.
 func TestBlockListenerHeadBlockNumber_DispatchesAndSkipsDuplicateHead(t *testing.T) {
+	// Block the first getFilterChanges until after AddConsumer registers; otherwise markStarted()
+	// unblocks waitUntilStarted before the first head refresh+dispatch, so the first event can be
+	// sent with zero consumers.
+	startLatch := newTestLatch()
 	var bnCall int
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, _ context.CancelFunc) {
 		conf.BlockPollingInterval = shortDelay
@@ -1779,7 +1783,12 @@ func TestBlockListenerHeadBlockNumber_DispatchesAndSkipsDuplicateHead(t *testing
 			*args[1].(*string) = testBlockFilterID1
 		}).Once()
 
+		var getFilterCalls int
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			getFilterCalls++
+			if getFilterCalls == 1 {
+				startLatch.waitComplete()
+			}
 			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
 			*hbh = nil
 		}).Maybe()
@@ -1792,6 +1801,7 @@ func TestBlockListenerHeadBlockNumber_DispatchesAndSkipsDuplicateHead(t *testing
 		Ctx:     context.Background(),
 		Updates: updates,
 	})
+	startLatch.complete()
 
 	ev1 := <-updates
 	assert.Equal(t, uint64(1000), ev1.HeadBlockNumber)
