@@ -51,4 +51,5 @@ var (
 	_ = ffc("config.connector.traceTXForRevertReason", "Enable the use of transaction trace functions (e.g. debug_traceTransaction) to obtain transaction revert reasons. This can place a high load on the EVM client.", i18n.BooleanType)
 	_ = ffc("config.connector.maxAsyncBlockFetchConcurrency", "Maximum concurrency when using asynchronous block downloading (minium 1)", i18n.IntType)
 	_ = ffc("config.connector.useGetBlockReceipts", "When true, the eth_getBlockReceipts call is available for this connector to use", i18n.BooleanType)
+	_ = ffc("config.connector.blockTrackingMode", "The block tracking mode for the block listener", "`headBlockNumber` or `inMemoryPartialChain`")
 )

@@ -23,6 +23,10 @@ import (
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
+func (c *ethConnector) GetBlockListenerTrackingMode(_ context.Context) ffcapi.BlockListenerTrackingMode {
+	return c.blockTrackingMode
+}
+
 func (c *ethConnector) NewBlockListener(_ context.Context, req *ffcapi.NewBlockListenerRequest) (*ffcapi.NewBlockListenerResponse, ffcapi.ErrorReason, error) {
 	// Add the block consumer
 	c.blockListener.AddConsumer(req.ListenerContext, &ethblocklistener.BlockUpdateConsumer{

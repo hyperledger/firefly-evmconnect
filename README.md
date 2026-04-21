@@ -34,22 +34,23 @@ For a full list of configuration options see [config.md](./config.md)
 
 ```yaml
 connectors:
-- type: ethereum
-  server:
-    port: 5102
-  ethereum:
-    url: http://localhost:8545
+  - type: ethereum
+    server:
+      port: 5102
+    ethereum:
+      url: http://localhost:8545
 ```
 
 ## Blockchain node compatibility
 
 For EVM connector to function properly, you should check the blockchain node supports the following JSON-RPC Methods over HTTP:
+
 ### Event tracking
+
 - `eth_blockNumber`
 - `eth_newBlockFilter`
 - `eth_getFilterLogs`
 - `eth_getFilterChanges`
-- `eth_getBlockByHash`
 - `eth_getLogs`
 - `eth_newFilter`
 - `eth_uninstallFilter`
@@ -57,17 +58,39 @@ For EVM connector to function properly, you should check the blockchain node sup
 - `eth_getTransactionReceipt`
 
 ### Query
+
 - `eth_call`
 - `eth_getBalance`
 - `eth_gasPrice`[^1]
-  
+
 ### Transaction submission
+
 - `eth_estimateGas`
 - `eth_sendTransaction`
 - `eth_getTransactionCount`
 - `eth_sendRawTransaction`[^2]
 
-
 [^1]: also used by Transaction submission if the handler is configured to get gas price using "connector".
 
 [^2]: only required by custom transaction handlers that supports pre-signing.
+
+### Optional methods
+
+#### Transaction tracing
+
+> Required when [connector.traceTXForRevertReason](./config.md#connector) is set to `true` (default: `false`)
+
+- `debug_traceTransaction`
+
+#### Block listener
+
+> Required when [connector.blockTrackingMode](./config.md#connector) is set to `inMemoryPartialChain`
+
+- `eth_getBlockByHash`
+- `eth_getBlockByNumber`
+
+#### Receipt fetching
+
+> Required when [connector.useGetBlockReceipts](./config.md#connector) is set to `true`
+
+- `eth_getBlockReceipts`

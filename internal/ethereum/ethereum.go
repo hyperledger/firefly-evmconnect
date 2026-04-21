@@ -43,8 +43,10 @@ import (
 )
 
 type ethConnector struct {
-	backend                    rpcbackend.Backend
-	wsBackend                  rpcbackend.WebSocketRPCClient
+	backend           rpcbackend.Backend
+	wsBackend         rpcbackend.WebSocketRPCClient
+	blockTrackingMode ffcapi.BlockListenerTrackingMode
+
 	serializer                 *abi.Serializer
 	gasEstimationFactor        *big.Float
 	catchupPageSize            int64
@@ -78,6 +80,15 @@ type Connector interface {
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
+
+	blockListenerTrackingMode := ffcapi.BlockListenerTrackingMode(conf.GetString(BlockTrackingMode))
+	if blockListenerTrackingMode == "" {
+		blockListenerTrackingMode = ffcapi.BlockListenerTrackingModeInMemoryPartialChain
+	}
+	if blockListenerTrackingMode != ffcapi.BlockListenerTrackingModeHeadBlockNumber && blockListenerTrackingMode != ffcapi.BlockListenerTrackingModeInMemoryPartialChain {
+		return nil, i18n.NewError(ctx, msgs.MsgInvalidBlockListenerTrackingMode, blockListenerTrackingMode)
+	}
+
 	c := &ethConnector{
 		eventStreams:               make(map[fftypes.UUID]*eventStream),
 		catchupPageSize:            conf.GetInt64(EventsCatchupPageSize),
@@ -86,6 +97,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
 		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
 		traceTXForRevertReason:     conf.GetBool(TraceTXForRevertReason),
+		blockTrackingMode:          blockListenerTrackingMode,
 		retry:                      retryutil.RetryWrapper{Retry: &retry.Retry{}},
 	}
 
@@ -164,6 +176,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		BlockCacheSize:                conf.GetInt(BlockCacheSize),
 		MaxAsyncBlockFetchConcurrency: conf.GetInt(MaxAsyncBlockFetchConcurrency),
 		UseGetBlockReceipts:           conf.GetBool(UseGetBlockReceipts),
+		TrackingMode:                  blockListenerTrackingMode,
 	}, c.backend, c.wsBackend); err != nil {
 		return nil, err
 	}
@@ -216,6 +229,7 @@ func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context,
 			Rebuilt:                 ethrpcRes.Rebuilt,
 			NewFork:                 ethrpcRes.NewFork,
 			Confirmed:               ethrpcRes.Confirmed,
+			ActualConfirmationCount: ethrpcRes.ActualConfirmationCount,
 			TargetConfirmationCount: ethrpcRes.TargetConfirmationCount,
 		}
 		if ethrpcReceipt != nil {

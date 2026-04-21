@@ -49,21 +49,23 @@ import (
 //
 //	`rebuilt` will be true if an invalid confirmation list is detected by the reconciliation process
 type ConfirmationUpdateResult struct {
-	Confirmations           []*ethrpc.MinimalBlockInfo `json:"confirmations,omitempty"`
+	Confirmations           []*ethrpc.MinimalBlockInfo `json:"confirmations,omitempty"` // the confirmation list
 	Rebuilt                 bool                       `json:"rebuilt,omitempty"`       // when true, it means the existing confirmations contained invalid blocks, the new confirmations are rebuilt from scratch
 	NewFork                 bool                       `json:"newFork,omitempty"`       // when true, it means a new fork was detected based on the existing confirmations
 	Confirmed               bool                       `json:"confirmed,omitempty"`     // when true, it means the confirmation list is complete and the transaction is confirmed
 	TargetConfirmationCount uint64                     `json:"targetConfirmationCount"` // the target number of confirmations for this reconcile request
+	ActualConfirmationCount uint64                     `json:"actualConfirmationCount"` // the actual number of confirmations for this reconcile request
 }
 
 type BlockListenerConfig struct {
-	MonitoredHeadLength           int           `json:"monitoredHeadLength"`
-	BlockPollingInterval          time.Duration `json:"blockPollingInterval"`
-	HederaCompatibilityMode       bool          `json:"hederaCompatibilityMode"`
-	BlockCacheSize                int           `json:"blockCacheSize"`
-	IncludeLogsBloom              bool          `json:"includeLogsBloom"`
-	UseGetBlockReceipts           bool          `json:"useGetBlockReceipts"`
-	MaxAsyncBlockFetchConcurrency int           `json:"maxAsyncBlockFetchConcurrency"`
+	MonitoredHeadLength           int                              `json:"monitoredHeadLength"`
+	BlockPollingInterval          time.Duration                    `json:"blockPollingInterval"`
+	HederaCompatibilityMode       bool                             `json:"hederaCompatibilityMode"`
+	BlockCacheSize                int                              `json:"blockCacheSize"`
+	IncludeLogsBloom              bool                             `json:"includeLogsBloom"`
+	UseGetBlockReceipts           bool                             `json:"useGetBlockReceipts"`
+	MaxAsyncBlockFetchConcurrency int                              `json:"maxAsyncBlockFetchConcurrency"`
+	TrackingMode                  ffcapi.BlockListenerTrackingMode `json:"trackingMode,omitempty"`
 }
 
 type BlockListener interface {
@@ -126,6 +128,9 @@ type blockListener struct {
 	canonicalChain     *list.List
 	highestBlockSet    bool
 	highestBlock       uint64
+
+	// headBlockNumber mode: last head value sent on the block listener channel (only written from listenLoop)
+	currentChainHead uint64
 }
 
 func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListenerConfig, httpConf *ffresty.Config, wsConf *wsclient.WSConfig) (bl BlockListener, err error) {
@@ -141,6 +146,9 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 	if conf.MaxAsyncBlockFetchConcurrency <= 0 {
 		conf.MaxAsyncBlockFetchConcurrency = 1
 	}
+	if conf.TrackingMode == "" {
+		conf.TrackingMode = ffcapi.BlockListenerTrackingModeInMemoryPartialChain
+	}
 	bl := &blockListener{
 		ctx:                           log.WithLogField(ctx, "role", "blocklistener"),
 		retry:                         &retryutil.RetryWrapper{Retry: retry},
@@ -152,6 +160,7 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 		newHeadsTap:                   make(chan struct{}),
 		highestBlockSet:               false,
 		highestBlock:                  0,
+		currentChainHead:              0,
 		consumers:                     make(map[fftypes.UUID]*BlockUpdateConsumer),
 		canonicalChain:                list.New(),
 		blockFetchConcurrencyThrottle: make(chan *blockReceiptRequest, conf.MaxAsyncBlockFetchConcurrency),
@@ -248,6 +257,17 @@ func (bl *blockListener) establishBlockHeightWithRetry() error {
 	})
 }
 
+// refreshHighestBlockFromRPC updates highestBlock from eth_blockNumber. Caller must not hold canonicalChainLock.
+func (bl *blockListener) refreshHighestBlockFromRPC() (uint64, error) {
+	var hexBlockHeight ethtypes.HexInteger
+	rpcErr := bl.backend.CallRPC(bl.ctx, &hexBlockHeight, "eth_blockNumber")
+	if rpcErr != nil {
+		return 0, rpcErr.Error()
+	}
+	head := hexBlockHeight.BigInt().Uint64()
+	return head, nil
+}
+
 func (bl *blockListener) waitNextIteration() bool {
 	select {
 	case <-bl.ctx.Done():
@@ -312,6 +332,30 @@ func (bl *blockListener) listenLoop() {
 			continue
 		}
 		log.L(bl.ctx).Debugf("Block filter received new block hashes: %+v", blockHashes)
+
+		if bl.TrackingMode == ffcapi.BlockListenerTrackingModeHeadBlockNumber {
+			head, err := bl.refreshHighestBlockFromRPC()
+			if err != nil {
+				log.L(bl.ctx).Errorf("Failed to refresh chain head: %s", err)
+				failCount++
+				continue
+			}
+			if head == bl.currentChainHead {
+				failCount = 0
+				continue
+			}
+			bl.currentChainHead = head
+			update := &ffcapi.BlockHashEvent{GapPotential: false, Created: fftypes.Now(), HeadBlockNumber: bl.currentChainHead}
+			bl.consumerMux.Lock()
+			consumers := make([]*BlockUpdateConsumer, 0, len(bl.consumers))
+			for _, c := range bl.consumers {
+				consumers = append(consumers, c)
+			}
+			bl.consumerMux.Unlock()
+			bl.dispatchToConsumers(consumers, update)
+			failCount = 0
+			continue
+		}
 
 		update := &ffcapi.BlockHashEvent{GapPotential: gapPotential, Created: fftypes.Now()}
 		var notifyPos *list.Element
@@ -619,6 +663,10 @@ func (bl *blockListener) GetHighestBlock(ctx context.Context) (uint64, bool) {
 	bl.canonicalChainLock.RUnlock()
 	log.L(ctx).Debugf("ChainHead=%d", highestBlock)
 	return highestBlock, true
+}
+
+func (bl *blockListener) GetHeadBlockNumber(_ context.Context) uint64 {
+	return bl.currentChainHead
 }
 
 func (bl *blockListener) setHighestBlock(block uint64) {

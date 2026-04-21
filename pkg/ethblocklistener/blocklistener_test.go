@@ -1747,6 +1747,69 @@ func TestBlockListenerWaitUntilStartedOnlyReturnsAfterEstablishingBlockFilter(t 
 	mRPC.AssertExpectations(t)
 }
 
+// TestBlockListenerHeadBlockNumber_DispatchesAndSkipsDuplicateHead exercises listenLoop head-only mode:
+// eth_blockNumber refresh updates currentChainHead and dispatches BlockHashEvent with HeadBlockNumber;
+// when the RPC head is unchanged, no event is sent.
+func TestBlockListenerHeadBlockNumber_DispatchesAndSkipsDuplicateHead(t *testing.T) {
+	var bnCall int
+	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, _ context.CancelFunc) {
+		conf.BlockPollingInterval = shortDelay
+		conf.TrackingMode = ffcapi.BlockListenerTrackingModeHeadBlockNumber
+
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
+			bnCall++
+			hbh := args[1].(*ethtypes.HexInteger)
+			var v uint64
+			switch bnCall {
+			case 1:
+				v = 1000 // establishBlockHeightWithRetry
+			case 2:
+				v = 1000 // first refresh: currentChainHead was 0 → dispatch
+			case 3:
+				v = 1000 // second refresh: same as currentChainHead → no dispatch
+			case 4:
+				v = 1001 // head advanced → dispatch
+			default:
+				v = 1001 // stable after cancel
+			}
+			*hbh = *ethtypes.NewHexIntegerU64(v)
+		}).Maybe()
+
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newBlockFilter").Return(nil).Run(func(args mock.Arguments) {
+			*args[1].(*string) = testBlockFilterID1
+		}).Once()
+
+		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
+			hbh := args[1].(*[]ethtypes.HexBytes0xPrefix)
+			*hbh = nil
+		}).Maybe()
+	})
+	defer done()
+
+	updates := make(chan *ffcapi.BlockHashEvent, 16)
+	bl.AddConsumer(context.Background(), &BlockUpdateConsumer{
+		ID:      fftypes.NewUUID(),
+		Ctx:     context.Background(),
+		Updates: updates,
+	})
+
+	ev1 := <-updates
+	assert.Equal(t, uint64(1000), ev1.HeadBlockNumber)
+	assert.False(t, ev1.GapPotential)
+	assert.Empty(t, ev1.BlockHashes)
+
+	ev2 := <-updates
+	assert.Equal(t, uint64(1001), ev2.HeadBlockNumber)
+	assert.False(t, ev2.GapPotential)
+	assert.Empty(t, ev2.BlockHashes)
+
+	done()
+	<-bl.listenLoopDone
+
+	assert.Equal(t, uint64(1001), bl.currentChainHead)
+	mRPC.AssertExpectations(t)
+}
+
 func TestBlockListenerDispatchStopped(t *testing.T) {
 	_, bl, _, done := newTestBlockListener(t)
 	done()
