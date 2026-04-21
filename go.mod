@@ -100,4 +100,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/hyperledger/firefly-signer => github.com/davecrighton/firefly-signer v1.1.23-0.20260421094944-fdf091eea4db
+replace github.com/hyperledger/firefly-signer => github.com/davecrighton/firefly-signer v1.1.23-0.20260421131225-77652c2eeb43
