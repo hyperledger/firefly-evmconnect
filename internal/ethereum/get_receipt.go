@@ -134,7 +134,7 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 	var errorMessage string
 	returnDataBytes, _ := hex.DecodeString(padHexData(revertReason))
 	var errors abi.ABI
-	if decoded, ok := errors.UnwrapErrorStringCtx(ctx, returnDataBytes); ok {
+	if decoded, ok := errors.ErrorStringCtx(ctx, returnDataBytes, abi.ErrorFormatOption{Unwrap: true}); ok {
 		errorMessage = decoded
 	}
 
