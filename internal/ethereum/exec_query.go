@@ -151,7 +151,7 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 		for _, e := range errorAbis {
 			errors = append(errors, e)
 		}
-		if result, ok := errors.ErrorStringCtx(ctx, outputData, abi.ErrorFormatOption{Unwrap: true}); ok {
+		if result, ok := errors.ErrorStringCtx(ctx, outputData, abi.ErrorFormatOption{SearchForWrappedBinaryErrors: true}); ok {
 			return result
 		}
 		log.L(ctx).Debugf("Directly returning revert reason: %s", outputData)
