@@ -28,8 +28,6 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/davecrighton/firefly-signer v1.1.23-0.20260421131225-77652c2eeb43 h1:mx5D/eyZtXm+TgECTGM3fbEDWb71t6A2WqlWlhoeUyQ=
-github.com/davecrighton/firefly-signer v1.1.23-0.20260421131225-77652c2eeb43/go.mod h1:cb40Xkm/t2+KH+V1q3/zxZPohBNEA0iOA7mcr9wyfzI=
 github.com/decred/dcrd/crypto/blake256 v1.0.1 h1:7PltbUIQB7u/FfZ39+DGa/ShuMyJ5ilcvdfma9wOH6Y=
 github.com/decred/dcrd/crypto/blake256 v1.0.1/go.mod h1:2OfgNZ5wDpcsFmHmCK5gZTPcCXqlm2ArzUIkw9czNJo=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 h1:8UrgZ3GkP4i/CLijOJx79Yu+etlyjdBU4sfcs2WYQMs=
@@ -104,6 +102,8 @@ github.com/huandu/xstrings v1.4.0 h1:D17IlohoQq4UcpqD7fDk80P7l+lwAmlFaBHgOipl2FU
 github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/hyperledger/firefly-common v1.5.9 h1:Z1+SuKNYJ8hPKQ5CvcsMg6r/E4RyW6wb08nGwtcc8Ww=
 github.com/hyperledger/firefly-common v1.5.9/go.mod h1:1Xawm5PUhxT7k+CL/Kr3i1LE3cTTzoQwZMLimvlW8rs=
+github.com/hyperledger/firefly-signer v1.1.23-0.20260422080826-42345c6c6b85 h1:gh3YhxUYYwOfBCsEJXFmWO7SFzFrNuNulXftOam2JRI=
+github.com/hyperledger/firefly-signer v1.1.23-0.20260422080826-42345c6c6b85/go.mod h1:cb40Xkm/t2+KH+V1q3/zxZPohBNEA0iOA7mcr9wyfzI=
 github.com/hyperledger/firefly-transaction-manager v1.4.4 h1:cbG9FkQWriOcc1MMGaMqU7OpOwLloSV+PImOoaN0ckU=
 github.com/hyperledger/firefly-transaction-manager v1.4.4/go.mod h1:1kbYt8ofDXqfwC02vwV/HoOjmiv0IuT9UkJ//bbrliE=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
