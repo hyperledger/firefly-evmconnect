@@ -17,10 +17,8 @@
 package ethereum
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
 	"github.com/hyperledger/firefly-common/pkg/i18n"
@@ -32,21 +30,6 @@ import (
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
 	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
-)
-
-var (
-	// See https://docs.soliditylang.org/en/v0.8.14/control-structures.html#revert
-	// There default error for `revert("some error")` is a function Error(string)
-	defaultError = &abi.Entry{
-		Type: abi.Error,
-		Name: "Error",
-		Inputs: abi.ParameterArray{
-			{
-				Type: "string",
-			},
-		},
-	}
-	defaultErrorID = defaultError.FunctionSelectorBytes()
 )
 
 func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeRequest) (*ffcapi.QueryInvokeResponse, ffcapi.ErrorReason, error) {
@@ -164,59 +147,15 @@ func processRevertReason(ctx context.Context, outputData ethtypes.HexBytes0xPref
 	// result in a multiple of 32 bytes) and has exactly 4 extra bytes for a function
 	// signature
 	if len(outputData)%32 == 4 {
-		signature := outputData[0:4]
-		if bytes.Equal(signature, defaultErrorID) {
-			errorInfo, err := defaultError.DecodeCallDataCtx(ctx, outputData)
-			if err == nil && len(errorInfo.Children) == 1 {
-				if strError, ok := errorInfo.Children[0].Value.(string); ok {
-					return strError
-				}
-			}
-			log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-		} else if len(errorAbis) > 0 {
-			// check if the signature matches any of the declared custom error definitions
-			for _, e := range errorAbis {
-				idBytes := e.FunctionSelectorBytes()
-				if bytes.Equal(signature, idBytes) {
-					err := formatCustomError(ctx, e, outputData)
-					if err == "" {
-						log.L(ctx).Warnf("Invalid revert data: %s", outputData)
-						break
-					}
-					return err
-				}
-			}
+		var errors abi.ABI
+		for _, e := range errorAbis {
+			errors = append(errors, e)
 		}
-		// we call this "transient error" because it signals to the caller of the case
-		// that the raw revert data is returned, then it gets thrown away. so no need to translate
+		if result, ok := errors.ErrorStringCtx(ctx, outputData, abi.ErrorFormatOption{SearchForWrappedBinaryErrors: true}); ok {
+			return result
+		}
 		log.L(ctx).Debugf("Directly returning revert reason: %s", outputData)
 		return outputData.String()
 	}
 	return ""
-}
-
-func formatCustomError(ctx context.Context, e *abi.Entry, outputData ethtypes.HexBytes0xPrefix) string {
-	errorInfo, err := e.DecodeCallDataCtx(ctx, outputData)
-	if err == nil {
-		strError := fmt.Sprintf("%s(", e.Name)
-		for i, child := range errorInfo.Children {
-			strError += formatErrorComponent(ctx, child)
-			if i < len(errorInfo.Children)-1 {
-				strError += ", "
-			}
-		}
-		strError += ")"
-		return strError
-	}
-	return ""
-}
-
-func formatErrorComponent(ctx context.Context, child *abi.ComponentValue) string {
-	value, err := child.JSON()
-	if err != nil {
-		// if this part of the error structure failed to parse, simply append "?"
-		log.L(ctx).Warnf("Failed to parse component value in error: %+v", child)
-		return "?"
-	}
-	return string(value)
 }

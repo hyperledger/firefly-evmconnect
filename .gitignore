@@ -8,3 +8,7 @@ __debug*
 .vscode/*.log
 *.iml
 .idea/
+
+# Local Go workspace (not part of the module release)
+go.work
+go.work.sum

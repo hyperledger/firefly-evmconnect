@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"testing"
@@ -31,6 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+var testDefaultError = &abi.Entry{
+	Type:   abi.Error,
+	Name:   "Error",
+	Inputs: abi.ParameterArray{{Type: "string"}},
+}
 
 const sampleGasEstimate = `{
 	"ffcapi": {
@@ -150,7 +155,7 @@ func TestGasEstimateFailRevertReasonInData(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	errData, err := defaultError.EncodeCallDataValues([]string{"this reason"})
+	errData, err := testDefaultError.EncodeCallDataValues([]string{"this reason"})
 	assert.NoError(t, err)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -205,7 +210,7 @@ func TestGasEstimateFailThenRevertDataFromCall(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	errData, err := defaultError.EncodeCallDataValues([]string{"this reason"})
+	errData, err := testDefaultError.EncodeCallDataValues([]string{"this reason"})
 	assert.NoError(t, err)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -261,7 +266,7 @@ func TestGasEstimateFailCustomErrorCannotParse(t *testing.T) {
 	ctx, c, mRPC, done := newTestConnector(t)
 	defer done()
 
-	errData, err := defaultError.EncodeCallDataValues([]string{"this reason"})
+	errData, err := testDefaultError.EncodeCallDataValues([]string{"this reason"})
 	assert.NoError(t, err)
 	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
 		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
@@ -281,6 +286,3 @@ func TestGasEstimateFailCustomErrorCannotParse(t *testing.T) {
 
 }
 
-func TestFormatErrorComponentBadCV(t *testing.T) {
-	assert.Equal(t, "?", formatErrorComponent(context.Background(), &abi.ComponentValue{}))
-}
