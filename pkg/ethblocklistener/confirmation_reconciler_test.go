@@ -136,7 +136,7 @@ func TestReconcileConfirmationsForTransaction_HeadBlockNumber_PartialConfirmatio
 	}
 	if assert.NotNil(t, result) {
 		assert.False(t, result.Confirmed)
-		assert.Equal(t, uint64(3), result.ActualConfirmationCount)
+		assert.Equal(t, uint64(3), result.CurrentConfirmationCount)
 		assert.Equal(t, uint64(5), result.TargetConfirmationCount)
 	}
 }
@@ -152,7 +152,7 @@ func TestReconcileConfirmationsForTransaction_HeadBlockNumber_FullyConfirmed(t *
 	assert.NoError(t, err)
 	if assert.NotNil(t, receipt) && assert.NotNil(t, result) {
 		assert.True(t, result.Confirmed)
-		assert.Equal(t, uint64(5), result.ActualConfirmationCount)
+		assert.Equal(t, uint64(5), result.CurrentConfirmationCount)
 		assert.Equal(t, uint64(5), result.TargetConfirmationCount)
 	}
 }
@@ -168,7 +168,7 @@ func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ActualCountCappedA
 	assert.NoError(t, err)
 	if assert.NotNil(t, result) {
 		assert.True(t, result.Confirmed)
-		assert.Equal(t, uint64(3), result.ActualConfirmationCount)
+		assert.Equal(t, uint64(3), result.CurrentConfirmationCount)
 		assert.Equal(t, uint64(3), result.TargetConfirmationCount)
 	}
 }

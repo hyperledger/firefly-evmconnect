@@ -225,12 +225,12 @@ func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context,
 	}
 	if err == nil && ethrpcRes != nil {
 		res = &ffcapi.ConfirmationUpdateResult{
-			Confirmations:           ethRPCtoFFCAPIConfirmations(ethrpcRes.Confirmations),
-			Rebuilt:                 ethrpcRes.Rebuilt,
-			NewFork:                 ethrpcRes.NewFork,
-			Confirmed:               ethrpcRes.Confirmed,
-			ActualConfirmationCount: ethrpcRes.ActualConfirmationCount,
-			TargetConfirmationCount: ethrpcRes.TargetConfirmationCount,
+			Confirmations:            ethRPCtoFFCAPIConfirmations(ethrpcRes.Confirmations),
+			Rebuilt:                  ethrpcRes.Rebuilt,
+			NewFork:                  ethrpcRes.NewFork,
+			Confirmed:                ethrpcRes.Confirmed,
+			CurrentConfirmationCount: ethrpcRes.CurrentConfirmationCount,
+			TargetConfirmationCount:  ethrpcRes.TargetConfirmationCount,
 		}
 		if ethrpcReceipt != nil {
 			res.Receipt = c.enrichTransactionReceipt(ctx, ethrpcReceipt)

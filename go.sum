@@ -113,8 +113,8 @@ github.com/jarcoal/httpmock v1.2.0 h1:gSvTxxFR/MEMfsGrvRbdfpRUMBStovlSRLw0Ep1bww
 github.com/jarcoal/httpmock v1.2.0/go.mod h1:oCoTsnAz4+UoOUIf5lJOWV2QQIW5UoeUI6aM2YnWAZk=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
-github.com/kaleido-io/firefly-transaction-manager v0.0.0-20260422103131-3c7e067ab475 h1:sDRCp0E5sM0HLkd1x579LR0V+oJRC7QcMZ74ms/4QIk=
-github.com/kaleido-io/firefly-transaction-manager v0.0.0-20260422103131-3c7e067ab475/go.mod h1:1kbYt8ofDXqfwC02vwV/HoOjmiv0IuT9UkJ//bbrliE=
+github.com/kaleido-io/firefly-transaction-manager v0.0.0-20260422115257-d08c82a8967b h1:Ii4//NrYcoDlig8b8ZaWu/+CnT+kLwIKDLav3E29n/U=
+github.com/kaleido-io/firefly-transaction-manager v0.0.0-20260422115257-d08c82a8967b/go.mod h1:1kbYt8ofDXqfwC02vwV/HoOjmiv0IuT9UkJ//bbrliE=
 github.com/karlseguin/ccache v2.0.3+incompatible h1:j68C9tWOROiOLWTS/kCGg9IcJG+ACqn5+0+t8Oh83UU=
 github.com/karlseguin/ccache v2.0.3+incompatible/go.mod h1:CM9tNPzT6EdRh14+jiW8mEF9mkNZuuE51qmgGYUB93w=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=

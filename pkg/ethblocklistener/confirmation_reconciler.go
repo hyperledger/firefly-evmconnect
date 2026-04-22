@@ -55,15 +55,15 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 			// the transaction is not yet included in the chain head
 			return nil, nil, i18n.NewError(ctx, msgs.MsgTransactionNotIncludedInChainHead, txHash, chainHead, txReceipt.BlockNumber.String())
 		}
-		actualConfirmationCount := chainHead - txReceipt.BlockNumber.Uint64()
-		if actualConfirmationCount > targetConfirmationCount {
-			actualConfirmationCount = targetConfirmationCount
+		currentConfirmationCount := chainHead - txReceipt.BlockNumber.Uint64()
+		if currentConfirmationCount > targetConfirmationCount {
+			currentConfirmationCount = targetConfirmationCount
 		}
 		return &ConfirmationUpdateResult{
-			Confirmed: actualConfirmationCount == targetConfirmationCount,
+			Confirmed: currentConfirmationCount == targetConfirmationCount,
 			// no support on fork detection in this mode
-			ActualConfirmationCount: actualConfirmationCount,
-			TargetConfirmationCount: targetConfirmationCount,
+			CurrentConfirmationCount: currentConfirmationCount,
+			TargetConfirmationCount:  targetConfirmationCount,
 		}, txReceipt, nil
 	}
 
@@ -83,7 +83,7 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, blockInfoExistingConfirmations, txBlockInfo, targetConfirmationCount)
 	if confirmationUpdateResult != nil {
 		confirmationUpdateResult.TargetConfirmationCount = targetConfirmationCount
-		confirmationUpdateResult.ActualConfirmationCount = uint64(len(confirmationUpdateResult.Confirmations)) - 1
+		confirmationUpdateResult.CurrentConfirmationCount = uint64(len(confirmationUpdateResult.Confirmations)) - 1
 		// NOTE: This function does not do the full receipt decoding, for which there is a complex function for.
 		// The "Receipt" object is left empty (but the JSON/RPC receipt is return to the caller for enrichment)
 	}
