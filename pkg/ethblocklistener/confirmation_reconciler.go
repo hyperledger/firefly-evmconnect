@@ -61,7 +61,7 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 		}
 		return &ConfirmationUpdateResult{
 			Confirmed: currentConfirmationCount == targetConfirmationCount,
-			// no support on fork detection in this mode
+			// no support on fork detection in this mode from the connector although firefly transaction manager will inject `NewFork: true` if it detects a reduction in confirmationCount. 
 			CurrentConfirmationCount: currentConfirmationCount,
 			TargetConfirmationCount:  targetConfirmationCount,
 		}, txReceipt, nil
