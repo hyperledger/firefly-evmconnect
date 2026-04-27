@@ -41,7 +41,7 @@ func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.
 
 func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
 
-	if bl.BlockListenerConfig.TrackingMode == ffcapi.BlockListenerTrackingModeHeadBlockNumber {
+	if bl.BlockListenerConfig.ChainTrackingMode == ffcapi.ChainTrackingModeLight {
 		// when chain head is the only thing that's being tracked, we only need to calculate the confirmation list based on the head block number
 		// get the transaction receipt only
 		txReceipt, err := bl.GetTransactionReceipt(ctx, txHash)

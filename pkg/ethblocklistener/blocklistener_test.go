@@ -1758,7 +1758,7 @@ func TestBlockListenerHeadBlockNumber_DispatchesAndSkipsDuplicateHead(t *testing
 	var bnCall int
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, _ context.CancelFunc) {
 		conf.BlockPollingInterval = shortDelay
-		conf.TrackingMode = ffcapi.BlockListenerTrackingModeHeadBlockNumber
+		conf.ChainTrackingMode = ffcapi.ChainTrackingModeLight
 
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_blockNumber").Return(nil).Run(func(args mock.Arguments) {
 			bnCall++

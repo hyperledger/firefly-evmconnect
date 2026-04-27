@@ -45,7 +45,7 @@ import (
 type ethConnector struct {
 	backend           rpcbackend.Backend
 	wsBackend         rpcbackend.WebSocketRPCClient
-	blockTrackingMode ffcapi.BlockListenerTrackingMode
+	chainTrackingMode ffcapi.ChainTrackingMode
 
 	serializer                 *abi.Serializer
 	gasEstimationFactor        *big.Float
@@ -81,12 +81,12 @@ type Connector interface {
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
 
-	blockListenerTrackingMode := ffcapi.BlockListenerTrackingMode(conf.GetString(BlockTrackingMode))
-	if blockListenerTrackingMode == "" {
-		blockListenerTrackingMode = ffcapi.BlockListenerTrackingModeInMemoryPartialChain
+	chainTrackingMode := ffcapi.ChainTrackingMode(conf.GetString(ChainTrackingMode))
+	if chainTrackingMode == "" {
+		chainTrackingMode = ffcapi.ChainTrackingModeFull
 	}
-	if blockListenerTrackingMode != ffcapi.BlockListenerTrackingModeHeadBlockNumber && blockListenerTrackingMode != ffcapi.BlockListenerTrackingModeInMemoryPartialChain {
-		return nil, i18n.NewError(ctx, msgs.MsgInvalidBlockListenerTrackingMode, blockListenerTrackingMode)
+	if chainTrackingMode != ffcapi.ChainTrackingModeLight && chainTrackingMode != ffcapi.ChainTrackingModeFull {
+		return nil, i18n.NewError(ctx, msgs.MsgInvalidChainTrackingMode, chainTrackingMode)
 	}
 
 	c := &ethConnector{
@@ -97,7 +97,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
 		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
 		traceTXForRevertReason:     conf.GetBool(TraceTXForRevertReason),
-		blockTrackingMode:          blockListenerTrackingMode,
+		chainTrackingMode:          chainTrackingMode,
 		retry:                      retryutil.RetryWrapper{Retry: &retry.Retry{}},
 	}
 
@@ -176,7 +176,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		BlockCacheSize:                conf.GetInt(BlockCacheSize),
 		MaxAsyncBlockFetchConcurrency: conf.GetInt(MaxAsyncBlockFetchConcurrency),
 		UseGetBlockReceipts:           conf.GetBool(UseGetBlockReceipts),
-		TrackingMode:                  blockListenerTrackingMode,
+		ChainTrackingMode:             c.chainTrackingMode,
 	}, c.backend, c.wsBackend); err != nil {
 		return nil, err
 	}

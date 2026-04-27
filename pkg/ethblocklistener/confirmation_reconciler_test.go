@@ -72,7 +72,7 @@ const sampleJSONRPCReceipt = `{
 const headModeSampleTxHash = "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2"
 
 func headBlockNumberTestConf(conf *BlockListenerConfig, _ *rpcbackendmocks.Backend, _ context.CancelFunc) {
-	conf.TrackingMode = ffcapi.BlockListenerTrackingModeHeadBlockNumber
+	conf.ChainTrackingMode = ffcapi.ChainTrackingModeLight
 }
 
 func mockHeadModeReceipt(t *testing.T, mRPC *rpcbackendmocks.Backend, txHash string) {

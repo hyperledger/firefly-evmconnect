@@ -58,14 +58,14 @@ type ConfirmationUpdateResult struct {
 }
 
 type BlockListenerConfig struct {
-	MonitoredHeadLength           int                              `json:"monitoredHeadLength"`
-	BlockPollingInterval          time.Duration                    `json:"blockPollingInterval"`
-	HederaCompatibilityMode       bool                             `json:"hederaCompatibilityMode"`
-	BlockCacheSize                int                              `json:"blockCacheSize"`
-	IncludeLogsBloom              bool                             `json:"includeLogsBloom"`
-	UseGetBlockReceipts           bool                             `json:"useGetBlockReceipts"`
-	MaxAsyncBlockFetchConcurrency int                              `json:"maxAsyncBlockFetchConcurrency"`
-	TrackingMode                  ffcapi.BlockListenerTrackingMode `json:"trackingMode,omitempty"`
+	MonitoredHeadLength           int                      `json:"monitoredHeadLength"`
+	BlockPollingInterval          time.Duration            `json:"blockPollingInterval"`
+	HederaCompatibilityMode       bool                     `json:"hederaCompatibilityMode"`
+	BlockCacheSize                int                      `json:"blockCacheSize"`
+	IncludeLogsBloom              bool                     `json:"includeLogsBloom"`
+	UseGetBlockReceipts           bool                     `json:"useGetBlockReceipts"`
+	MaxAsyncBlockFetchConcurrency int                      `json:"maxAsyncBlockFetchConcurrency"`
+	ChainTrackingMode             ffcapi.ChainTrackingMode `json:"chainTrackingMode,omitempty"`
 }
 
 type BlockListener interface {
@@ -146,8 +146,8 @@ func NewBlockListenerSupplyBackend(ctx context.Context, retry *retry.Retry, conf
 	if conf.MaxAsyncBlockFetchConcurrency <= 0 {
 		conf.MaxAsyncBlockFetchConcurrency = 1
 	}
-	if conf.TrackingMode == "" {
-		conf.TrackingMode = ffcapi.BlockListenerTrackingModeInMemoryPartialChain
+	if conf.ChainTrackingMode == "" {
+		conf.ChainTrackingMode = ffcapi.ChainTrackingModeFull
 	}
 	bl := &blockListener{
 		ctx:                           log.WithLogField(ctx, "role", "blocklistener"),
@@ -333,7 +333,7 @@ func (bl *blockListener) listenLoop() {
 		}
 		log.L(bl.ctx).Debugf("Block filter received new block hashes: %+v", blockHashes)
 
-		if bl.TrackingMode == ffcapi.BlockListenerTrackingModeHeadBlockNumber {
+		if bl.ChainTrackingMode == ffcapi.ChainTrackingModeLight {
 			head, err := bl.refreshHighestBlockFromRPC()
 			if err != nil {
 				log.L(bl.ctx).Errorf("Failed to refresh chain head: %s", err)

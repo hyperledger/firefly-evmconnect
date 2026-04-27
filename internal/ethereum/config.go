@@ -27,7 +27,7 @@ const (
 	ConfigDataFormat            = "dataFormat"
 	BlockPollingInterval        = "blockPollingInterval"
 	BlockCacheSize              = "blockCacheSize"
-	BlockTrackingMode           = "blockTrackingMode"
+	ChainTrackingMode           = "chainTrackingMode"
 	EventsCatchupPageSize       = "events.catchupPageSize"
 	EventsCatchupThreshold      = "events.catchupThreshold"
 	EventsCatchupDownscaleRegex = "events.catchupDownscaleRegex"
@@ -72,7 +72,7 @@ func InitConfig(conf config.Section) {
 	conf.AddKnownKey(WebSocketsEnabled, false)
 	conf.AddKnownKey(BlockCacheSize, 250)
 	conf.AddKnownKey(BlockPollingInterval, "1s")
-	conf.AddKnownKey(BlockTrackingMode, ffcapi.BlockListenerTrackingModeInMemoryPartialChain)
+	conf.AddKnownKey(ChainTrackingMode, ffcapi.ChainTrackingModeFull)
 	conf.AddKnownKey(ConfigDataFormat, "map")
 	conf.AddKnownKey(ConfigGasEstimationFactor, DefaultGasEstimationFactor)
 	conf.AddKnownKey(EventsBlockTimestamps, true)
