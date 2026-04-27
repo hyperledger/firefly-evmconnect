@@ -17,7 +17,6 @@
 package ethereum
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -132,17 +131,13 @@ func (c *ethConnector) getErrorInfo(ctx context.Context, transactionHash string,
 		revertReason = revertFromReceipt.String()
 	}
 
-	// See if the return value is using the default error you get from "revert"
 	var errorMessage string
 	returnDataBytes, _ := hex.DecodeString(padHexData(revertReason))
-	if len(returnDataBytes) > 4 && bytes.Equal(returnDataBytes[0:4], defaultErrorID) {
-		value, err := defaultError.DecodeCallDataCtx(ctx, returnDataBytes)
-		if err == nil {
-			errorMessage = value.Children[0].Value.(string)
-		}
+	var errors abi.ABI
+	if decoded, ok := errors.ErrorStringCtx(ctx, returnDataBytes, abi.ErrorFormatOption{SearchForWrappedBinaryErrors: true}); ok {
+		errorMessage = decoded
 	}
 
-	// Otherwise we can't decode it, so put it directly in the error
 	if errorMessage == "" {
 		if len(returnDataBytes) > 0 {
 			errorMessage = i18n.NewError(ctx, msgs.MsgReturnValueNotDecoded, revertReason).Error()
