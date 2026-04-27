@@ -67,7 +67,7 @@
 |---|-----------|----|-------------|
 |blockCacheSize|Maximum of blocks to hold in the block info cache|`int`|`250`
 |blockPollingInterval|Interval for polling to check for new blocks|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
-|chainTrackingMode|Chain tracking mode. `light`: fetches head block numbers only, does not download block details, disables block listener support, and confirmation results include only the confirmation count. `full`: fetches head block numbers and block details, maintains an in-memory partial chain, enables block listener support, and confirmation results include both confirmation count and block details.|`light` or `full`|`full`
+|chainTrackingMode|Tracking mode for connector block progression. light: fetches head block numbers only, does not download block details, disables block listener support, and confirmation results include only the confirmation count. full: fetches head block numbers and block details, maintains an in-memory partial chain, enables block listener support, and confirmation results include both confirmation count and block details.|`light` or `full`|`full`
 |connectionTimeout|The maximum amount of time that a connection is allowed to remain with no data transmitted|[`time.Duration`](https://pkg.go.dev/time#Duration)|`30s`
 |dataFormat|Configure the JSON data format for query output and events|map,flat_array,self_describing|`map`
 |expectContinueTimeout|See [ExpectContinueTimeout in the Go docs](https://pkg.go.dev/net/http#Transport)|[`time.Duration`](https://pkg.go.dev/time#Duration)|`1s`
