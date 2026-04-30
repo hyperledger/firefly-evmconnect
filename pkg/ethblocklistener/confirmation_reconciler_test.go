@@ -30,6 +30,7 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
 	"github.com/hyperledger/firefly-signer/pkg/rpcbackend"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -67,6 +68,22 @@ const sampleJSONRPCReceipt = `{
 	"type": "0x0"
 }`
 
+// Transaction hash in sampleJSONRPCReceipt (block 0x7b9 = 1977).
+const headModeSampleTxHash = "0x7d48ae971faf089878b57e3c28e3035540d34f38af395958d2c73c36c57c83a2"
+
+func headBlockNumberTestConf(conf *BlockListenerConfig, _ *rpcbackendmocks.Backend, _ context.CancelFunc) {
+	conf.ChainTrackingMode = ffcapi.ChainTrackingModeLight
+}
+
+func mockHeadModeReceipt(t *testing.T, mRPC *rpcbackendmocks.Backend, txHash string) {
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", txHash).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
+			assert.NoError(t, err)
+		})
+}
+
 // Tests of the reconcileConfirmationsForTransaction function
 
 func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) {
@@ -89,6 +106,90 @@ func TestReconcileConfirmationsForTransaction_TransactionNotFound(t *testing.T) 
 	assert.Nil(t, result)
 
 	mRPC.AssertExpectations(t)
+}
+
+func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ChainHeadBehindReceipt(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
+	defer done()
+
+	mockHeadModeReceipt(t, mRPC, headModeSampleTxHash)
+	bl.currentChainHead = 1976 // receipt block is 1977 (0x7b9)
+
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), headModeSampleTxHash, nil, 5)
+	assert.Error(t, err)
+	assert.Regexp(t, "FF23070", err)
+	assert.Nil(t, result)
+	assert.Nil(t, receipt)
+}
+
+func TestReconcileConfirmationsForTransaction_HeadBlockNumber_PartialConfirmations(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
+	defer done()
+
+	mockHeadModeReceipt(t, mRPC, headModeSampleTxHash)
+	bl.currentChainHead = 1980 // 1980 - 1977 = 3 confirmations vs target 5
+
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), headModeSampleTxHash, nil, 5)
+	assert.NoError(t, err)
+	if assert.NotNil(t, receipt) {
+		assert.Equal(t, uint64(1977), receipt.BlockNumber.Uint64())
+	}
+	if assert.NotNil(t, result) {
+		assert.False(t, result.Confirmed)
+		assert.Equal(t, uint64(3), result.CurrentConfirmationCount)
+		assert.Equal(t, uint64(5), result.TargetConfirmationCount)
+	}
+}
+
+func TestReconcileConfirmationsForTransaction_HeadBlockNumber_FullyConfirmed(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
+	defer done()
+
+	mockHeadModeReceipt(t, mRPC, headModeSampleTxHash)
+	bl.currentChainHead = 1982 // 1982 - 1977 = 5 confirmations
+
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), headModeSampleTxHash, nil, 5)
+	assert.NoError(t, err)
+	if assert.NotNil(t, receipt) && assert.NotNil(t, result) {
+		assert.True(t, result.Confirmed)
+		assert.Equal(t, uint64(5), result.CurrentConfirmationCount)
+		assert.Equal(t, uint64(5), result.TargetConfirmationCount)
+	}
+}
+
+func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ActualCountCappedAtTarget(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
+	defer done()
+
+	mockHeadModeReceipt(t, mRPC, headModeSampleTxHash)
+	bl.currentChainHead = 2500 // many blocks past receipt; cap at target
+
+	result, _, err := bl.ReconcileConfirmationsForTransaction(context.Background(), headModeSampleTxHash, nil, 3)
+	assert.NoError(t, err)
+	if assert.NotNil(t, result) {
+		assert.True(t, result.Confirmed)
+		assert.Equal(t, uint64(3), result.CurrentConfirmationCount)
+		assert.Equal(t, uint64(3), result.TargetConfirmationCount)
+	}
+}
+
+func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ReceiptRPCError(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", headModeSampleTxHash).
+		Return(&rpcbackend.RPCError{Message: "pop"}).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte("null"), args[1])
+			assert.NoError(t, err)
+		})
+
+	bl.currentChainHead = 2000
+
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), headModeSampleTxHash, nil, 5)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Nil(t, receipt)
 }
 
 func TestReconcileConfirmationsForTransaction_ReceiptRPCCallError(t *testing.T) {

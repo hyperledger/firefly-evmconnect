@@ -43,8 +43,10 @@ import (
 )
 
 type ethConnector struct {
-	backend                    rpcbackend.Backend
-	wsBackend                  rpcbackend.WebSocketRPCClient
+	backend           rpcbackend.Backend
+	wsBackend         rpcbackend.WebSocketRPCClient
+	chainTrackingMode ffcapi.ChainTrackingMode
+
 	serializer                 *abi.Serializer
 	gasEstimationFactor        *big.Float
 	catchupPageSize            int64
@@ -78,6 +80,15 @@ type Connector interface {
 }
 
 func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connector, err error) {
+
+	chainTrackingMode := ffcapi.ChainTrackingMode(conf.GetString(ChainTrackingMode))
+	if chainTrackingMode == "" {
+		chainTrackingMode = ffcapi.ChainTrackingModeFull
+	}
+	if chainTrackingMode != ffcapi.ChainTrackingModeLight && chainTrackingMode != ffcapi.ChainTrackingModeFull {
+		return nil, i18n.NewError(ctx, msgs.MsgInvalidChainTrackingMode, chainTrackingMode)
+	}
+
 	c := &ethConnector{
 		eventStreams:               make(map[fftypes.UUID]*eventStream),
 		catchupPageSize:            conf.GetInt64(EventsCatchupPageSize),
@@ -86,6 +97,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		eventBlockTimestamps:       conf.GetBool(EventsBlockTimestamps),
 		eventFilterPollingInterval: conf.GetDuration(EventsFilterPollingInterval),
 		traceTXForRevertReason:     conf.GetBool(TraceTXForRevertReason),
+		chainTrackingMode:          chainTrackingMode,
 		retry:                      retryutil.RetryWrapper{Retry: &retry.Retry{}},
 	}
 
@@ -164,6 +176,7 @@ func NewEthereumConnector(ctx context.Context, conf config.Section) (cc Connecto
 		BlockCacheSize:                conf.GetInt(BlockCacheSize),
 		MaxAsyncBlockFetchConcurrency: conf.GetInt(MaxAsyncBlockFetchConcurrency),
 		UseGetBlockReceipts:           conf.GetBool(UseGetBlockReceipts),
+		ChainTrackingMode:             c.chainTrackingMode,
 	}, c.backend, c.wsBackend); err != nil {
 		return nil, err
 	}
@@ -212,11 +225,12 @@ func (c *ethConnector) ReconcileConfirmationsForTransaction(ctx context.Context,
 	}
 	if err == nil && ethrpcRes != nil {
 		res = &ffcapi.ConfirmationUpdateResult{
-			Confirmations:           ethRPCtoFFCAPIConfirmations(ethrpcRes.Confirmations),
-			Rebuilt:                 ethrpcRes.Rebuilt,
-			NewFork:                 ethrpcRes.NewFork,
-			Confirmed:               ethrpcRes.Confirmed,
-			TargetConfirmationCount: ethrpcRes.TargetConfirmationCount,
+			Confirmations:            ethRPCtoFFCAPIConfirmations(ethrpcRes.Confirmations),
+			Rebuilt:                  ethrpcRes.Rebuilt,
+			NewFork:                  ethrpcRes.NewFork,
+			Confirmed:                ethrpcRes.Confirmed,
+			CurrentConfirmationCount: ethrpcRes.CurrentConfirmationCount,
+			TargetConfirmationCount:  ethrpcRes.TargetConfirmationCount,
 		}
 		if ethrpcReceipt != nil {
 			res.Receipt = c.enrichTransactionReceipt(ctx, ethrpcReceipt)

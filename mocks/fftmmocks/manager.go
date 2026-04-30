@@ -11,6 +11,8 @@ import (
 
 	ffcapi "github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 
+	metric "github.com/hyperledger/firefly-common/pkg/metric"
+
 	mock "github.com/stretchr/testify/mock"
 
 	mux "github.com/gorilla/mux"
@@ -131,6 +133,26 @@ func (_m *Manager) GetTransactionByIDWithStatus(ctx context.Context, txID string
 	}
 
 	return r0, r1
+}
+
+// MetricsRegistry provides a mock function with no fields
+func (_m *Manager) MetricsRegistry() metric.MetricsRegistry {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for MetricsRegistry")
+	}
+
+	var r0 metric.MetricsRegistry
+	if rf, ok := ret.Get(0).(func() metric.MetricsRegistry); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(metric.MetricsRegistry)
+		}
+	}
+
+	return r0
 }
 
 // ReconcileConfirmationsForTransaction provides a mock function with given fields: ctx, txHash, existingConfirmations, targetConfirmationCount

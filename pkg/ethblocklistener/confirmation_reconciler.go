@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/firefly-evmconnect/internal/msgs"
 	"github.com/hyperledger/firefly-evmconnect/pkg/ethrpc"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
+	"github.com/hyperledger/firefly-transaction-manager/pkg/ffcapi"
 )
 
 func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.BlockInfoJSONRPC) {
@@ -39,6 +40,32 @@ func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.
 }
 
 func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
+
+	if bl.BlockListenerConfig.ChainTrackingMode == ffcapi.ChainTrackingModeLight {
+		// when chain head is the only thing that's being tracked, we only need to calculate the confirmation list based on the head block number
+		// get the transaction receipt only
+		txReceipt, err := bl.GetTransactionReceipt(ctx, txHash)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to fetch transaction receipt using tx hash %s: %v", txHash, err)
+			return nil, nil, err
+		}
+		// compare it against the chain head
+		chainHead := bl.GetHeadBlockNumber(ctx)
+		if chainHead < txReceipt.BlockNumber.Uint64() {
+			// the transaction is not yet included in the chain head
+			return nil, nil, i18n.NewError(ctx, msgs.MsgTransactionNotIncludedInChainHead, txHash, chainHead, txReceipt.BlockNumber.String())
+		}
+		currentConfirmationCount := chainHead - txReceipt.BlockNumber.Uint64()
+		if currentConfirmationCount > targetConfirmationCount {
+			currentConfirmationCount = targetConfirmationCount
+		}
+		return &ConfirmationUpdateResult{
+			Confirmed: currentConfirmationCount == targetConfirmationCount,
+			// no support on fork detection in this mode from the connector although firefly transaction manager will inject `NewFork: true` if it detects a reduction in confirmationCount.
+			CurrentConfirmationCount: currentConfirmationCount,
+			TargetConfirmationCount:  targetConfirmationCount,
+		}, txReceipt, nil
+	}
 
 	blockInfoExistingConfirmations := toBlockInfoList(existingConfirmations)
 
@@ -56,6 +83,7 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, blockInfoExistingConfirmations, txBlockInfo, targetConfirmationCount)
 	if confirmationUpdateResult != nil {
 		confirmationUpdateResult.TargetConfirmationCount = targetConfirmationCount
+		confirmationUpdateResult.CurrentConfirmationCount = uint64(len(confirmationUpdateResult.Confirmations)) - 1
 		// NOTE: This function does not do the full receipt decoding, for which there is a complex function for.
 		// The "Receipt" object is left empty (but the JSON/RPC receipt is return to the caller for enrichment)
 	}
