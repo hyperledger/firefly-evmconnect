@@ -61,18 +61,13 @@ For EVM connector to function properly, you should check the blockchain node sup
 
 - `eth_call`
 - `eth_getBalance`
-- `eth_gasPrice`[^1]
+- `eth_gasPrice`
 
 ### Transaction submission
 
 - `eth_estimateGas`
-- `eth_sendTransaction`
+- `eth_sendTransaction` / `eth_sendRawTransaction`
 - `eth_getTransactionCount`
-- `eth_sendRawTransaction`[^2]
-
-[^1]: also used by Transaction submission if the handler is configured to get gas price using "connector".
-
-[^2]: only required by custom transaction handlers that supports pre-signing.
 
 ### Optional methods
 
