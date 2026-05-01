@@ -52,6 +52,26 @@ func (_m *BlockListener) GetBackend() rpcbackend.RPC {
 	return r0
 }
 
+// GetBlockGasLimit provides a mock function with no fields
+func (_m *BlockListener) GetBlockGasLimit() *ethtypes.HexInteger {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBlockGasLimit")
+	}
+
+	var r0 *ethtypes.HexInteger
+	if rf, ok := ret.Get(0).(func() *ethtypes.HexInteger); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ethtypes.HexInteger)
+		}
+	}
+
+	return r0
+}
+
 // GetBlockInfoByHash provides a mock function with given fields: ctx, hash0xString
 func (_m *BlockListener) GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error) {
 	ret := _m.Called(ctx, hash0xString)

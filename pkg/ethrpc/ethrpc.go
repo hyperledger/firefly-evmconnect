@@ -168,6 +168,7 @@ type BlockInfoJSONRPC struct {
 	Hash         ethtypes.HexBytes0xPrefix   `json:"hash" ffstruct:"BlockInfoJSONRPC"`
 	ParentHash   ethtypes.HexBytes0xPrefix   `json:"parentHash" ffstruct:"BlockInfoJSONRPC"`
 	Timestamp    ethtypes.HexUint64          `json:"timestamp" ffstruct:"BlockInfoJSONRPC"`
+	GasLimit     *ethtypes.HexInteger        `json:"gasLimit" ffstruct:"BlockInfoJSONRPC"`
 	LogsBloom    ethtypes.HexBytes0xPrefix   `json:"logsBloom" ffstruct:"BlockInfoJSONRPC"`
 	Transactions []ethtypes.HexBytes0xPrefix `json:"transactions" ffstruct:"BlockInfoJSONRPC"`
 }
@@ -277,6 +278,7 @@ func (b *BlockHeaderJSONRPC) ToBlockInfo(includeLogsBloom bool) *BlockInfoJSONRP
 		Hash:       b.Hash,
 		ParentHash: b.ParentHash,
 		Timestamp:  b.Timestamp,
+		GasLimit:   b.GasLimit,
 	}
 	if includeLogsBloom {
 		bi.LogsBloom = b.LogsBloom

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger/firefly-common/pkg/fftypes"
+	"github.com/hyperledger/firefly-evmconnect/mocks/ethblocklistenermocks"
 	"github.com/hyperledger/firefly-signer/pkg/abi"
 	"github.com/hyperledger/firefly-signer/pkg/ethsigner"
 	"github.com/hyperledger/firefly-signer/pkg/ethtypes"
@@ -71,6 +72,34 @@ func TestGasEstimateOK(t *testing.T) {
 	assert.Empty(t, reason)
 
 	assert.Equal(t, int64(18517) /* 1.5 uplift */, res.GasEstimate.Int64())
+
+}
+
+func TestGasEstimateAboveBlockLimit(t *testing.T) {
+
+	ctx, c, mRPC, done := newTestConnector(t)
+	defer done()
+
+	mbl := ethblocklistenermocks.NewBlockListener(t)
+	mbl.On("GetBlockGasLimit").Return(ethtypes.NewHexInteger64(1000))
+	mbl.On("WaitClosed").Return()
+	c.blockListener = mbl
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_estimateGas",
+		mock.MatchedBy(func(tx *ethsigner.Transaction) bool {
+			return true
+		})).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			args[1].(*ethtypes.HexInteger).BigInt().SetString("12345", 10)
+		})
+
+	var req ffcapi.TransactionInput
+	err := json.Unmarshal([]byte(sampleGasEstimate), &req)
+	assert.NoError(t, err)
+	_, reason, err := c.GasEstimate(ctx, &req)
+	assert.Regexp(t, "FF23071", err)
+	assert.Empty(t, reason)
 
 }
 
@@ -285,4 +314,3 @@ func TestGasEstimateFailCustomErrorCannotParse(t *testing.T) {
 	assert.Nil(t, res)
 
 }
-
