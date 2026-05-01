@@ -90,6 +90,19 @@ func (c *ethConnector) gasEstimate(ctx context.Context, tx *ethsigner.Transactio
 	// Multiply the gas estimate by the configured factor
 	fGasEstimate := new(big.Float).SetInt(gasEstimate.BigInt())
 	_ = fGasEstimate.Mul(fGasEstimate, c.gasEstimationFactor)
-	_, _ = fGasEstimate.Int(gasEstimate.BigInt())
-	return &gasEstimate, "", nil
+	scaledLimit, _ := fGasEstimate.Int(nil)
+
+	// If the gas estimate is larger than the maximum gas limit on the block, then we fail at this
+	// early stage. Because otherwise we'll accept the transaction in, but fail to actually submit
+	// it to the mempool of the blockchain. It's odd that the default configuration of chains (Besu inc.)
+	// allow the gas estimate max to be so much higher than the block max - but they do.
+	if c.blockListener != nil {
+		gasLimit := c.blockListener.GetBlockGasLimit()
+		if gasLimit != nil && gasLimit.BigInt().Cmp(scaledLimit) < 0 {
+			return nil, "", i18n.NewError(ctx, msgs.MsgTransactionEstimateTooLargeForBlock,
+				scaledLimit.String(), c.gasEstimationFactor, gasEstimate.BigInt().String(), gasLimit.BigInt().String())
+		}
+	}
+
+	return (*ethtypes.HexInteger)(scaledLimit), "", nil
 }

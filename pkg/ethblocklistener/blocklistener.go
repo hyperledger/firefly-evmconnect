@@ -74,6 +74,7 @@ type BlockListener interface {
 	AddConsumer(ctx context.Context, c *BlockUpdateConsumer)
 	RemoveConsumer(ctx context.Context, id *fftypes.UUID)
 	GetHighestBlock(ctx context.Context) (uint64, bool)
+	GetBlockGasLimit() *ethtypes.HexInteger // nil if unknown
 	GetBlockInfoByNumber(ctx context.Context, blockNumber uint64, allowCache bool, expectedParentHashStr string, expectedBlockHashStr string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetBlockInfoByHash(ctx context.Context, hash0xString string) (*ethrpc.BlockInfoJSONRPC, error)
 	GetEVMBlockWithTxHashesByHash(ctx context.Context, hash0xString string) (b *ethrpc.EVMBlockWithTxHashesJSONRPC, err error)
@@ -124,10 +125,11 @@ type blockListener struct {
 	BlockListenerConfig
 
 	//  canonical chain
-	canonicalChainLock sync.RWMutex // covers highestBlock and canonicalChain
-	canonicalChain     *list.List
-	highestBlockSet    bool
-	highestBlock       uint64
+	canonicalChainLock   sync.RWMutex // covers highestBlock and canonicalChain
+	canonicalChain       *list.List
+	highestBlockSet      bool
+	highestBlock         uint64
+	highestBlockGasLimit *ethtypes.HexInteger
 
 	// headBlockNumber mode: last head value sent on the block listener channel (only written from listenLoop)
 	currentChainHead uint64
@@ -424,7 +426,7 @@ func (bl *blockListener) reconcileCanonicalChain(bi *ethrpc.BlockInfoJSONRPC) *l
 	bl.canonicalChainLock.Lock()
 	defer bl.canonicalChainLock.Unlock()
 
-	bl.checkAndSetHighestBlock(bi.Number.Uint64())
+	bl.checkAndSetHighestBlock(bi.Number.Uint64(), bi.GasLimit)
 
 	// Find the position of this block in the block sequence
 	pos := bl.canonicalChain.Back()
@@ -553,7 +555,7 @@ func (bl *blockListener) rebuildCanonicalChain() *list.Element {
 			notifyPos = newElem
 		}
 
-		bl.checkAndSetHighestBlock(bi.Number.Uint64())
+		bl.checkAndSetHighestBlock(bi.Number.Uint64(), bi.GasLimit)
 
 	}
 	return notifyPos
@@ -665,6 +667,13 @@ func (bl *blockListener) GetHighestBlock(ctx context.Context) (uint64, bool) {
 	return highestBlock, true
 }
 
+// Gives a non-nil value only if the block listener is tracking the head and has access to the full block
+func (bl *blockListener) GetBlockGasLimit() *ethtypes.HexInteger {
+	bl.canonicalChainLock.RLock()
+	defer bl.canonicalChainLock.RUnlock()
+	return bl.highestBlockGasLimit
+}
+
 func (bl *blockListener) GetHeadBlockNumber(_ context.Context) uint64 {
 	return bl.currentChainHead
 }
@@ -677,10 +686,13 @@ func (bl *blockListener) setHighestBlock(block uint64) {
 }
 
 // Caller MUST hold the canonicalChain WRITE LOCK
-func (bl *blockListener) checkAndSetHighestBlock(block uint64) {
+func (bl *blockListener) checkAndSetHighestBlock(block uint64, blockGasLimit *ethtypes.HexInteger) {
 	if block > bl.highestBlock {
 		bl.highestBlock = block
 		bl.highestBlockSet = true
+		if blockGasLimit != nil && blockGasLimit.BigInt().Sign() > 0 {
+			bl.highestBlockGasLimit = blockGasLimit
+		}
 	}
 }
 

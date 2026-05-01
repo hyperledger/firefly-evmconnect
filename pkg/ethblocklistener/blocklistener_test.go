@@ -219,6 +219,7 @@ func TestBlockListenerOKSequential(t *testing.T) {
 				Number:     1003,
 				Hash:       block1003Hash,
 				ParentHash: block1002Hash,
+				GasLimit:   ethtypes.NewHexInteger64(10000),
 			}}
 		})
 	})
@@ -252,6 +253,8 @@ func TestBlockListenerOKSequential(t *testing.T) {
 	mRPC.AssertExpectations(t)
 
 	assert.Len(t, bl.SnapshotMonitoredHeadChain(), bl.MonitoredHeadLength)
+
+	require.Equal(t, int64(10000), bl.GetBlockGasLimit().Int64())
 
 }
 

@@ -88,4 +88,5 @@ var (
 	MsgReturnedBlockHashMismatch                = ffe("FF23068", "Returned block %d hash %s does not match requested hash %s")
 	MsgInvalidChainTrackingMode                 = ffe("FF23069", "Invalid chain tracking mode '%s': must be 'light' or 'full'")
 	MsgTransactionNotIncludedInChainHead        = ffe("FF23070", "Transaction '%s' cannot be reconciled because chain head %d is before receipt block %s")
+	MsgTransactionEstimateTooLargeForBlock      = ffe("FF23071", "Gas estimate %s (scaled at %.2f from estimate %s) too large for the current block gas limit %s")
 )
