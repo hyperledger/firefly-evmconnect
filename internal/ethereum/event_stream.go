@@ -301,8 +301,9 @@ func (es *eventStream) leadGroupCatchup() bool {
 		}
 		log.L(es.ctx).Infof("Stream catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
 
-		// The poll position never enters the unstable window, so the HWM for the restart
-		// checkpoint is simply the next block to poll
+		// toBlock is already capped at pollableHead above, so the next-to-poll position never
+		// itself marks an unstable block as done - no separate clamp is needed here (unlike the
+		// steady-state loops, whose toBlock intentionally scans past the safe point)
 		hwmBlock := toBlock + 1
 
 		// Dispatch the events
@@ -376,7 +377,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Check we're not outside of the steady state window, and need to fall back to
-				// catchup mode. Catchup only polls up to the stability horizon (checkpointBlockGap
+				// catchup mode. Catchup only polls up to the safe point (checkpointBlockGap
 				// behind the head), so we measure against the same point - the two loops can never
 				// disagree and bounce control between each other.
 				chainHeadBlock, _ := es.c.blockListener.GetHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
