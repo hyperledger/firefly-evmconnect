@@ -144,6 +144,10 @@ func NewEthereumConnectorWithRPC(ctx context.Context, conf config.Section, rpc e
 	c.retry.Factor = withDeprecatedConfFallback(conf, conf.GetFloat64, DeprecatedRetryFactor, RetryFactor)
 	c.retry.MaximumDelay = withDeprecatedConfFallback(conf, conf.GetDuration, DeprecatedRetryMaxDelay, RetryMaxDelay)
 
+	if c.catchupPageSize < 1 {
+		return nil, i18n.NewError(ctx, msgs.MsgCatchupPageSizeInvalid, c.catchupPageSize)
+	}
+
 	if c.catchupThreshold < c.catchupPageSize {
 		log.L(ctx).Warnf("Catchup threshold %d must be at least as large as the catchup page size %d (overridden to %d)", c.catchupThreshold, c.catchupPageSize, c.catchupPageSize)
 		c.catchupThreshold = c.catchupPageSize

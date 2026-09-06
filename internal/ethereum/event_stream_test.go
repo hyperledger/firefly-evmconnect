@@ -1689,6 +1689,23 @@ func TestLeadGroupGetLogsResetsPollStateOnListenerChange(t *testing.T) {
 	assert.Equal(t, int64(995), l1.getHWMBlock())
 }
 
+func TestStoreHeadBlockForwardNeverRegresses(t *testing.T) {
+
+	es := &eventStream{}
+	es.headBlock.Store(500)
+
+	// A full-mode re-org rewind can compute a hwmBlock behind the value already stored - it
+	// must be ignored, or a listener in individual catchup already past 500 would stall
+	es.storeHeadBlockForward(400)
+	assert.Equal(t, int64(500), es.headBlock.Load())
+
+	es.storeHeadBlockForward(600)
+	assert.Equal(t, int64(600), es.headBlock.Load())
+
+	es.storeHeadBlockForward(600)
+	assert.Equal(t, int64(600), es.headBlock.Load())
+}
+
 func TestStreamLoopClientModeUsesGetLogsNotNewFilter(t *testing.T) {
 
 	es, _, mRPC, mbl, cancelCtx, done := testGetLogsModeStream(t, 995)

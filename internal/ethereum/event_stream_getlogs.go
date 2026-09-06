@@ -339,8 +339,10 @@ func (es *eventStream) leadGroupSteadyStateGetLogs() bool {
 					return true
 				}
 
-				// Update the head block to be the hwm block
-				es.headBlock.Store(hwmBlock)
+				// Update the head block to be the hwm block - a full-mode re-org rewind can
+				// otherwise pull this backward, briefly stalling any other listener whose
+				// individual catchup had already advanced past the old value (see catchupCeiling)
+				es.storeHeadBlockForward(hwmBlock)
 
 				if lightMode {
 					// Record the block-versions we just delivered, advance the committed window

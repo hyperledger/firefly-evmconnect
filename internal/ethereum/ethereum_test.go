@@ -111,6 +111,10 @@ func TestConnectorInit(t *testing.T) {
 
 	conf.Set(EventsFilterPollingMode, string(FilterPollingModeClient))
 	conf.Set(WebSocketsEnabled, true)
+	conf.Set(EventsCatchupPageSize, 0)
+	_, err = NewEthereumConnector(context.Background(), conf)
+	assert.Regexp(t, "FF23079", err)
+
 	conf.Set(EventsCatchupThreshold, 1)
 	conf.Set(EventsCatchupPageSize, 500)
 	conf.Set(EventsCatchupDownscaleRegex, "Response size is larger.*error.")

@@ -208,6 +208,19 @@ func (es *eventStream) catchupCeiling() (int64, bool) {
 	return headBlock, headBlock >= 0
 }
 
+// storeHeadBlockForward advances the stream's head position, unless a re-org rewind has
+// momentarily pulled the new value behind where it already was - the position must never
+// regress, or a listener in individual catchup already past it would stall until it catches
+// back up (see catchupCeiling)
+func (es *eventStream) storeHeadBlockForward(newHeadBlock int64) {
+	for {
+		current := es.headBlock.Load()
+		if newHeadBlock <= current || es.headBlock.CompareAndSwap(current, newHeadBlock) {
+			return
+		}
+	}
+}
+
 func (es *eventStream) rejoinLeadGroup(l *listener) {
 	l.es.mux.Lock()
 	defer l.es.mux.Unlock()
@@ -433,7 +446,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			}
 
 			// Update the head block to be the hwm block
-			es.headBlock.Store(hwmBlock)
+			es.storeHeadBlockForward(hwmBlock)
 		}
 
 		// Reset failure count if we reach here
