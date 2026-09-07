@@ -148,14 +148,12 @@ func blockHashInHeadChain(headChain []*ethrpc.BlockInfoJSONRPC, blockNumber int6
 	return nil
 }
 
-// steadyStateScanCeiling returns the highest block the steady-state scan is allowed to poll to.
-// Both modes poll all the way to the head, but in full mode we must never pass a block above the
-// safe point that the canonical view does not cover: the hashes recorded from the snapshot
-// at scan time are what checkReorgRewind compares on later cycles, and a block scanned without a
-// recorded hash could never be invalidated. The view is contiguous and sized to the
-// checkpointBlockGap, so in steady operation its top IS the head (the head number itself comes
-// from reconciled blocks) and this ceiling never binds - it holds the scan back only while the
-// view is back-filling, such as at startup when it is seeded with a single anchor block.
+// steadyStateScanCeiling returns the highest block the steady-state scan may poll to.
+// Light mode always scans to chainHead. Full mode scans to min(chainHead, snapshotTop),
+// but never above the safe point unless the block listener snapshot already covers that block -
+// checkReorgRewind needs the hash from the snapshot taken before eth_getLogs.
+// In normal operation the snapshot reaches the head (backfilled at startup), so this rarely binds.
+// it only holds the scan back while the snapshot is still catching up, e.g. when startup backfill failed.
 func steadyStateScanCeiling(lightMode bool, chainHead, stableHead int64, headChain []*ethrpc.BlockInfoJSONRPC) int64 {
 	if lightMode {
 		return chainHead

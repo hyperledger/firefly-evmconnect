@@ -142,13 +142,14 @@ func mockSeedBlockNotFoundMaybe(mRPC *rpcbackendmocks.Backend, seedHeight uint64
 	return mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexNumber(seedHeight), false).Return(nil).Maybe()
 }
 
-// mockSeedBlock mocks eth_getBlockByNumber at height returning a block with the given hash.
-func mockSeedBlock(mRPC *rpcbackendmocks.Backend, height uint64, hash ethtypes.HexBytes0xPrefix) *mock.Call {
+// mockSeedBlock mocks eth_getBlockByNumber at height returning a block with the given hash and parent hash.
+func mockSeedBlock(mRPC *rpcbackendmocks.Backend, height uint64, hash, parentHash ethtypes.HexBytes0xPrefix) *mock.Call {
 	return mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getBlockByNumber", hexNumber(height), false).Return(nil).Run(func(args mock.Arguments) {
 		*args[1].(**ethrpc.EVMBlockWithTxHashesJSONRPC) = &ethrpc.EVMBlockWithTxHashesJSONRPC{
 			BlockHeaderJSONRPC: ethrpc.BlockHeaderJSONRPC{
-				Number: ethtypes.HexUint64(height),
-				Hash:   hash,
+				Number:     ethtypes.HexUint64(height),
+				Hash:       hash,
+				ParentHash: parentHash,
 			},
 		}
 	})
@@ -296,12 +297,35 @@ func TestBlockListenerStartGettingHighestBlockFailBeforeStop(t *testing.T) {
 	mRPC.AssertExpectations(t)
 }
 
+// testBlockChain builds a run of blocks from fromBlock to toBlock (inclusive), each correctly
+// chained to its predecessor's hash via ParentHash, for tests exercising seedMonitoredHead's
+// multi-block backfill.
+func testBlockChain(fromBlock, toBlock uint64) map[uint64]ethtypes.HexBytes0xPrefix {
+	hashes := make(map[uint64]ethtypes.HexBytes0xPrefix, toBlock-fromBlock+1)
+	for b := fromBlock; b <= toBlock; b++ {
+		hashes[b] = testBlockHashFor(b)
+	}
+	return hashes
+}
+
+func mockSeedBlockChain(mRPC *rpcbackendmocks.Backend, hashes map[uint64]ethtypes.HexBytes0xPrefix, fromBlock, toBlock uint64) {
+	for b := fromBlock; b <= toBlock; b++ {
+		var parentHash ethtypes.HexBytes0xPrefix
+		if b > fromBlock {
+			parentHash = hashes[b-1]
+		}
+		mockSeedBlock(mRPC, b, hashes[b], parentHash).Once()
+	}
+}
+
 func TestBlockListenerSeedMonitoredHead_BlockFound(t *testing.T) {
-	block951Hash := testBlockHashFor(951)
+	// window is [998,1000] - 998 and 999 are backfilled internally (silently reconciled), and
+	// 1000 (highestBlock) is fetched and returned for the caller to reconcile as before
+	hashes := testBlockChain(998, 1000)
 
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, _ context.CancelFunc) {
-		conf.MonitoredHeadLength = 50 // seed at block 1000-50+1 = 951
-		mockSeedBlock(mRPC, 951, block951Hash).Once()
+		conf.MonitoredHeadLength = 3 // seed window is 1000-3+1 = 998
+		mockSeedBlockChain(mRPC, hashes, 998, 1000)
 	})
 	defer done()
 
@@ -313,20 +337,29 @@ func TestBlockListenerSeedMonitoredHead_BlockFound(t *testing.T) {
 	bi := bl.seedMonitoredHead()
 
 	require.NotNil(t, bi)
-	assert.Equal(t, uint64(951), bi.Number.Uint64())
-	assert.Equal(t, block951Hash, bi.Hash)
+	assert.Equal(t, uint64(1000), bi.Number.Uint64())
+	assert.Equal(t, hashes[1000], bi.Hash)
+
+	// 998 and 999 were backfilled into the canonical chain view before this call returned
+	view := bl.SnapshotMonitoredHeadChain()
+	require.Len(t, view, 2)
+	assert.Equal(t, uint64(998), view[0].Number.Uint64())
+	assert.Equal(t, uint64(999), view[1].Number.Uint64())
+
 	mRPC.AssertExpectations(t)
 }
 
 func TestBlockListenerSeedMonitoredHead_ReconcileAndDispatch(t *testing.T) {
-	block951Hash := testBlockHashFor(951)
+	// window is [998,1000] - only the final block (1000) generates a consumer notification,
+	// since 998 and 999 are backfilled silently before the listen loop's first iteration
+	hashes := testBlockChain(998, 1000)
 
 	_, bl, mRPC, done := newTestBlockListener(t, func(conf *BlockListenerConfig, mRPC *rpcbackendmocks.Backend, cancelCtx context.CancelFunc) {
 		conf.BlockPollingInterval = shortDelay
-		conf.MonitoredHeadLength = 50 // seed at block 1000-50+1 = 951
+		conf.MonitoredHeadLength = 3 // seed window is 1000-3+1 = 998
 
 		mockInitialBlockHeight(mRPC, 1000)
-		mockSeedBlock(mRPC, 951, block951Hash).Once()
+		mockSeedBlockChain(mRPC, hashes, 998, 1000)
 		mockNewBlockFilter(mRPC, testBlockFilterID1).Once()
 		mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", testBlockFilterID1).Return(nil).Run(func(args mock.Arguments) {
 			*args[1].(*[]ethtypes.HexBytes0xPrefix) = nil
@@ -345,7 +378,7 @@ func TestBlockListenerSeedMonitoredHead_ReconcileAndDispatch(t *testing.T) {
 	bl.checkAndStartListenerLoop()
 
 	ev := <-updates
-	assert.Equal(t, []string{block951Hash.String()}, ev.BlockHashes)
+	assert.Equal(t, []string{hashes[1000].String()}, ev.BlockHashes)
 
 	bl.WaitClosed()
 	mRPC.AssertExpectations(t)
