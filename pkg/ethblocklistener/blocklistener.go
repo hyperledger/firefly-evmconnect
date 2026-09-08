@@ -237,6 +237,8 @@ func (bl *blockListener) seedMonitoredHead() *ethrpc.BlockInfoJSONRPC {
 		bl.reconcileCanonicalChain(bi)
 	}
 
+	// the last block is still returned for the listen loop's first iteration to reconcile as before
+	// preserving existing notification timing
 	bi := fetchBlock(highestBlock)
 	if bi == nil {
 		return nil
