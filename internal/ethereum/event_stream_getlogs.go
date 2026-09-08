@@ -150,7 +150,7 @@ func blockHashInHeadChain(headChain []*ethrpc.BlockInfoJSONRPC, blockNumber int6
 
 // steadyStateScanCeiling returns the highest block the steady-state scan may poll to.
 // Light mode always scans to chainHead. Full mode scans to min(chainHead, snapshotTop),
-// but never above the safe point unless the block listener snapshot already covers that block -
+// but never above the stable threshold unless the block listener snapshot already covers that block -
 // checkReorgRewind needs the hash from the snapshot taken before eth_getLogs.
 // In normal operation the snapshot reaches the head (backfilled at startup), so this rarely binds.
 // it only holds the scan back while the snapshot is still catching up, e.g. when startup backfill failed.
