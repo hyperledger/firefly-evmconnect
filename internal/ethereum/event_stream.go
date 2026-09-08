@@ -213,6 +213,10 @@ func (es *eventStream) catchupCeiling() (int64, bool) {
 // regress, or a listener in individual catchup already past it would stall until it catches
 // back up (see catchupCeiling)
 func (es *eventStream) storeHeadBlockForward(newHeadBlock int64) {
+	// headBlock is atomic so lead-group dispatch and listener catchup can update it without
+	// taking the stream lock. CompareAndSwap(current, new) only succeeds if nobody else changed
+	// it since Load. On failure another writer won the race, so reload and retry. The loop is
+	// not a wait: it only spins on concurrent updates. We never store a lower value.
 	for {
 		current := es.headBlock.Load()
 		if newHeadBlock <= current || es.headBlock.CompareAndSwap(current, newHeadBlock) {
@@ -316,7 +320,7 @@ func (es *eventStream) leadGroupCatchup() bool {
 
 		// toBlock is already capped at pollableHead above, so the next-to-poll position never
 		// itself marks an unstable block as done - no separate clamp is needed here (unlike the
-		// steady-state loops, whose toBlock intentionally scans past the safe point)
+		// steady-state loops, whose toBlock intentionally scans past the stable threshold)
 		hwmBlock := toBlock + 1
 
 		// Dispatch the events
@@ -390,7 +394,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Check we're not outside of the steady state window, and need to fall back to
-				// catchup mode. Catchup only polls up to the safe point (checkpointBlockGap
+				// catchup mode. Catchup only polls up to the stable threshold (checkpointBlockGap
 				// behind the head), so we measure against the same point - the two loops can never
 				// disagree and bounce control between each other.
 				chainHeadBlock, _ := es.c.blockListener.GetHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
@@ -498,8 +502,8 @@ func (es *eventStream) preStartProcessing() {
 		}
 	}
 	if headBlock < 0 || headBlock > safeHead {
-		// Either there were no initial listeners, or they are all ahead of the safe point. Either way
-		// the head position is the safe point, so that listeners added later are classified against a
+		// Either there were no initial listeners, or they are all ahead of the stable threshold. Either way
+		// the head position is the stable threshold, so that listeners added later are classified against a
 		// real head position (a listener started while headBlock is unestablished is held in catchup -
 		// see checkReadyForLeadPackOrRemoved)
 		headBlock = safeHead
