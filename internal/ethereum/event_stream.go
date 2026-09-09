@@ -213,13 +213,12 @@ func (es *eventStream) catchupCeiling() (int64, bool) {
 // regress, or a listener in individual catchup already past it would stall until it catches
 // back up (see catchupCeiling)
 func (es *eventStream) storeHeadBlockForward(newHeadBlock int64) {
-	// headBlock is atomic so lead-group dispatch and listener catchup can update it without
-	// taking the stream lock. CompareAndSwap(current, new) only succeeds if nobody else changed
-	// it since Load. On failure another writer won the race, so reload and retry. The loop is
-	// not a wait: it only spins on concurrent updates. We never store a lower value.
+	// We do an optimistic locking update via an atomic integer (rather than using mutex)
 	for {
+		// Snapshot the current value
 		current := es.headBlock.Load()
-		if newHeadBlock <= current || es.headBlock.CompareAndSwap(current, newHeadBlock) {
+		if newHeadBlock <= current || // If the current value is behind the new head, leave it unchanged
+			es.headBlock.CompareAndSwap(current, newHeadBlock) { // Otherwise attempt to update it, but if the value changed beneath us go round again
 			return
 		}
 	}
