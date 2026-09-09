@@ -208,6 +208,22 @@ func (es *eventStream) catchupCeiling() (int64, bool) {
 	return headBlock, headBlock >= 0
 }
 
+// storeHeadBlockForward advances the stream's head position, unless a re-org rewind has
+// momentarily pulled the new value behind where it already was - the position must never
+// regress, or a listener in individual catchup already past it would stall until it catches
+// back up (see catchupCeiling)
+func (es *eventStream) storeHeadBlockForward(newHeadBlock int64) {
+	// We do an optimistic locking update via an atomic integer (rather than using mutex)
+	for {
+		// Snapshot the current value
+		current := es.headBlock.Load()
+		if newHeadBlock <= current || // If the current value is behind the new head, leave it unchanged
+			es.headBlock.CompareAndSwap(current, newHeadBlock) { // Otherwise attempt to update it, but if the value changed beneath us go round again
+			return
+		}
+	}
+}
+
 func (es *eventStream) rejoinLeadGroup(l *listener) {
 	l.es.mux.Lock()
 	defer l.es.mux.Unlock()
@@ -301,8 +317,9 @@ func (es *eventStream) leadGroupCatchup() bool {
 		}
 		log.L(es.ctx).Infof("Stream catchup fromBlock=%d toBlock=%d headBlock=%d events=%d listeners=%d", fromBlock, toBlock, chainHeadBlock, len(events), len(ag.listeners))
 
-		// The poll position never enters the unstable window, so the HWM for the restart
-		// checkpoint is simply the next block to poll
+		// toBlock is already capped at pollableHead above, so the next-to-poll position never
+		// itself marks an unstable block as done - no separate clamp is needed here (unlike the
+		// steady-state loops, whose toBlock intentionally scans past the stable threshold)
 		hwmBlock := toBlock + 1
 
 		// Dispatch the events
@@ -376,7 +393,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 				}
 
 				// Check we're not outside of the steady state window, and need to fall back to
-				// catchup mode. Catchup only polls up to the stability horizon (checkpointBlockGap
+				// catchup mode. Catchup only polls up to the stable threshold (checkpointBlockGap
 				// behind the head), so we measure against the same point - the two loops can never
 				// disagree and bounce control between each other.
 				chainHeadBlock, _ := es.c.blockListener.GetHighestBlock(es.ctx) /* note we know we're initialized here and will not block */
@@ -432,7 +449,7 @@ func (es *eventStream) leadGroupSteadyState() bool {
 			}
 
 			// Update the head block to be the hwm block
-			es.headBlock.Store(hwmBlock)
+			es.storeHeadBlockForward(hwmBlock)
 		}
 
 		// Reset failure count if we reach here
@@ -484,8 +501,8 @@ func (es *eventStream) preStartProcessing() {
 		}
 	}
 	if headBlock < 0 || headBlock > safeHead {
-		// Either there were no initial listeners, or they are all ahead of the safe point. Either way
-		// the head position is the safe point, so that listeners added later are classified against a
+		// Either there were no initial listeners, or they are all ahead of the stable threshold. Either way
+		// the head position is the stable threshold, so that listeners added later are classified against a
 		// real head position (a listener started while headBlock is unestablished is held in catchup -
 		// see checkReadyForLeadPackOrRemoved)
 		headBlock = safeHead

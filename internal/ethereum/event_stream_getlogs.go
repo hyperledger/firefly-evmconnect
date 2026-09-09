@@ -64,7 +64,7 @@ func (ps *getLogsPollState) filterDelivered(logs []*ethrpc.LogJSONRPC) []*ethrpc
 
 // advanceRescan moves the light mode poll state forwards after successfully dispatching a page:
 // the newly delivered block-versions are recorded for de-duplication on later sweeps, the
-// committed window base moves to newBase (capped at the stability horizon), records for blocks
+// committed window base moves to newBase (capped at the stable threshold), records for blocks
 // that have become stable are dropped (they are never re-scanned), and the sweep cursor either
 // pages onwards or resets ready to re-scan the whole window on the next cycle.
 func (ps *getLogsPollState) advanceRescan(newLogs []*ethrpc.LogJSONRPC, newBase, toBlock, chainHead int64) {
@@ -148,14 +148,12 @@ func blockHashInHeadChain(headChain []*ethrpc.BlockInfoJSONRPC, blockNumber int6
 	return nil
 }
 
-// steadyStateScanCeiling returns the highest block the steady-state scan is allowed to poll to.
-// Both modes poll all the way to the head, but in full mode we must never pass a block above the
-// stability horizon that the canonical view does not cover: the hashes recorded from the snapshot
-// at scan time are what checkReorgRewind compares on later cycles, and a block scanned without a
-// recorded hash could never be invalidated. The view is contiguous and sized to the
-// checkpointBlockGap, so in steady operation its top IS the head (the head number itself comes
-// from reconciled blocks) and this ceiling never binds - it holds the scan back only while the
-// view is back-filling, such as at startup when it is seeded with a single anchor block.
+// steadyStateScanCeiling returns the highest block the steady-state scan may poll to.
+// Light mode always scans to chainHead. Full mode scans to min(chainHead, snapshotTop),
+// but never above the stable threshold unless the block listener snapshot already covers that block -
+// checkReorgRewind needs the hash from the snapshot taken before eth_getLogs.
+// In normal operation the snapshot reaches the head (backfilled at startup), so this rarely binds.
+// it only holds the scan back while the snapshot is still catching up, e.g. when startup backfill failed.
 func steadyStateScanCeiling(lightMode bool, chainHead, stableHead int64, headChain []*ethrpc.BlockInfoJSONRPC) int64 {
 	if lightMode {
 		return chainHead
@@ -257,7 +255,7 @@ func (es *eventStream) leadGroupSteadyStateGetLogs() bool {
 				poll.reset(fromBlock)
 			}
 
-			// The stability horizon is the point checkpointBlockGap behind the head, below which
+			// The stable threshold is checkpointBlockGap behind the head, below which
 			// re-orgs are not expected
 			stableHead := chainHead - es.c.checkpointBlockGap
 			if stableHead < 0 {
@@ -265,7 +263,7 @@ func (es *eventStream) leadGroupSteadyStateGetLogs() bool {
 			}
 
 			// Check we're not outside of the steady state window, and need to fall back to catchup
-			// mode. Catchup only polls up to the stability horizon, so we measure against the same
+			// mode. Catchup only polls up to the stable threshold, so we measure against the same
 			// point - the two loops can never disagree and bounce control between each other.
 			if (stableHead - poll.fromBlock) > es.c.catchupThreshold {
 				log.L(es.ctx).Warnf("Block gap reached %d (above threshold of %d) - reverting to catchup mode", stableHead-poll.fromBlock, es.c.catchupThreshold)
@@ -279,7 +277,7 @@ func (es *eventStream) leadGroupSteadyStateGetLogs() bool {
 			// In light chain tracking mode there is no canonical chain view to check against, so
 			// instead we re-scan the whole unstable window on every sweep, de-duplicating what we
 			// already delivered by block hash - the committed position (poll.fromBlock) only ever
-			// advances to the stability horizon, and the sweep cursor pages beyond it to the head
+			// advances to the stable threshold, and the sweep cursor pages beyond it to the head
 			lightMode := es.c.chainTrackingMode == ffcapi.ChainTrackingModeLight
 			var headChain []*ethrpc.BlockInfoJSONRPC
 			scanFrom := poll.fromBlock
@@ -319,7 +317,7 @@ func (es *eventStream) leadGroupSteadyStateGetLogs() bool {
 					continue
 				}
 
-				// High water mark for the restart checkpoint is min(scan position, stability horizon):
+				// High water mark for the restart checkpoint is min(scan position, stable threshold):
 				// the scan runs to the head, but blocks in the unstable window can still change and the
 				// re-org repair state (recorded hashes / delivered blocks) is in-memory only, so the
 				// checkpoint holds at the horizon and a restart re-scans the window (redelivery is
@@ -339,8 +337,10 @@ func (es *eventStream) leadGroupSteadyStateGetLogs() bool {
 					return true
 				}
 
-				// Update the head block to be the hwm block
-				es.headBlock.Store(hwmBlock)
+				// Update the head block to be the hwm block - a full-mode re-org rewind can
+				// otherwise pull this backward, briefly stalling any other listener whose
+				// individual catchup had already advanced past the old value (see catchupCeiling)
+				es.storeHeadBlockForward(hwmBlock)
 
 				if lightMode {
 					// Record the block-versions we just delivered, advance the committed window

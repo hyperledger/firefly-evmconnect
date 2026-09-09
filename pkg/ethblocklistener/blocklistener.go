@@ -161,7 +161,7 @@ func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListen
 		isStarted:                     false,
 		startDone:                     make(chan struct{}),
 		initialBlockHeightObtained:    make(chan struct{}),
-		newHeadsTap:                   make(chan struct{}),
+		newHeadsTap:                   make(chan struct{}, 1), // buffer 1 so a tap is not dropped if the listen loop is not currently waiting
 		highestBlockSet:               false,
 		highestBlock:                  0,
 		currentChainHead:              0,
@@ -191,16 +191,23 @@ func (bl *blockListener) GetMonitoredHeadLength() int {
 	return bl.BlockListenerConfig.MonitoredHeadLength
 }
 
-// seedMonitoredHead fetches the single anchor block at highestBlock-MonitoredHeadLength+1.
-// The returned block is used by the listen loop to seed the canonical chain on the first
-// iteration via reconcileCanonicalChain, so that the chain is populated before the first
-// filter poll and confirmations can be delivered as soon as they arrive.
+// seedMonitoredHead backfills the whole monitored window, from highestBlock-MonitoredHeadLength+1
+// up to highestBlock, before the listen loop's first iteration. Without this, the window would
+// otherwise only reach full length as new blocks arrive on the live block filter created just
+// after this returns - one block at a time, paced by real chain block production rather than by
+// polling interval. On a chain with slow block times that leaves full chain-tracking mode's
+// client-side getLogs polling (steadyStateScanCeiling) holding its scan back for a long time
+// right after startup, while confirmations and re-org repair for that whole window are unavailable.
+//
+// The last (highestBlock itself) is always fetched and returned for the listen loop to reconcile on
+// its first iteration.
 func (bl *blockListener) seedMonitoredHead() *ethrpc.BlockInfoJSONRPC {
 	bl.canonicalChainLock.RLock()
 	highestBlockSet := bl.highestBlockSet
+	highestBlock := bl.highestBlock
 	startBlock := uint64(0)
-	if bl.highestBlock >= bl.monitoredHeadLength {
-		startBlock = bl.highestBlock - bl.monitoredHeadLength + 1
+	if highestBlock >= bl.monitoredHeadLength {
+		startBlock = highestBlock - bl.monitoredHeadLength + 1
 	}
 	bl.canonicalChainLock.RUnlock()
 
@@ -208,15 +215,35 @@ func (bl *blockListener) seedMonitoredHead() *ethrpc.BlockInfoJSONRPC {
 		return nil
 	}
 
-	var bi *ethrpc.BlockInfoJSONRPC
-	if err := bl.retry.Do(bl.ctx, "seed monitored head", func(_ int) (retry bool, err error) {
-		bi, err = bl.GetBlockInfoByNumber(bl.ctx, startBlock, false, "", "")
-		return err != nil, err
-	}); err != nil || bi == nil {
-		log.L(bl.ctx).Warnf("Failed to seed monitored head at block %d: %v", startBlock, err)
+	fetchBlock := func(blockNumber uint64) *ethrpc.BlockInfoJSONRPC {
+		var bi *ethrpc.BlockInfoJSONRPC
+		if err := bl.retry.Do(bl.ctx, "seed monitored head", func(_ int) (retry bool, err error) {
+			bi, err = bl.GetBlockInfoByNumber(bl.ctx, blockNumber, false, "", "")
+			return err != nil, err
+		}); err != nil || bi == nil {
+			log.L(bl.ctx).Warnf("Failed to seed monitored head at block %d: %v", blockNumber, err)
+			return nil
+		}
+		return bi
+	}
+
+	for blockNumber := startBlock; blockNumber < highestBlock; blockNumber++ {
+		bi := fetchBlock(blockNumber)
+		if bi == nil {
+			// Give up on the backfill and fall back to the original slow-fill behavior - the
+			// live filter will still extend the window forward from whatever it has reached
+			return nil
+		}
+		bl.reconcileCanonicalChain(bi)
+	}
+
+	// the last block is still returned for the listen loop's first iteration to reconcile as before
+	// preserving existing notification timing
+	bi := fetchBlock(highestBlock)
+	if bi == nil {
 		return nil
 	}
-	log.L(bl.ctx).Infof("Seeded monitored head at block %d", startBlock)
+	log.L(bl.ctx).Infof("Seeded monitored head from block %d to %d", startBlock, highestBlock)
 	return bi
 }
 

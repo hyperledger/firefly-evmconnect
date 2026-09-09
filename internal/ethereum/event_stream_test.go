@@ -1537,7 +1537,7 @@ func TestLeadGroupGetLogsPaginationAndHWMClamp(t *testing.T) {
 
 	mbl.On("GetHighestBlock", mock.Anything).Return(uint64(1000), true)
 	// The monitored view covers the whole unstable window (checkpointBlockGap 50 behind head
-	// 1000) - the scan may only pass blocks above the stability horizon that the view covers
+	// 1000) - the scan may only pass blocks above the safe point that the view covers
 	mbl.On("SnapshotMonitoredHeadChain").Return(testHeadChain(951, 1000, 1001 /* no fork */))
 
 	type pollRange struct{ from, to, hwmAtCall int64 }
@@ -1634,13 +1634,155 @@ func TestLeadGroupGetLogsReorgRewind(t *testing.T) {
 	assert.True(t, <-loopDone)
 }
 
+func TestLeadGroupGetLogsResetsPollStateOnListenerChange(t *testing.T) {
+
+	es, l1, mRPC, mbl, cancelCtx, done := testGetLogsModeStream(t, 995)
+	defer done()
+
+	mbl.On("GetHighestBlock", mock.Anything).Return(uint64(1000), true)
+	mbl.On("SnapshotMonitoredHeadChain").Return(testHeadChain(951, 1000, 1001 /* no fork */))
+
+	polls := make(chan []int64, 20)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		filter := args[3].(*ethrpc.LogFilterJSONRPC)
+		polls <- []int64{filter.FromBlock.BigInt().Int64(), filter.ToBlock.BigInt().Int64()}
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
+	})
+
+	loopDone := make(chan bool, 1)
+	go func() {
+		loopDone <- es.leadGroupSteadyStateGetLogs()
+	}()
+
+	assert.Equal(t, []int64{995, 1000}, <-polls)
+
+	// A new lead-group listener behind the in-memory poll position must reset that
+	// state. Otherwise we would stay at fromBlock 1001 and never scan its HWM.
+	// L1's stored HWM stays at 995 (moveHWMForwards never goes backwards), so the
+	// reset base is L2's 980.
+	l2ID := fftypes.NewUUID()
+	l2 := &listener{
+		id:       l2ID,
+		c:        es.c,
+		es:       es,
+		hwmBlock: 980,
+		config: listenerConfig{
+			filters: []*eventFilter{{}},
+		},
+	}
+	es.mux.Lock()
+	es.listeners[*l2ID] = l2
+	es.updateCount++
+	es.mux.Unlock()
+
+	p := <-polls
+	assert.Equal(t, []int64{980, 989}, p)
+
+	for p[1] < 1000 {
+		p = <-polls
+	}
+	es.removeEventListener(l2ID)
+	assert.Equal(t, []int64{995, 1000}, <-polls)
+
+	cancelCtx()
+	assert.True(t, <-loopDone)
+	assert.Equal(t, int64(995), l1.getHWMBlock())
+}
+
+func TestStoreHeadBlockForwardNeverRegresses(t *testing.T) {
+
+	es := &eventStream{}
+	es.headBlock.Store(500)
+
+	// A full-mode re-org rewind can compute a hwmBlock behind the value already stored - it
+	// must be ignored, or a listener in individual catchup already past 500 would stall
+	es.storeHeadBlockForward(400)
+	assert.Equal(t, int64(500), es.headBlock.Load())
+
+	es.storeHeadBlockForward(600)
+	assert.Equal(t, int64(600), es.headBlock.Load())
+
+	es.storeHeadBlockForward(600)
+	assert.Equal(t, int64(600), es.headBlock.Load())
+}
+
+func TestStreamLoopClientModeUsesGetLogsNotNewFilter(t *testing.T) {
+
+	es, _, mRPC, mbl, cancelCtx, done := testGetLogsModeStream(t, 995)
+	defer done()
+	es.c.eventFilterPollingMode = FilterPollingModeClient
+
+	mbl.On("GetHighestBlock", mock.Anything).Return(uint64(1000), true)
+	mbl.On("SnapshotMonitoredHeadChain").Return(testHeadChain(951, 1000, 1001 /* no fork */))
+
+	sawGetLogs := make(chan struct{}, 1)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
+		select {
+		case sawGetLogs <- struct{}{}:
+		default:
+		}
+	})
+
+	go es.streamLoop()
+
+	select {
+	case <-sawGetLogs:
+	case <-time.After(5 * time.Second):
+		t.Fatal("client mode streamLoop never called eth_getLogs")
+	}
+	mRPC.AssertNotCalled(t, "CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything)
+
+	cancelCtx()
+	<-es.streamLoopDone
+}
+
+func TestStreamLoopServerModeUsesNewFilter(t *testing.T) {
+
+	es, _, mRPC, mbl, cancelCtx, done := testGetLogsModeStream(t, 995)
+	defer done()
+	// Default eventFilterPollingMode is server (empty / FilterPollingModeServer)
+
+	mbl.On("GetHighestBlock", mock.Anything).Return(uint64(1000), true)
+
+	sawNewFilter := make(chan struct{}, 1)
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_newFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*string) = "filter1"
+		select {
+		case sawNewFilter <- struct{}{}:
+		default:
+		}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
+	})
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getFilterChanges", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{}
+	}).Maybe()
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_uninstallFilter", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*bool) = true
+	}).Maybe()
+
+	go es.streamLoop()
+
+	select {
+	case <-sawNewFilter:
+	case <-time.After(5 * time.Second):
+		t.Fatal("server mode streamLoop never called eth_newFilter")
+	}
+	mRPC.AssertNotCalled(t, "CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything)
+
+	cancelCtx()
+	<-es.streamLoopDone
+}
+
 func TestLeadGroupGetLogsFullModeHoldsAtViewCoverage(t *testing.T) {
 
 	es, l, mRPC, mbl, cancelCtx, done := testGetLogsModeStream(t, 960)
 	defer done()
 	es.c.checkpointBlockGap = 6
 
-	// The re-org repair for blocks above the stability horizon relies on the hashes
+	// The re-org repair for blocks above the safe point relies on the hashes
 	// recorded from the monitored view at scan time, so the scan must never pass a block above
 	// the horizon that the view does not cover. The view back-fills here in three stages:
 	// empty (startup, before the seed), covering the window base only, then the full window.
@@ -1685,7 +1827,7 @@ func TestLeadGroupGetLogsFullModeHoldsAtViewCoverage(t *testing.T) {
 		}
 	}
 
-	// With an empty view we page up to the stability horizon (994) and no further - blocks at or
+	// With an empty view we page up to the safe point (994) and no further - blocks at or
 	// below the horizon are stable by definition and need no recorded hash
 	assert.Equal(t, pollRange{from: 960, to: 969, hwmAtCall: 960}, readPoll("page 1"))
 	assert.Equal(t, pollRange{from: 970, to: 979, hwmAtCall: 970}, readPoll("page 2"))
@@ -1697,7 +1839,7 @@ func TestLeadGroupGetLogsFullModeHoldsAtViewCoverage(t *testing.T) {
 	assert.Equal(t, pollRange{from: 995, to: 996, hwmAtCall: 994}, readPoll("scan to view coverage"))
 
 	// The view completes to the head - the scan completes with it, and the HWM/checkpoint stays
-	// at the stability horizon throughout
+	// at the safe point throughout
 	setHeadChain(testHeadChain(995, 1000, 1001 /* no fork */))
 	assert.Equal(t, pollRange{from: 997, to: 1000, hwmAtCall: 994}, readPoll("scan to head"))
 
@@ -1775,7 +1917,7 @@ func TestGetLogsPollStateAdvanceRescan(t *testing.T) {
 	hash1000 := "0x00000000000000000000000000000000000000000000000000000000000003e8"
 
 	// A page mid-sweep: delivered block-versions are recorded, the committed base holds at the
-	// stability horizon, and the sweep cursor pages onwards without waiting
+	// safe point, and the sweep cursor pages onwards without waiting
 	ps := &getLogsPollState{fromBlock: 994, scanBlock: -1}
 	ps.advanceRescan([]*ethrpc.LogJSONRPC{testLog(995, hash995), testLog(996, hash996)}, 994, 996, 1000)
 	assert.Equal(t, int64(994), ps.fromBlock)
@@ -1792,7 +1934,7 @@ func TestGetLogsPollStateAdvanceRescan(t *testing.T) {
 	assert.Equal(t, int64(-1), ps.scanBlock)
 	assert.Len(t, ps.deliveredBlocks, 3)
 
-	// The chain grows and the committed base advances with the stability horizon - records for
+	// The chain grows and the committed base advances with the safe point - records for
 	// blocks that fall below the base are pruned (those blocks are stable, never re-scanned)
 	ps.advanceRescan(nil, 996, 1002, 1002)
 	assert.Equal(t, int64(996), ps.fromBlock)
@@ -1965,7 +2107,7 @@ func TestLeadGroupGetLogsLightModeRescansUnstableWindow(t *testing.T) {
 	}()
 
 	// Light mode pages all the way to the head just like full mode, but the committed position
-	// (and with it the HWM/checkpoint) holds at the stability horizon - checkpointBlockGap (6)
+	// (and with it the HWM/checkpoint) holds at the safe point - checkpointBlockGap (6)
 	// behind the head
 	expected := []pollRange{
 		{from: 960, to: 969, hwmAtCall: 960},
@@ -2108,7 +2250,7 @@ func TestLeadGroupGetLogsLightModeNoCatchupOscillation(t *testing.T) {
 	}()
 
 	// The raw gap to the head (1000-905=95) is over the catchup threshold (90), but the gap to
-	// the stability horizon that catchup would poll to (994-905=89) is not - we must measure the
+	// the safe point that catchup would poll to (994-905=89) is not - we must measure the
 	// same way and stay in steady state, or we would bounce between the two loops without making
 	// progress
 	assert.Equal(t, []int64{905, 914}, <-polls)
@@ -2223,7 +2365,7 @@ func TestLeadGroupGetLogsLightModeRescanDedupAndReorgRedetect(t *testing.T) {
 	assert.Equal(t, blockHashB, ev.Event.ID.BlockHash)
 	assert.Equal(t, fftypes.FFuint64(998), ev.Event.ID.BlockNumber)
 
-	// The committed position (and HWM/checkpoint) held at the stability horizon throughout
+	// The committed position (and HWM/checkpoint) held at the safe point throughout
 	assert.Equal(t, int64(994), l.getHWMBlock())
 
 	cancelCtx()
@@ -2388,7 +2530,7 @@ func TestLeadGroupGetLogsFullModeNoCatchupOscillation(t *testing.T) {
 	}()
 
 	// The raw gap to the head (1000-905=95) is over the catchup threshold (90), but catchup only
-	// polls to the stability horizon (950), which we are within the threshold of (45) - so it
+	// polls to the safe point (950), which we are within the threshold of (45) - so it
 	// would exit straight back to us without polling. We must measure the reversion check the
 	// same way and stay in steady state (still polling to the head - full mode delivers the
 	// unstable window with hash tracking), or the two loops would bounce control forever
@@ -2418,11 +2560,80 @@ func TestLeadGroupCatchupCapsAtStableHead(t *testing.T) {
 	// The gap to the pollable head (994-900=94) is over the catchup threshold (90), so catchup
 	// runs one page - but that page is capped at head-checkpointBlockGap (994) rather than
 	// running to fromBlock+catchupPageSize-1 (1399), so the unstable window is left for the
-	// steady state loop to deliver, and the HWM (994+1) follows the poll position exactly
+	// steady state loop to deliver. toBlock (994) was already fully scanned, so the HWM is the
+	// next block to poll (995) - it never re-marks 994 as pending, which would cause the
+	// steady-state loop to re-deliver any event landing exactly on the horizon block.
 	exited := es.leadGroupCatchup()
 	assert.False(t, exited)
 	assert.Equal(t, []int64{900, 994}, <-polls)
 	assert.Equal(t, int64(995), l.getHWMBlock())
+}
+
+func TestLeadGroupCatchupNoDuplicateAtStableHead(t *testing.T) {
+
+	es, l, mRPC, mbl, _, done := testGetLogsModeStream(t, 900)
+	defer done()
+	es.c.catchupThreshold = 90
+	es.c.catchupPageSize = 500
+	es.c.checkpointBlockGap = 6
+	es.c.chainID = "12345"
+	es.c.eventBlockTimestamps = false
+
+	// A real matchable event, so we can prove it is only ever delivered once
+	var eventABI *abi.Entry
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"anonymous": false,
+		"inputs": [],
+		"name": "Test",
+		"type": "event"
+	}`), &eventABI))
+	topic0, err := eventABI.SignatureHashCtx(context.Background())
+	require.NoError(t, err)
+	addr := ethtypes.MustNewAddress("0x112233445566778899aabbccddeeff0011223344")
+	l.config.filters[0] = &eventFilter{
+		Topic0:  topic0,
+		Address: addr,
+		Event:   eventABI,
+	}
+	l.config.options = &listenerOptions{}
+	l.ee = &eventEnricher{connector: es.c}
+
+	delivered := make(chan *ffcapi.ListenerEvent, 2)
+	es.events = delivered
+
+	mbl.On("GetHighestBlock", mock.Anything).Return(uint64(1000), true)
+
+	// A real event sitting exactly on the horizon block (994) that the page caps at
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getLogs", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args[1].(*[]*ethrpc.LogJSONRPC) = []*ethrpc.LogJSONRPC{
+			{
+				Address:          addr,
+				Topics:           []ethtypes.HexBytes0xPrefix{topic0},
+				Data:             []byte{},
+				BlockNumber:      ethtypes.HexUint64(994),
+				TransactionIndex: ethtypes.HexUint64(1),
+				LogIndex:         ethtypes.HexUint64(0),
+				BlockHash:        ethtypes.HexBytes0xPrefix{},
+			},
+		}
+	}).Once()
+
+	// leadGroupCatchup loops internally: having capped this page at 994 and dispatched its
+	// event, it must re-check readiness with fromBlock=995 (not 994), find itself caught up,
+	// and return without polling again - if the HWM were capped at 994 instead, this re-check
+	// would re-poll and re-dispatch the same event (no second eth_getLogs expectation is
+	// registered here, so that would fail the test)
+	exited := es.leadGroupCatchup()
+	assert.False(t, exited)
+	assert.Equal(t, int64(995), l.getHWMBlock())
+
+	select {
+	case ev := <-delivered:
+		assert.Equal(t, fftypes.FFuint64(994), ev.Event.ID.BlockNumber)
+	default:
+		t.Fatal("expected exactly one delivered event")
+	}
+	assert.Empty(t, delivered)
 }
 
 func TestLeadGroupCatchupCaughtUpToStableHead(t *testing.T) {
