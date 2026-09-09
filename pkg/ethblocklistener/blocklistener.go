@@ -161,7 +161,7 @@ func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListen
 		isStarted:                     false,
 		startDone:                     make(chan struct{}),
 		initialBlockHeightObtained:    make(chan struct{}),
-		newHeadsTap:                   make(chan struct{}),
+		newHeadsTap:                   make(chan struct{}, 1), // buffer 1 so a tap is not dropped if the listen loop is not currently waiting
 		highestBlockSet:               false,
 		highestBlock:                  0,
 		currentChainHead:              0,
