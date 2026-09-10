@@ -188,7 +188,7 @@ func NewBlockListener(ctx context.Context, retry *retry.Retry, conf *BlockListen
 }
 
 func (bl *blockListener) GetMonitoredHeadLength() int {
-	return bl.BlockListenerConfig.MonitoredHeadLength
+	return bl.MonitoredHeadLength
 }
 
 // seedMonitoredHead backfills the whole monitored window, from highestBlock-MonitoredHeadLength+1

@@ -55,11 +55,11 @@ const optSelfDescribing = "self-describing"
 const optPretty = "pretty"
 
 var jsonFormatOptionSupportedValues = map[string][]string{
-	"mode":    {optObject, optArray, optSelfDescribing},
-	"number":  {optString, optHex0x, optHex, optJSONNumber},
-	"bytes":   {optHex0x, optHex, optHexPlain, optBase64},
-	"address": {optHex0x, optHex, optHexPlain, optChecksum},
-	optPretty: {"true", "false"},
+	"mode":     {optObject, optArray, optSelfDescribing},
+	keyNumber:  {optString, optHex0x, optHex, optJSONNumber},
+	"bytes":    {optHex0x, optHex, optHexPlain, optBase64},
+	keyAddress: {optHex0x, optHex, optHexPlain, optChecksum},
+	optPretty:  {"true", "false"},
 }
 
 func unknownJSONFormatOptionNameError(ctx context.Context, option, value string) error {
@@ -124,7 +124,7 @@ func (jfo JSONFormatOptions) GetSerializerSet(ctx context.Context, skipErrors bo
 						return nil, unknownJSONFormatOptionValueError(ctx, option, v)
 					}
 				}
-			case "number":
+			case keyNumber:
 				switch strings.ToLower(v) {
 				case optString: // default
 					ss.Integer = abi.Base10StringIntSerializer
@@ -150,7 +150,7 @@ func (jfo JSONFormatOptions) GetSerializerSet(ctx context.Context, skipErrors bo
 						return nil, unknownJSONFormatOptionValueError(ctx, option, v)
 					}
 				}
-			case "address":
+			case keyAddress:
 				switch strings.ToLower(v) {
 				case optHex0x, optHex:
 					ss.Address = abi.HexAddrSerializer0xPrefix

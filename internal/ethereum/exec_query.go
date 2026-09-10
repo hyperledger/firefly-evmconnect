@@ -40,7 +40,7 @@ func (c *ethConnector) QueryInvoke(ctx context.Context, req *ffcapi.QueryInvokeR
 	}
 
 	// Parse the optional errors JSON spec, if available
-	errors, err := buildErrorsABI(ctx, req.TransactionInput.Errors)
+	errors, err := buildErrorsABI(ctx, req.Errors)
 	if err != nil {
 		return nil, ffcapi.ErrorReasonInvalidInputs, err
 	}

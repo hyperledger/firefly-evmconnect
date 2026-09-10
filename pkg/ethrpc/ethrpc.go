@@ -24,6 +24,16 @@ import (
 	"github.com/hyperledger-firefly/signer/pkg/ethtypes"
 )
 
+const (
+	keyAddress          = "address"
+	keyBlockHash        = "blockHash"
+	keyBlockNumber      = "blockNumber"
+	keyHash             = "hash"
+	keyLogsBloom        = "logsBloom"
+	keyNumber           = "number"
+	keyTransactionIndex = "transactionIndex"
+)
+
 // TxReceiptJSONRPC is the receipt obtained over JSON/RPC from the ethereum client, with gas used, logs and contract address
 type TxReceiptJSONRPC struct {
 	TransactionHash   ethtypes.HexBytes0xPrefix `json:"transactionHash" ffstruct:"TxReceiptJSONRPC"`
@@ -53,9 +63,9 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 	if err == nil {
 		jb, err = jss.MarshalFormattedMap(map[string]any{
 			"transactionHash":   ([]byte)(txr.TransactionHash),
-			"transactionIndex":  (*uint64)(&txr.TransactionIndex),
-			"blockHash":         ([]byte)(txr.BlockHash),
-			"blockNumber":       (*uint64)(&txr.BlockNumber),
+			keyTransactionIndex: (*uint64)(&txr.TransactionIndex),
+			keyBlockHash:        ([]byte)(txr.BlockHash),
+			keyBlockNumber:      (*uint64)(&txr.BlockNumber),
 			"from":              (*[20]byte)(txr.From),
 			"to":                (*[20]byte)(txr.To),
 			"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
@@ -63,7 +73,7 @@ func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsh
 			"gasUsed":           (*big.Int)(txr.GasUsed),
 			"contractAddress":   (*[20]byte)(txr.ContractAddress),
 			"logs":              logsArray,
-			"logsBloom":         ([]byte)(txr.LogsBloom),
+			keyLogsBloom:        ([]byte)(txr.LogsBloom),
 			"status":            (*uint64)(txr.Status),
 			"type":              (*uint64)(txr.Type),
 			"revertReason":      ([]byte)(txr.RevertReason),
@@ -101,19 +111,19 @@ func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalO
 	optsWithNulls = append(optsWithNulls, MarshalOption{OmitNullFields: []string{"maxFeePerGas", "maxPriorityFeePerGas", "gasPrice"}})
 	optsWithNulls = append(optsWithNulls, opts...)
 	return jss.MarshalFormattedMap(map[string]any{
-		"blockHash":            ([]byte)(txi.BlockHash),
-		"blockNumber":          (*uint64)(&txi.BlockNumber),
+		keyBlockHash:           ([]byte)(txi.BlockHash),
+		keyBlockNumber:         (*uint64)(&txi.BlockNumber),
 		"chainId":              (*big.Int)(txi.ChainID),
 		"from":                 (*[20]byte)(txi.From),
 		"gas":                  (*big.Int)(txi.Gas),
 		"gasPrice":             (*big.Int)(txi.GasPrice),
 		"maxFeePerGas":         (*big.Int)(txi.MaxFeePerGas),
 		"maxPriorityFeePerGas": (*big.Int)(txi.MaxPriorityFeePerGas),
-		"hash":                 ([]byte)(txi.Hash),
+		keyHash:                ([]byte)(txi.Hash),
 		"input":                ([]byte)(txi.Input),
 		"nonce":                (*big.Int)(txi.Nonce),
 		"to":                   (*[20]byte)(txi.To),
-		"transactionIndex":     (*uint64)(txi.TransactionIndex),
+		keyTransactionIndex:    (*uint64)(txi.TransactionIndex),
 		"type":                 (*uint64)(txi.Type),
 		"value":                (*big.Int)(txi.Value),
 		"v":                    (*big.Int)(txi.V),
@@ -150,15 +160,15 @@ func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption
 		topicsArray[i] = ([]byte)(t)
 	}
 	return jss.MarshalFormattedMap(map[string]any{
-		"removed":          l.Removed,
-		"logIndex":         (*uint64)(&l.LogIndex),
-		"transactionIndex": (*uint64)(&l.TransactionIndex),
-		"blockNumber":      (*uint64)(&l.BlockNumber),
-		"transactionHash":  ([]byte)(l.TransactionHash),
-		"blockHash":        ([]byte)(l.BlockHash),
-		"address":          (*[20]byte)(l.Address),
-		"data":             ([]byte)(l.Data),
-		"topics":           topicsArray,
+		"removed":           l.Removed,
+		"logIndex":          (*uint64)(&l.LogIndex),
+		keyTransactionIndex: (*uint64)(&l.TransactionIndex),
+		keyBlockNumber:      (*uint64)(&l.BlockNumber),
+		"transactionHash":   ([]byte)(l.TransactionHash),
+		keyBlockHash:        ([]byte)(l.BlockHash),
+		keyAddress:          (*[20]byte)(l.Address),
+		"data":              ([]byte)(l.Data),
+		"topics":            topicsArray,
 	}, opts...)
 }
 
@@ -180,11 +190,11 @@ func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...Marsha
 		txnArray[i] = ([]byte)(t)
 	}
 	return jss.MarshalFormattedMap(map[string]any{
-		"number":       (*uint64)(&bi.Number),
-		"hash":         ([]byte)(bi.Hash),
+		keyNumber:      (*uint64)(&bi.Number),
+		keyHash:        ([]byte)(bi.Hash),
 		"parentHash":   ([]byte)(bi.ParentHash),
 		"timestamp":    (*uint64)(&bi.Timestamp),
-		"logsBloom":    ([]byte)(bi.LogsBloom),
+		keyLogsBloom:   ([]byte)(bi.LogsBloom),
 		"transactions": txnArray,
 	}, opts...)
 }
@@ -255,13 +265,13 @@ func (b *BlockHeaderJSONRPC) getFormatMap() map[string]any {
 		unclesArray[i] = ([]byte)(uncle)
 	}
 	return map[string]any{
-		"number":           (*uint64)(&b.Number),
-		"hash":             ([]byte)(b.Hash),
+		keyNumber:          (*uint64)(&b.Number),
+		keyHash:            ([]byte)(b.Hash),
 		"mixHash":          ([]byte)(b.MixHash),
 		"parentHash":       ([]byte)(b.ParentHash),
 		"nonce":            ([]byte)(b.Nonce),
 		"sha3Uncles":       ([]byte)(b.SHA3Uncles),
-		"logsBloom":        ([]byte)(b.LogsBloom),
+		keyLogsBloom:       ([]byte)(b.LogsBloom),
 		"transactionsRoot": ([]byte)(b.TransactionsRoot),
 		"stateRoot":        ([]byte)(b.StateRoot),
 		"receiptsRoot":     ([]byte)(b.ReceiptsRoot),
@@ -331,7 +341,7 @@ func (b *EVMBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts
 	for i, t := range b.Transactions {
 		txnHashArray[i] = ([]byte)(t)
 	}
-	formatMap := b.BlockHeaderJSONRPC.getFormatMap()
+	formatMap := b.getFormatMap()
 	formatMap["transactions"] = txnHashArray
 	return jss.MarshalFormattedMap(formatMap, opts...)
 }
@@ -344,7 +354,7 @@ func (b *EVMBlockWithTransactionsJSONRPC) MarshalFormat(jss *JSONSerializerSet, 
 		}
 	}
 	if err == nil {
-		formatMap := b.BlockHeaderJSONRPC.getFormatMap()
+		formatMap := b.getFormatMap()
 		formatMap["transactions"] = txnsArray
 		jb, err = jss.MarshalFormattedMap(formatMap, opts...)
 	}

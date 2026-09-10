@@ -1,0 +1,25 @@
+all: false
+filename: '{{ .InterfaceName | snakecase }}.go'
+structname: '{{ .InterfaceName }}'
+template-data:
+  unroll-variadic: true
+packages:
+  github.com/hyperledger-firefly/signer/pkg/rpcbackend:
+    config:
+      dir: mocks/rpcbackendmocks
+      pkgname: rpcbackendmocks
+    interfaces:
+      Backend:
+      Subscription:
+  github.com/hyperledger-firefly/transaction-manager/pkg/fftm:
+    config:
+      dir: mocks/fftmmocks
+      pkgname: fftmmocks
+    interfaces:
+      Manager:
+  github.com/hyperledger-firefly/evmconnect/pkg/ethblocklistener:
+    config:
+      dir: mocks/ethblocklistenermocks
+      pkgname: ethblocklistenermocks
+    interfaces:
+      BlockListener:
