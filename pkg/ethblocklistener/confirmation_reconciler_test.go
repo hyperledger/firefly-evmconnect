@@ -196,6 +196,33 @@ func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ZeroConfirmationCo
 	}
 }
 
+func TestReconcileConfirmationsForTransaction_ZeroConfirmationCount_SkipsChainCatchup(t *testing.T) {
+	// Default (non-light) chain tracking mode with an empty canonical chain, i.e. it has
+	// not caught up to the transaction block at all. A target confirmation count of 0 should
+	// still confirm immediately from the receipt alone, without ever consulting the
+	// in-memory partial chain or fetching any block info.
+	_, bl, mRPC, done := newTestBlockListener(t)
+	defer done()
+
+	mRPC.On("CallRPC", mock.Anything, mock.Anything, "eth_getTransactionReceipt", "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6").
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			err := json.Unmarshal([]byte(sampleJSONRPCReceipt), args[1])
+			assert.NoError(t, err)
+		})
+
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), "0x6197ef1a58a2a592bb447efb651f0db7945de21aa8048801b250bd7b7431f9b6", nil, 0)
+	assert.NoError(t, err)
+	if assert.NotNil(t, receipt) {
+		assert.Equal(t, uint64(1977), receipt.BlockNumber.Uint64())
+	}
+	if assert.NotNil(t, result) {
+		assert.True(t, result.Confirmed)
+		assert.Equal(t, uint64(0), result.CurrentConfirmationCount)
+		assert.Equal(t, uint64(0), result.TargetConfirmationCount)
+	}
+}
+
 func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ReceiptRPCError(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
 	defer done()
@@ -719,39 +746,6 @@ func TestBuildConfirmationQueueUsingInMemoryPartialChain_EmptyCanonicalChain(t *
 	mRPC.AssertExpectations(t)
 }
 
-func TestHandleZeroTargetConfirmationCount_EmptyCanonicalChain(t *testing.T) {
-	// Setup - create a blockListener with an empty canonical chain
-	mRPC := &rpcbackendmocks.Backend{}
-	bl := &blockListener{
-		canonicalChain: list.New(), // Empty canonical chain
-		rpc:            utRPC(t, mRPC),
-	}
-	bl.blockCache, _ = lru.New(100)
-
-	ctx := context.Background()
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(txBlockNumber)
-
-	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
-		Number:     ethtypes.HexUint64(txBlockNumber),
-		Hash:       txBlockHash,
-		ParentHash: generateTestHash(txBlockNumber - 1),
-	}
-
-	// Execute - a zero target confirmation count should confirm immediately without
-	// needing the in-memory partial chain to have caught up to the transaction block
-	result, err := bl.handleZeroTargetConfirmationCount(ctx, txBlockInfo)
-
-	// Assert
-	assert.NoError(t, err)
-	if assert.NotNil(t, result) {
-		assert.True(t, result.Confirmed)
-		assert.Len(t, result.Confirmations, 1)
-		assert.Equal(t, txBlockNumber, uint64(result.Confirmations[0].BlockNumber))
-	}
-	mRPC.AssertExpectations(t)
-}
-
 func TestBuildConfirmationList_ChainTooShort(t *testing.T) {
 	// Setup
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 99, []uint64{})
@@ -829,31 +823,6 @@ func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCount(t *testi
 	// The code builds a full confirmation queue from the canonical chain
 	assert.Len(t, confirmationUpdateResult.Confirmations, 1)
 	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-}
-
-func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCountChainNotCaughtUp(t *testing.T) {
-	// Setup - the in-memory partial chain has not yet caught up to the tx block
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 99, []uint64{})
-	defer done()
-	ctx := context.Background()
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(txBlockNumber)
-	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
-		Number:     ethtypes.HexUint64(txBlockNumber),
-		Hash:       txBlockHash,
-		ParentHash: generateTestHash(txBlockNumber - 1),
-	}
-	targetConfirmationCount := uint64(0)
-
-	// Execute - a zero target confirmation count should confirm immediately, regardless
-	// of whether the in-memory partial chain has caught up to the tx block
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, nil, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	if assert.NotNil(t, confirmationUpdateResult) {
-		assert.True(t, confirmationUpdateResult.Confirmed)
-		assert.Len(t, confirmationUpdateResult.Confirmations, 1)
-		assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
-	}
 }
 
 func TestBuildConfirmationList_NilConfirmationMapUnconfirmed(t *testing.T) {
@@ -1118,35 +1087,6 @@ func TestBuildConfirmationList_NewForkAfterFirstConfirmation(t *testing.T) {
 	assert.True(t, confirmationUpdateResult.NewFork)
 	assert.True(t, confirmationUpdateResult.Confirmed)
 	assert.Len(t, confirmationUpdateResult.Confirmations, 6)
-}
-
-func TestBuildConfirmationList_NewForkAfterFirstConfirmation_ZeroConfirmationCount(t *testing.T) {
-	// Setup
-	bl, done := newBlockListenerWithTestChain(t, 100, 5, 100, 150, []uint64{})
-	defer done()
-	ctx := context.Background()
-	existingQueue := []*ethrpc.BlockInfoJSONRPC{
-		{Hash: generateTestHash(100), Number: 100, ParentHash: generateTestHash(99)},
-		{Hash: generateTestHash(101), Number: 101, ParentHash: generateTestHash(100)},
-		{Hash: generateTestHash(991 /* fork1 */), Number: 102, ParentHash: generateTestHash(101)},
-	}
-
-	txBlockNumber := uint64(100)
-	txBlockHash := generateTestHash(100)
-	txBlockInfo := &ethrpc.BlockInfoJSONRPC{
-		Number:     ethtypes.HexUint64(txBlockNumber),
-		Hash:       txBlockHash,
-		ParentHash: generateTestHash(99),
-	}
-	targetConfirmationCount := uint64(0)
-
-	// Execute
-	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, existingQueue, txBlockInfo, targetConfirmationCount)
-	assert.NoError(t, err)
-	// Assert
-	assert.False(t, confirmationUpdateResult.NewFork)
-	assert.True(t, confirmationUpdateResult.Confirmed)
-	assert.Len(t, confirmationUpdateResult.Confirmations, 1)
 }
 
 func TestBuildConfirmationList_NewForkAndNoConnectionToCanonicalChain(t *testing.T) {

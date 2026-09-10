@@ -41,6 +41,21 @@ func toBlockInfoList(ffcapiBlocks []*ethrpc.MinimalBlockInfo) (blocks []*ethrpc.
 
 func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Context, txHash string, existingConfirmations []*ethrpc.MinimalBlockInfo, targetConfirmationCount uint64) (*ConfirmationUpdateResult, *ethrpc.TxReceiptJSONRPC, error) {
 
+	if targetConfirmationCount == 0 {
+		// regardless of the chain tracking mode, when target confirmation count is set to 0
+		// we can immediately return a confirmed result without fetching any block information
+		txReceipt, err := bl.GetTransactionReceipt(ctx, txHash)
+		if err != nil {
+			log.L(ctx).Errorf("Failed to fetch transaction receipt using tx hash %s: %v", txHash, err)
+			return nil, nil, err
+		}
+		return &ConfirmationUpdateResult{
+			Confirmed:                true,
+			TargetConfirmationCount:  0,
+			CurrentConfirmationCount: 0,
+		}, txReceipt, nil
+	}
+
 	if bl.BlockListenerConfig.ChainTrackingMode == ffcapi.ChainTrackingModeLight {
 		// when chain head is the only thing that's being tracked, we only need to calculate the confirmation list based on the head block number
 		// get the transaction receipt only
@@ -48,13 +63,6 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 		if err != nil {
 			log.L(ctx).Errorf("Failed to fetch transaction receipt using tx hash %s: %v", txHash, err)
 			return nil, nil, err
-		}
-		if targetConfirmationCount == 0 {
-			return &ConfirmationUpdateResult{
-				Confirmed:                true,
-				TargetConfirmationCount:  0,
-				CurrentConfirmationCount: 0,
-			}, txReceipt, nil
 		}
 		// compare it against the chain head
 		chainHead := bl.GetHeadBlockNumber(ctx)
@@ -102,15 +110,6 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 func (bl *blockListener) buildConfirmationList(ctx context.Context, existingConfirmations []*ethrpc.BlockInfoJSONRPC, txBlockInfo *ethrpc.BlockInfoJSONRPC, targetConfirmationCount uint64) (*ConfirmationUpdateResult, error) {
 	// Primary objective of this algorithm is to build a contiguous, linked list of `MinimalBlockInfo` structs, starting from the transaction block and ending as far as our current knowledge of the in-memory partial canonical chain allows.
 	// Secondary objective is to report whether any fork was detected (and corrected) during this analysis
-
-	// handle confirmation count of 0 as a special case to reduce complexity of the main algorithm
-	if targetConfirmationCount == 0 {
-		reconcileResult, err := bl.handleZeroTargetConfirmationCount(ctx, txBlockInfo)
-		if reconcileResult != nil || err != nil {
-			return reconcileResult, err
-		}
-	}
-
 	// Initialize the result with the target confirmation count
 	reconcileResult := &ConfirmationUpdateResult{}
 
@@ -367,18 +366,6 @@ func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx con
 		nextInMemoryBlock = nextInMemoryBlock.Next()
 	}
 	return newConfirmationsWithoutTxBlock, nil
-}
-
-func (bl *blockListener) handleZeroTargetConfirmationCount(_ context.Context, txBlockInfo *ethrpc.BlockInfoJSONRPC) (*ConfirmationUpdateResult, error) {
-	bl.canonicalChainLock.RLock()
-	defer bl.canonicalChainLock.RUnlock()
-	// when target confirmation count is set to 0 as it requires no extra blocks from the in-memory partial chain
-	// we can immediately return a confirmed result
-	return &ConfirmationUpdateResult{
-		Confirmed:     true,
-		Confirmations: []*ethrpc.MinimalBlockInfo{txBlockInfo.ToMinimalBlockInfo()},
-	}, nil
-
 }
 
 func (bl *blockListener) handleTargetCountMetWithEarlyList(existingConfirmations []*ethrpc.BlockInfoJSONRPC, targetConfirmationCount uint64) *ConfirmationUpdateResult {
