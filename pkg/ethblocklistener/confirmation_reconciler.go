@@ -49,6 +49,13 @@ func (bl *blockListener) ReconcileConfirmationsForTransaction(ctx context.Contex
 			log.L(ctx).Errorf("Failed to fetch transaction receipt using tx hash %s: %v", txHash, err)
 			return nil, nil, err
 		}
+		if targetConfirmationCount == 0 {
+			return &ConfirmationUpdateResult{
+				Confirmed:                true,
+				TargetConfirmationCount:  0,
+				CurrentConfirmationCount: 0,
+			}, txReceipt, nil
+		}
 		// compare it against the chain head
 		chainHead := bl.GetHeadBlockNumber(ctx)
 		if chainHead < txReceipt.BlockNumber.Uint64() {
@@ -365,14 +372,8 @@ func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx con
 func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, txBlockInfo *ethrpc.BlockInfoJSONRPC) (*ConfirmationUpdateResult, error) {
 	bl.canonicalChainLock.RLock()
 	defer bl.canonicalChainLock.RUnlock()
-	// if the target confirmation count is 0, and the transaction blocks is before the last block in the in-memory partial chain,
+	// when target confirmation count is set to 0 as it requires no extra blocks from the in-memory partial chain
 	// we can immediately return a confirmed result
-	txBlockNumber := txBlockInfo.Number.Uint64()
-	err := bl.validateChainCaughtUp(ctx, txBlockInfo, txBlockNumber)
-	if err != nil {
-		return nil, err
-	}
-
 	return &ConfirmationUpdateResult{
 		Confirmed:     true,
 		Confirmations: []*ethrpc.MinimalBlockInfo{txBlockInfo.ToMinimalBlockInfo()},

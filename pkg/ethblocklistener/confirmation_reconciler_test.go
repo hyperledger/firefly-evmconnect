@@ -175,6 +175,27 @@ func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ActualCountCappedA
 	}
 }
 
+func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ZeroConfirmationCount(t *testing.T) {
+	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
+	defer done()
+
+	mockHeadModeReceipt(t, mRPC, headModeSampleTxHash)
+	// currentChainHead is left at its zero value (behind the receipt block), to prove the
+	// chain head is never consulted when no confirmations are required
+	bl.currentChainHead = 0
+
+	result, receipt, err := bl.ReconcileConfirmationsForTransaction(context.Background(), headModeSampleTxHash, nil, 0)
+	assert.NoError(t, err)
+	if assert.NotNil(t, receipt) {
+		assert.Equal(t, uint64(1977), receipt.BlockNumber.Uint64())
+	}
+	if assert.NotNil(t, result) {
+		assert.True(t, result.Confirmed)
+		assert.Equal(t, uint64(0), result.CurrentConfirmationCount)
+		assert.Equal(t, uint64(0), result.TargetConfirmationCount)
+	}
+}
+
 func TestReconcileConfirmationsForTransaction_HeadBlockNumber_ReceiptRPCError(t *testing.T) {
 	_, bl, mRPC, done := newTestBlockListener(t, headBlockNumberTestConf)
 	defer done()
@@ -717,13 +738,17 @@ func TestHandleZeroTargetConfirmationCount_EmptyCanonicalChain(t *testing.T) {
 		ParentHash: generateTestHash(txBlockNumber - 1),
 	}
 
-	// Execute - should return error when canonical chain is empty
+	// Execute - a zero target confirmation count should confirm immediately without
+	// needing the in-memory partial chain to have caught up to the transaction block
 	result, err := bl.handleZeroTargetConfirmationCount(ctx, txBlockInfo)
 
-	// Assert - expect error with code FF23062 for empty canonical chain
-	assert.Error(t, err)
-	assert.Regexp(t, "FF23062", err.Error())
-	assert.Nil(t, result)
+	// Assert
+	assert.NoError(t, err)
+	if assert.NotNil(t, result) {
+		assert.True(t, result.Confirmed)
+		assert.Len(t, result.Confirmations, 1)
+		assert.Equal(t, txBlockNumber, uint64(result.Confirmations[0].BlockNumber))
+	}
 	mRPC.AssertExpectations(t)
 }
 
@@ -806,8 +831,8 @@ func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCount(t *testi
 	assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
 }
 
-func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCountError(t *testing.T) {
-	// Setup
+func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCountChainNotCaughtUp(t *testing.T) {
+	// Setup - the in-memory partial chain has not yet caught up to the tx block
 	bl, done := newBlockListenerWithTestChain(t, 100, 5, 50, 99, []uint64{})
 	defer done()
 	ctx := context.Background()
@@ -820,11 +845,15 @@ func TestBuildConfirmationList_NilConfirmationMap_ZeroConfirmationCountError(t *
 	}
 	targetConfirmationCount := uint64(0)
 
-	// Execute
+	// Execute - a zero target confirmation count should confirm immediately, regardless
+	// of whether the in-memory partial chain has caught up to the tx block
 	confirmationUpdateResult, err := bl.buildConfirmationList(ctx, nil, txBlockInfo, targetConfirmationCount)
-	assert.Error(t, err)
-	assert.Nil(t, confirmationUpdateResult)
-	assert.Regexp(t, "FF23062", err.Error())
+	assert.NoError(t, err)
+	if assert.NotNil(t, confirmationUpdateResult) {
+		assert.True(t, confirmationUpdateResult.Confirmed)
+		assert.Len(t, confirmationUpdateResult.Confirmations, 1)
+		assert.Equal(t, txBlockNumber, uint64(confirmationUpdateResult.Confirmations[0].BlockNumber))
+	}
 }
 
 func TestBuildConfirmationList_NilConfirmationMapUnconfirmed(t *testing.T) {
