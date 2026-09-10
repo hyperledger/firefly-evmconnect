@@ -369,7 +369,7 @@ func (bl *blockListener) buildConfirmationQueueUsingInMemoryPartialChain(ctx con
 	return newConfirmationsWithoutTxBlock, nil
 }
 
-func (bl *blockListener) handleZeroTargetConfirmationCount(ctx context.Context, txBlockInfo *ethrpc.BlockInfoJSONRPC) (*ConfirmationUpdateResult, error) {
+func (bl *blockListener) handleZeroTargetConfirmationCount(_ context.Context, txBlockInfo *ethrpc.BlockInfoJSONRPC) (*ConfirmationUpdateResult, error) {
 	bl.canonicalChainLock.RLock()
 	defer bl.canonicalChainLock.RUnlock()
 	// when target confirmation count is set to 0 as it requires no extra blocks from the in-memory partial chain
