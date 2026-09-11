@@ -139,6 +139,57 @@ func TestFormatTransaction(t *testing.T) {
 	require.JSONEq(t, sampleTransaction, string(ethSerialized))
 }
 
+func TestFormatTransactionEIP1559(t *testing.T) {
+	var txInfo TxInfoJSONRPC
+	err := json.Unmarshal([]byte(sampleTransaction), &txInfo)
+	require.NoError(t, err)
+	txInfo.GasPrice = nil
+	txInfo.MaxFeePerGas = ethtypes.NewHexInteger64(1000)
+	txInfo.MaxPriorityFeePerGas = ethtypes.NewHexInteger64(10)
+
+	jss := testJSONSerializationSet(t, "number=hex")
+
+	ethSerialized, err := txInfo.MarshalFormat(jss)
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+
+	var genericMap map[string]any
+	err = json.Unmarshal(ethSerialized, &genericMap)
+	require.NoError(t, err)
+	_, hasGasPrice := genericMap["gasPrice"]
+	require.False(t, hasGasPrice)
+	require.Equal(t, "0x3e8", genericMap["maxFeePerGas"])
+	require.Equal(t, "0xa", genericMap["maxPriorityFeePerGas"])
+}
+
+func TestFormatLog(t *testing.T) {
+	var receipt TxReceiptJSONRPC
+	err := json.Unmarshal([]byte(sampleReceipt), &receipt)
+	require.NoError(t, err)
+	require.Len(t, receipt.Logs, 1)
+
+	jss := testJSONSerializationSet(t, "number=hex&pretty=true")
+
+	ethSerialized, err := receipt.Logs[0].MarshalFormat(jss)
+	fmt.Println((string)(ethSerialized))
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"address": "0xaa75b5001274491c0985ba1012b09dfc02d9675d",
+		"topics": [
+			"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+			"0x00000000000000000000000003a85df677b2aa0f7cccc942242ee900de505ce8",
+			"0x000000000000000000000000af5ce0b6c5745e49b4292794496bf2a08b97608b"
+		],
+		"data": "0x00000000000000000000000000000000000000000000000246ddf97976680000",
+		"blockNumber": "0xe5f2",
+		"transactionHash": "0x6431a7fc56e24319bb431ed3040d77d1a7b54add9207266c19df6fc53961da99",
+		"transactionIndex": "0x0",
+		"blockHash": "0xd33367228e0a0e3667c910c7d92d3f6e724e2b6e2f671b28823a22f82597d023",
+		"logIndex": "0x0",
+		"removed": false
+	}`, string(ethSerialized))
+}
+
 func TestFormatReceipt(t *testing.T) {
 	var receipt TxReceiptJSONRPC
 	err := json.Unmarshal([]byte(sampleReceipt), &receipt)

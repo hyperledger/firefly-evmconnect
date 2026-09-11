@@ -43,35 +43,35 @@ type TxReceiptJSONRPC struct {
 	RevertReason      ethtypes.HexBytes0xPrefix `json:"revertReason" ffstruct:"TxReceiptJSONRPC"`
 }
 
-func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
-	logsArray := make([]json.RawMessage, len(txr.Logs))
+func (txr *TxReceiptJSONRPC) FormatMap() map[string]any {
+	logsArray := make([]any, len(txr.Logs))
 	for i, l := range txr.Logs {
-		if err == nil {
-			logsArray[i], err = l.MarshalFormat(jss, opts...)
-		}
+		logsArray[i] = l.FormatMap()
 	}
-	if err == nil {
-		jb, err = jss.MarshalFormattedMap(map[string]any{
-			"transactionHash":   ([]byte)(txr.TransactionHash),
-			"transactionIndex":  (*uint64)(&txr.TransactionIndex),
-			"blockHash":         ([]byte)(txr.BlockHash),
-			"blockNumber":       (*uint64)(&txr.BlockNumber),
-			"from":              (*[20]byte)(txr.From),
-			"to":                (*[20]byte)(txr.To),
-			"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
-			"effectiveGasPrice": (*big.Int)(txr.EffectiveGasPrice),
-			"gasUsed":           (*big.Int)(txr.GasUsed),
-			"contractAddress":   (*[20]byte)(txr.ContractAddress),
-			"logs":              logsArray,
-			"logsBloom":         ([]byte)(txr.LogsBloom),
-			"status":            (*uint64)(txr.Status),
-			"type":              (*uint64)(txr.Type),
-			"revertReason":      ([]byte)(txr.RevertReason),
-		}, append(opts, MarshalOption{
-			OmitNullFields: []string{"revertReason"},
-		})...)
+	m := map[string]any{
+		"transactionHash":   ([]byte)(txr.TransactionHash),
+		"transactionIndex":  (*uint64)(&txr.TransactionIndex),
+		"blockHash":         ([]byte)(txr.BlockHash),
+		"blockNumber":       (*uint64)(&txr.BlockNumber),
+		"from":              (*[20]byte)(txr.From),
+		"to":                (*[20]byte)(txr.To),
+		"cumulativeGasUsed": (*big.Int)(txr.CumulativeGasUsed),
+		"effectiveGasPrice": (*big.Int)(txr.EffectiveGasPrice),
+		"gasUsed":           (*big.Int)(txr.GasUsed),
+		"contractAddress":   (*[20]byte)(txr.ContractAddress),
+		"logs":              logsArray,
+		"logsBloom":         ([]byte)(txr.LogsBloom),
+		"status":            (*uint64)(txr.Status),
+		"type":              (*uint64)(txr.Type),
 	}
-	return jb, err
+	if txr.RevertReason != nil {
+		m["revertReason"] = ([]byte)(txr.RevertReason)
+	}
+	return m
+}
+
+func (txr *TxReceiptJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (json.RawMessage, error) {
+	return jss.MarshalFormattedMap(txr.FormatMap(), opts...)
 }
 
 // TxInfoJSONRPC is the transaction info obtained over JSON/RPC from the ethereum client, with input data
@@ -96,30 +96,38 @@ type TxInfoJSONRPC struct {
 	S                    *ethtypes.HexInteger      `json:"s" ffstruct:"TxInfoJSONRPC"`
 }
 
-func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
-	optsWithNulls := make([]MarshalOption, 0, len(opts)+1)
-	optsWithNulls = append(optsWithNulls, MarshalOption{OmitNullFields: []string{"maxFeePerGas", "maxPriorityFeePerGas", "gasPrice"}})
-	optsWithNulls = append(optsWithNulls, opts...)
-	return jss.MarshalFormattedMap(map[string]any{
-		"blockHash":            ([]byte)(txi.BlockHash),
-		"blockNumber":          (*uint64)(&txi.BlockNumber),
-		"chainId":              (*big.Int)(txi.ChainID),
-		"from":                 (*[20]byte)(txi.From),
-		"gas":                  (*big.Int)(txi.Gas),
-		"gasPrice":             (*big.Int)(txi.GasPrice),
-		"maxFeePerGas":         (*big.Int)(txi.MaxFeePerGas),
-		"maxPriorityFeePerGas": (*big.Int)(txi.MaxPriorityFeePerGas),
-		"hash":                 ([]byte)(txi.Hash),
-		"input":                ([]byte)(txi.Input),
-		"nonce":                (*big.Int)(txi.Nonce),
-		"to":                   (*[20]byte)(txi.To),
-		"transactionIndex":     (*uint64)(txi.TransactionIndex),
-		"type":                 (*uint64)(txi.Type),
-		"value":                (*big.Int)(txi.Value),
-		"v":                    (*big.Int)(txi.V),
-		"r":                    (*big.Int)(txi.R),
-		"s":                    (*big.Int)(txi.S),
-	}, optsWithNulls...)
+func (txi *TxInfoJSONRPC) FormatMap() map[string]any {
+	m := map[string]any{
+		"blockHash":        ([]byte)(txi.BlockHash),
+		"blockNumber":      (*uint64)(&txi.BlockNumber),
+		"chainId":          (*big.Int)(txi.ChainID),
+		"from":             (*[20]byte)(txi.From),
+		"gas":              (*big.Int)(txi.Gas),
+		"hash":             ([]byte)(txi.Hash),
+		"input":            ([]byte)(txi.Input),
+		"nonce":            (*big.Int)(txi.Nonce),
+		"to":               (*[20]byte)(txi.To),
+		"transactionIndex": (*uint64)(txi.TransactionIndex),
+		"type":             (*uint64)(txi.Type),
+		"value":            (*big.Int)(txi.Value),
+		"v":                (*big.Int)(txi.V),
+		"r":                (*big.Int)(txi.R),
+		"s":                (*big.Int)(txi.S),
+	}
+	if txi.GasPrice != nil {
+		m["gasPrice"] = (*big.Int)(txi.GasPrice)
+	}
+	if txi.MaxFeePerGas != nil {
+		m["maxFeePerGas"] = (*big.Int)(txi.MaxFeePerGas)
+	}
+	if txi.MaxPriorityFeePerGas != nil {
+		m["maxPriorityFeePerGas"] = (*big.Int)(txi.MaxPriorityFeePerGas)
+	}
+	return m
+}
+
+func (txi *TxInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (json.RawMessage, error) {
+	return jss.MarshalFormattedMap(txi.FormatMap(), opts...)
 }
 
 // See https://ethereum.org/hr/developers/docs/apis/json-rpc/#eth_newfilter
@@ -144,12 +152,12 @@ type LogJSONRPC struct {
 	Topics           []ethtypes.HexBytes0xPrefix `json:"topics" ffstruct:"LogJSONRPC"`
 }
 
-func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
+func (l *LogJSONRPC) FormatMap() map[string]any {
 	topicsArray := make([]any, len(l.Topics))
 	for i, t := range l.Topics {
 		topicsArray[i] = ([]byte)(t)
 	}
-	return jss.MarshalFormattedMap(map[string]any{
+	return map[string]any{
 		"removed":          l.Removed,
 		"logIndex":         (*uint64)(&l.LogIndex),
 		"transactionIndex": (*uint64)(&l.TransactionIndex),
@@ -159,7 +167,11 @@ func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption
 		"address":          (*[20]byte)(l.Address),
 		"data":             ([]byte)(l.Data),
 		"topics":           topicsArray,
-	}, opts...)
+	}
+}
+
+func (l *LogJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (json.RawMessage, error) {
+	return jss.MarshalFormattedMap(l.FormatMap(), opts...)
 }
 
 // BlockInfoJSONRPC are the info fields we parse from the JSON/RPC response, and cache
@@ -174,19 +186,23 @@ type BlockInfoJSONRPC struct {
 	Transactions  []ethtypes.HexBytes0xPrefix `json:"transactions" ffstruct:"BlockInfoJSONRPC"`
 }
 
-func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
+func (bi *BlockInfoJSONRPC) FormatMap() map[string]any {
 	txnArray := make([]any, len(bi.Transactions))
 	for i, t := range bi.Transactions {
 		txnArray[i] = ([]byte)(t)
 	}
-	return jss.MarshalFormattedMap(map[string]any{
+	return map[string]any{
 		"number":       (*uint64)(&bi.Number),
 		"hash":         ([]byte)(bi.Hash),
 		"parentHash":   ([]byte)(bi.ParentHash),
 		"timestamp":    (*uint64)(&bi.Timestamp),
 		"logsBloom":    ([]byte)(bi.LogsBloom),
 		"transactions": txnArray,
-	}, opts...)
+	}
+}
+
+func (bi *BlockInfoJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (json.RawMessage, error) {
+	return jss.MarshalFormattedMap(bi.FormatMap(), opts...)
 }
 
 func (bi *BlockInfoJSONRPC) Equal(bi2 *BlockInfoJSONRPC) bool {
@@ -249,7 +265,7 @@ type BlockHeaderJSONRPC struct {
 	Uncles           []ethtypes.HexBytes0xPrefix `json:"uncles" ffstruct:"BlockInfoJSONRPC"`
 }
 
-func (b *BlockHeaderJSONRPC) getFormatMap() map[string]any {
+func (b *BlockHeaderJSONRPC) FormatMap() map[string]any {
 	unclesArray := make([]any, len(b.Uncles))
 	for i, uncle := range b.Uncles {
 		unclesArray[i] = ([]byte)(uncle)
@@ -326,27 +342,30 @@ func (b *EVMBlockWithTransactionsJSONRPC) ToBlockInfo(includeLogsBloom bool) *Bl
 	return bi
 }
 
-func (b *EVMBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (_ json.RawMessage, err error) {
+func (b *EVMBlockWithTxHashesJSONRPC) FormatMap() map[string]any {
 	txnHashArray := make([]any, len(b.Transactions))
 	for i, t := range b.Transactions {
 		txnHashArray[i] = ([]byte)(t)
 	}
-	formatMap := b.BlockHeaderJSONRPC.getFormatMap()
+	formatMap := b.BlockHeaderJSONRPC.FormatMap()
 	formatMap["transactions"] = txnHashArray
-	return jss.MarshalFormattedMap(formatMap, opts...)
+	return formatMap
 }
 
-func (b *EVMBlockWithTransactionsJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (jb json.RawMessage, err error) {
-	txnsArray := make([]json.RawMessage, len(b.Transactions))
-	for i, l := range b.Transactions {
-		if err == nil {
-			txnsArray[i], err = l.MarshalFormat(jss, opts...)
-		}
+func (b *EVMBlockWithTxHashesJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (json.RawMessage, error) {
+	return jss.MarshalFormattedMap(b.FormatMap(), opts...)
+}
+
+func (b *EVMBlockWithTransactionsJSONRPC) FormatMap() map[string]any {
+	txnsArray := make([]any, len(b.Transactions))
+	for i, t := range b.Transactions {
+		txnsArray[i] = t.FormatMap()
 	}
-	if err == nil {
-		formatMap := b.BlockHeaderJSONRPC.getFormatMap()
-		formatMap["transactions"] = txnsArray
-		jb, err = jss.MarshalFormattedMap(formatMap, opts...)
-	}
-	return jb, err
+	formatMap := b.BlockHeaderJSONRPC.FormatMap()
+	formatMap["transactions"] = txnsArray
+	return formatMap
+}
+
+func (b *EVMBlockWithTransactionsJSONRPC) MarshalFormat(jss *JSONSerializerSet, opts ...MarshalOption) (json.RawMessage, error) {
+	return jss.MarshalFormattedMap(b.FormatMap(), opts...)
 }
