@@ -272,15 +272,20 @@ func TestFormatStructVariation(t *testing.T) {
 	jss := testJSONSerializationSet(t, "pretty=true")
 
 	ethSerialized, err := jss.MarshalFormattedMap(map[string]any{
-		"float1": big.NewFloat(123.456),
+		"float1":   big.NewFloat(123.456),
+		"omitted":  (*big.Int)(nil),
+		"retained": (*big.Int)(nil),
 		"nested": map[string]any{
 			"float2": big.NewFloat(234.567),
 		},
+	}, MarshalOption{
+		OmitNullFields: []string{"omitted"},
 	})
 	fmt.Println((string)(ethSerialized))
 	require.NoError(t, err)
 	require.JSONEq(t, `{
 		"float1": "123.456",
+		"retained": null,
 		"nested": {
 			"float2": "234.567"
 		}
